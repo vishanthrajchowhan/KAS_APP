@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block title %}Users | KAS{% endblock %}
+
+{% block content %}
+<section class="page-title">
+    <div>
+        <h1>Users</h1>
+        <p>Create admin, employee, and client accounts for secure access.</p>
+    </div>
+</section>
+
+<section class="form-shell">
+    <form class="form-card" method="post" action="{{ url_for('users') }}">
+        <section class="form-section">
+            <h2>Add User</h2>
+            <div class="form-grid two">
+                <div>
+                    <label for="name">Name</label>
+                    <input id="name" name="name" type="text" required maxlength="140">
+                </div>
+                <div>
+                    <label for="email">Email</label>
+                    <input id="email" name="email" type="email" required maxlength="180">
+                </div>
+            </div>
+            <div class="form-grid two">
+                <div>
+                    <label for="password">Temporary Password</label>
+                    <input id="password" name="password" type="password" required minlength="6">
+                </div>
+                <div>
+                    <label for="role">Role</label>
+                    <select id="role" name="role" required>
+                        {% for role in roles %}
+                            <option value="{{ role }}">{{ role|title }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+        </section>
+        <button class="button button-primary button-full" type="submit">Create User</button>
+    </form>
+</section>
+
+<section class="updates">
+    <h2>Existing Users</h2>
+    {% if users %}
+        <div class="table-card">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Role</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                        <tr>
+                            <td>{{ user.name }}</td>
+                            <td>{{ user.email }}</td>
+                            <td>{{ user.role|title }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p class="muted">No users yet.</p>
+    {% endif %}
+</section>
+{% endblock %}

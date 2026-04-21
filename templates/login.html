@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block title %}Login | KAS{% endblock %}
+
+{% block content %}
+<section class="auth-shell">
+    <div class="auth-copy">
+        <p class="eyebrow">Secure Access</p>
+        <h1>Sign in to your workspace.</h1>
+        <p>Admins manage the pipeline, employees update assigned work, and clients can follow their project.</p>
+    </div>
+
+    <form class="form-card auth-card" method="post" action="{{ url_for('login', next=request.args.get('next')) }}">
+        <label for="email">Email</label>
+        <input id="email" name="email" type="email" value="{{ email or '' }}" required autocomplete="username">
+
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" required autocomplete="current-password">
+
+        <button class="button button-primary button-full" type="submit">Sign In</button>
+        <p class="help-text">Use the account assigned by the office.</p>
+    </form>
+</section>
+{% endblock %}

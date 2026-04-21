@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}KAS{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <header class="site-header">
+        <a class="brand" href="{{ url_for('index') }}">KAS</a>
+        {% if g.user %}
+            <div class="header-actions">
+                <span class="worker-pill">{{ g.user.name }} · {{ g.user.role|title }}</span>
+                <nav class="top-nav" aria-label="Main navigation">
+                    <a href="{{ url_for('index') }}">Pipeline</a>
+                    {% if g.user.role == "admin" %}
+                        <form class="view-as-form" method="get" action="{{ url_for('index') }}">
+                            <label for="view-as">View As</label>
+                            <select id="view-as" name="view_as" onchange="this.form.submit()">
+                                {% set selected_view = request.args.get('view_as', 'admin') %}
+                                <option value="admin" {% if selected_view == 'admin' %}selected{% endif %}>Admin</option>
+                                <option value="employee" {% if selected_view == 'employee' %}selected{% endif %}>Employee</option>
+                                <option value="client" {% if selected_view == 'client' %}selected{% endif %}>Client</option>
+                            </select>
+                        </form>
+                        <a href="{{ url_for('add_job') }}">Add Lead</a>
+                        <a href="{{ url_for('users') }}">Users</a>
+                    {% endif %}
+                </nav>
+                <form method="post" action="{{ url_for('logout') }}">
+                    <button class="button button-small" type="submit">Sign Out</button>
+                </form>
+            </div>
+        {% endif %}
+    </header>
+
+    <main class="page">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="messages" role="status" aria-live="polite">
+                    {% for category, message in messages %}
+                        <p class="message {{ category }}">{{ message }}</p>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>

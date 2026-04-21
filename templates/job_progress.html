@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block title %}Progress for {{ job.name }} | KAS{% endblock %}
+
+{% block content %}
+<section class="page-title">
+    <div>
+        <h1>Job Progress</h1>
+        {% if g.user.role == "employee" %}
+            <p>{{ job.name }} at {{ job.location }}</p>
+        {% else %}
+            <p>{{ job.name }} for {{ job.client_name or "client not set" }} at {{ job.location }}</p>
+        {% endif %}
+    </div>
+    <a class="button button-primary" href="{{ url_for('update_job', job_id=job.id) }}">Open Job</a>
+</section>
+
+<section class="progress-hero">
+    <div>
+        <span class="status status-{{ job.status|lower|replace(' ', '-') }}">{{ job.status }}</span>
+        <h2>{{ job.name }}</h2>
+        {% if g.user.role != "employee" %}
+            <p class="client">{{ job.client_name or "Client not set" }}</p>
+        {% endif %}
+        <p class="location">{{ job.location }}</p>
+        {% if g.user.role != "employee" %}
+            <p>{{ job.description }}</p>
+        {% endif %}
+    </div>
+</section>
+
+<section class="dashboard-stats progress-stats" aria-label="Job progress summary">
+    <div>
+        <span>{{ progress.update_count or 0 }}</span>
+        <p>Updates</p>
+    </div>
+    <div>
+        <span>{{ progress.photo_count or 0 }}</span>
+        <p>Photos</p>
+    </div>
+    <div>
+        <span>{% if progress.first_update %}{{ progress.first_update[:10] }}{% else %}-{% endif %}</span>
+        <p>First Update</p>
+    </div>
+    <div>
+        <span>{% if progress.last_update %}{{ progress.last_update[:10] }}{% else %}-{% endif %}</span>
+        <p>Latest Update</p>
+    </div>
+</section>
+
+<section class="updates progress-timeline">
+    <h2>Progress Timeline</h2>
+    {% if updates %}
+        {% for update in updates %}
+            <article class="update-card timeline-card">
+                <div class="timeline-marker" aria-hidden="true"></div>
+                <div>
+                    <div class="update-card-header">
+                        <time datetime="{{ update.timestamp }}">{{ update.timestamp|replace('T', ' ') }}</time>
+                        <span>
+                            {{ update.photos|length }} photo{% if update.photos|length != 1 %}s{% endif %}
+                            {% if can_manage_receipts %} / {{ update.receipts|length }} receipt{% if update.receipts|length != 1 %}s{% endif %}{% endif %}
+                        </span>
+                    </div>
+                    {% if update.author_role == "client" %}
+                        <p class="eyebrow">Client Comment</p>
+                    {% endif %}
+                    {% if update.notes %}
+                        <p class="update-notes">{{ update.notes }}</p>
+                    {% else %}
+                        <p class="muted">Photos or CRM changes were added with this update.</p>
+                    {% endif %}
+                    {% if update.photos %}
+                        <div class="photo-grid">
+                            {% for photo in update.photos %}
+                                <a href="{{ url_for('uploaded_file', filename=photo.replace('uploads/', '')) }}" target="_blank" rel="noopener">
+                                    <img src="{{ url_for('uploaded_file', filename=photo.replace('uploads/', '')) }}" alt="Job progress photo">
+                                </a>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                    {% if can_manage_receipts and update.receipts %}
+                        <div class="receipt-list">
+                            <h3>Receipts / Bills</h3>
+                            {% for receipt in update.receipts %}
+                                <a href="{{ url_for('uploaded_file', filename=receipt.replace('uploads/', '')) }}" target="_blank" rel="noopener">
+                                    {{ receipt.replace('uploads/', '') }}
+                                </a>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+            </article>
+        {% endfor %}
+    {% else %}
+        <section class="empty-state">
+            <h2>No progress yet</h2>
+            <p>No updates have been submitted for this job yet.</p>
+            <a class="button button-primary" href="{{ url_for('update_job', job_id=job.id) }}">Open Job</a>
+        </section>
+    {% endif %}
+</section>
+{% endblock %}

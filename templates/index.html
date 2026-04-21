@@ -1,0 +1,236 @@
+{% extends "base.html" %}
+
+{% block title %}Pipeline | KAS{% endblock %}
+
+{% block content %}
+<section class="page-title">
+    <div>
+        <h1>Pipeline Dashboard</h1>
+        {% if dashboard_role == "admin" %}
+            <p>Track each project from first lead through proposal, work, invoice, and payment.</p>
+        {% elif dashboard_role == "employee" %}
+            <p>Your assigned jobs, field updates, and progress notes.</p>
+        {% else %}
+            <p>Your project portal with status, updates, and photos.</p>
+        {% endif %}
+    </div>
+    {% if can_manage_jobs %}
+        <a class="button button-primary" href="{{ url_for('add_job') }}">Add Lead</a>
+    {% endif %}
+</section>
+
+<section class="dashboard-stats crm-stats" aria-label="Pipeline summary">
+    {% if dashboard_role == "employee" %}
+        <div>
+            <span>{{ jobs|length }}</span>
+            <p>Assigned Jobs</p>
+        </div>
+        <div>
+            <span>{{ status_counts.get('Scheduled', 0) + status_counts.get('Started', 0) }}</span>
+            <p>Ready to Work</p>
+        </div>
+        <div>
+            <span>{{ metrics.in_progress_jobs or 0 }}</span>
+            <p>In Progress</p>
+        </div>
+        <div>
+            <span>{{ status_counts.get('Completed', 0) }}</span>
+            <p>Completed</p>
+        </div>
+        <div>
+            <span>{{ jobs|sum(attribute='update_count') }}</span>
+            <p>Updates Logged</p>
+        </div>
+    {% elif dashboard_role == "client" %}
+        {% set ns = namespace(active=0, completed=0, with_updates=0) %}
+        {% for job in jobs %}
+            {% if job.status in ["Completed", "Paid"] %}
+                {% set ns.completed = ns.completed + 1 %}
+            {% elif job.status != "Rejected" %}
+                {% set ns.active = ns.active + 1 %}
+            {% endif %}
+            {% if job.update_count %}
+                {% set ns.with_updates = ns.with_updates + 1 %}
+            {% endif %}
+        {% endfor %}
+        <div>
+            <span>{{ jobs|length }}</span>
+            <p>My Projects</p>
+        </div>
+        <div>
+            <span>{{ ns.active }}</span>
+            <p>Active Projects</p>
+        </div>
+        <div>
+            <span>{{ ns.completed }}</span>
+            <p>Completed Projects</p>
+        </div>
+        <div>
+            <span>{{ ns.with_updates }}</span>
+            <p>Projects with Updates</p>
+        </div>
+        <div>
+            <span>{{ jobs|sum(attribute='update_count') }}</span>
+            <p>Total Updates</p>
+        </div>
+    {% else %}
+        <div>
+            <span>{{ metrics.total_leads or 0 }}</span>
+            <p>Total Leads</p>
+        </div>
+        <div>
+            <span>{{ metrics.proposals_sent or 0 }}</span>
+            <p>Proposals Sent</p>
+        </div>
+        <div>
+            <span>{{ metrics.approved_jobs or 0 }}</span>
+            <p>Approved Jobs</p>
+        </div>
+        <div>
+            <span>{{ metrics.rejected_jobs or 0 }}</span>
+            <p>Rejected Jobs</p>
+        </div>
+        <div>
+            <span>{{ metrics.in_progress_jobs or 0 }}</span>
+            <p>In Progress</p>
+        </div>
+        {% if can_view_financials %}
+            <div>
+                <span>{{ conversion_rate }}%</span>
+                <p>Conversion Rate</p>
+            </div>
+            <div>
+                <span>{{ money(metrics.revenue_pipeline) }}</span>
+                <p>Revenue Pipeline</p>
+            </div>
+            <div>
+                <span>{{ money(metrics.collected_revenue) }}</span>
+                <p>Collected Revenue</p>
+            </div>
+        {% endif %}
+    {% endif %}
+</section>
+
+{% if dashboard_role != "client" %}
+    <section class="quick-filters" aria-label="Quick filters">
+        <a class="quick-filter {% if not filters.quick %}active{% endif %}" href="{{ url_for('index', view_as=filters.view_as) }}">All</a>
+        {% if dashboard_role == "employee" %}
+            <a class="quick-filter {% if filters.quick == 'assigned_work' %}active{% endif %}" href="{{ url_for('index', quick='assigned_work', view_as=filters.view_as) }}">Assigned Work</a>
+            <a class="quick-filter {% if filters.quick == 'in_progress' %}active{% endif %}" href="{{ url_for('index', quick='in_progress', view_as=filters.view_as) }}">In Progress</a>
+            <a class="quick-filter {% if filters.quick == 'completed' %}active{% endif %}" href="{{ url_for('index', quick='completed', view_as=filters.view_as) }}">Completed</a>
+        {% else %}
+            <a class="quick-filter {% if filters.quick == 'leads' %}active{% endif %}" href="{{ url_for('index', quick='leads', view_as=filters.view_as) }}">Only Leads</a>
+            <a class="quick-filter {% if filters.quick == 'proposals' %}active{% endif %}" href="{{ url_for('index', quick='proposals', view_as=filters.view_as) }}">Only Proposals</a>
+            <a class="quick-filter {% if filters.quick == 'approved' %}active{% endif %}" href="{{ url_for('index', quick='approved', view_as=filters.view_as) }}">Approved Jobs</a>
+            <a class="quick-filter {% if filters.quick == 'lost' %}active{% endif %}" href="{{ url_for('index', quick='lost', view_as=filters.view_as) }}">Lost Jobs</a>
+            {% if can_view_financials %}
+                <a class="quick-filter {% if filters.quick == 'payment_pending' %}active{% endif %}" href="{{ url_for('index', quick='payment_pending', view_as=filters.view_as) }}">Payment Pending</a>
+            {% endif %}
+        {% endif %}
+    </section>
+{% endif %}
+
+<form class="filters" method="get" action="{{ url_for('index') }}">
+    <input type="hidden" name="view_as" value="{{ filters.view_as }}">
+    <input type="hidden" name="quick" value="{{ filters.quick }}">
+
+    <div>
+        <label for="q">Search</label>
+        <input id="q" name="q" type="search" value="{{ filters.q }}" placeholder="Client, job, location">
+    </div>
+
+    <div>
+        <label for="status">Status</label>
+        <select id="status" name="status">
+            <option value="">All statuses</option>
+            <optgroup label="Pre-Construction">
+                {% for status in pre_construction_statuses %}
+                    <option value="{{ status }}" {% if filters.status == status %}selected{% endif %}>{{ status }}</option>
+                {% endfor %}
+            </optgroup>
+            <optgroup label="Execution">
+                {% for status in execution_statuses %}
+                    <option value="{{ status }}" {% if filters.status == status %}selected{% endif %}>{{ status }}</option>
+                {% endfor %}
+            </optgroup>
+            <optgroup label="Financial">
+                {% for status in financial_statuses %}
+                    <option value="{{ status }}" {% if filters.status == status %}selected{% endif %}>{{ status }}</option>
+                {% endfor %}
+            </optgroup>
+        </select>
+    </div>
+
+    <div>
+        <label for="sort">Sort</label>
+        <select id="sort" name="sort">
+            <option value="newest" {% if filters.sort == "newest" %}selected{% endif %}>Newest first</option>
+            <option value="updated" {% if filters.sort == "updated" %}selected{% endif %}>Recently updated</option>
+            <option value="oldest" {% if filters.sort == "oldest" %}selected{% endif %}>Oldest first</option>
+            <option value="status" {% if filters.sort == "status" %}selected{% endif %}>Status</option>
+        </select>
+    </div>
+
+    <button class="button button-primary" type="submit">Apply</button>
+    <a class="button" href="{{ url_for('index', view_as=filters.view_as) }}">Reset</a>
+</form>
+
+{% if jobs %}
+    <section class="job-list" aria-label="Job list">
+        {% for job in jobs %}
+            <article class="job-card">
+                <div class="job-card-top">
+                    <div>
+                        <h2>{{ job.name }}</h2>
+                        {% if dashboard_role != "employee" %}
+                            <p class="client">{{ job.client_name or "Client not set" }}</p>
+                        {% endif %}
+                        <p class="location">{{ job.location }}</p>
+                    </div>
+                    <span class="status status-{{ job.status|lower|replace(' ', '-') }}">
+                        {{ job.status }}
+                    </span>
+                </div>
+                {% if dashboard_role != "employee" %}
+                    <p>{{ job.description }}</p>
+                {% endif %}
+                {% if can_view_financials %}
+                    <div class="pipeline-money">
+                        <span>Proposal {{ money(job.proposal_amount) }}</span>
+                        <span>Invoice {{ money(job.invoice_amount) }}</span>
+                        <span class="payment payment-{{ (job.payment_status or 'Not Paid')|lower|replace(' ', '-') }}">{{ job.payment_status or "Not Paid" }}</span>
+                    </div>
+                {% endif %}
+                <div class="job-meta">
+                    {% if job.assigned_employee %}
+                        <span>Assigned to {{ job.assigned_employee }}</span>
+                    {% endif %}
+                    <span>{{ job.update_count }} update{% if job.update_count != 1 %}s{% endif %}</span>
+                    {% if job.last_update %}
+                        <span>Last update {{ job.last_update|replace('T', ' ') }}</span>
+                    {% else %}
+                        <span>No field updates yet</span>
+                    {% endif %}
+                </div>
+                <div class="job-actions">
+                    <a class="button button-primary" href="{{ url_for('update_job', job_id=job.id) }}">Open Job</a>
+                    <a class="button" href="{{ url_for('job_progress', job_id=job.id) }}">Progress Timeline</a>
+                    {% if can_manage_jobs %}
+                        <form method="post" action="{{ url_for('delete_job', job_id=job.id) }}" onsubmit="return confirm('Delete this job?');">
+                            <button class="button button-danger button-full" type="submit">Delete</button>
+                        </form>
+                    {% endif %}
+                </div>
+            </article>
+        {% endfor %}
+    </section>
+{% else %}
+    <section class="empty-state">
+        <h2>No matching jobs</h2>
+        <p>Adjust the filters or check with the office for access.</p>
+        {% if can_manage_jobs %}
+            <a class="button button-primary" href="{{ url_for('add_job') }}">Add Lead</a>
+        {% endif %}
+    </section>
+{% endif %}
+{% endblock %}

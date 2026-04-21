@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+
+{% block title %}{{ job.name }} | KAS{% endblock %}
+
+{% block content %}
+<section class="form-shell">
+    <div class="job-summary">
+        <span class="status status-{{ job.status|lower|replace(' ', '-') }}">{{ job.status }}</span>
+        <h1>{{ job.name }}</h1>
+        {% if g.user.role != "employee" %}
+            <p class="client">{{ job.client_name or "Client not set" }}</p>
+        {% endif %}
+        <p class="location">{{ job.location }}</p>
+        {% if g.user.role != "employee" %}
+            <p>{{ job.description }}</p>
+        {% endif %}
+        {% if can_view_financials %}
+            <div class="pipeline-money detail-money">
+                <span>Proposal {{ money(job.proposal_amount) }}</span>
+                <span>Invoice {{ money(job.invoice_amount) }}</span>
+                <span class="payment payment-{{ (job.payment_status or 'Not Paid')|lower|replace(' ', '-') }}">{{ job.payment_status or "Not Paid" }}</span>
+            </div>
+        {% endif %}
+    </div>
+
+    {% if can_edit_job %}
+        <form class="form-card" method="post" action="{{ url_for('submit_update') }}" enctype="multipart/form-data">
+            <input type="hidden" name="job_id" value="{{ job.id }}">
+
+            <section class="form-section">
+                <h2>Project Info</h2>
+                {% if can_manage_jobs %}
+                    <label for="client_name">Client Name</label>
+                    <input id="client_name" name="client_name" type="text" value="{{ job.client_name or '' }}" required maxlength="140">
+                {% endif %}
+
+                <label for="status">Pipeline Status</label>
+                {% if can_manage_jobs %}
+                    <select id="status" name="status" required>
+                        <optgroup label="Pre-Construction">
+                            {% for pipeline_status in pre_construction_statuses %}
+                                <option value="{{ pipeline_status }}" {% if pipeline_status == job.status %}selected{% endif %}>{{ pipeline_status }}</option>
+                            {% endfor %}
+                        </optgroup>
+                        <optgroup label="Execution">
+                            {% for pipeline_status in execution_statuses %}
+                                <option value="{{ pipeline_status }}" {% if pipeline_status == job.status %}selected{% endif %}>{{ pipeline_status }}</option>
+                            {% endfor %}
+                        </optgroup>
+                        <optgroup label="Financial">
+                            {% for pipeline_status in financial_statuses %}
+                                <option value="{{ pipeline_status }}" {% if pipeline_status == job.status %}selected{% endif %}>{{ pipeline_status }}</option>
+                            {% endfor %}
+                        </optgroup>
+                    </select>
+                {% else %}
+                    <input id="status" type="text" value="{{ job.status }}" readonly>
+                    <p class="help-text">Only admins can change pipeline status.</p>
+                {% endif %}
+
+                {% if can_manage_jobs %}
+                    <div class="form-grid two">
+                        <div>
+                            <label for="assigned_to">Assigned Employee</label>
+                            <select id="assigned_to" name="assigned_to">
+                                <option value="">Unassigned</option>
+                                {% for employee in employees %}
+                                    <option value="{{ employee.id }}" {% if job.assigned_to == employee.id %}selected{% endif %}>{{ employee.name }} ({{ employee.email }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label for="client_id">Client Portal User</label>
+                            <select id="client_id" name="client_id">
+                                <option value="">No client access yet</option>
+                                {% for client in clients %}
+                                    <option value="{{ client.id }}" {% if job.client_id == client.id %}selected{% endif %}>{{ client.name }} ({{ client.email }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                {% endif %}
+            </section>
+
+            {% if can_view_financials %}
+                <section class="form-section">
+                    <h2>Proposal</h2>
+                    <div class="form-grid two">
+                        <div>
+                            <label for="proposal_amount">Amount</label>
+                            <input id="proposal_amount" name="proposal_amount" type="number" min="0" step="0.01" value="{{ job.proposal_amount or '' }}" placeholder="0.00">
+                        </div>
+                        <div>
+                            <label for="proposal_sent_date">Sent Date</label>
+                            <input id="proposal_sent_date" name="proposal_sent_date" type="date" value="{{ job.proposal_sent_date or '' }}">
+                        </div>
+                    </div>
+                </section>
+
+                <section class="form-section">
+                    <h2>Decision</h2>
+                    <label for="decision_date">Decision Date</label>
+                    <input id="decision_date" name="decision_date" type="date" value="{{ job.decision_date or '' }}">
+
+                    <label for="rejection_reason">Rejected Reason</label>
+                    <textarea id="rejection_reason" name="rejection_reason" rows="3" placeholder="Required when status is Rejected">{{ job.rejection_reason or '' }}</textarea>
+                </section>
+
+                <section class="form-section">
+                    <h2>Financial</h2>
+                    {% if job.status == "Completed" %}
+                        <p class="help-text">This job is completed. Enter an invoice amount to move it into Invoiced.</p>
+                    {% endif %}
+                    <div class="form-grid two">
+                        <div>
+                            <label for="invoice_amount">Invoice Amount</label>
+                            <input id="invoice_amount" name="invoice_amount" type="number" min="0" step="0.01" value="{{ job.invoice_amount or '' }}" placeholder="0.00">
+                        </div>
+                        <div>
+                            <label for="payment_status">Payment Status</label>
+                            <select id="payment_status" name="payment_status" required>
+                                {% for option in payment_statuses %}
+                                    <option value="{{ option }}" {% if (job.payment_status or 'Not Paid') == option %}selected{% endif %}>{{ option }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                </section>
+            {% endif %}
+
+            <section class="form-section">
+                <h2>New Update</h2>
+                <p class="help-text">Write one update note, then attach all photos that belong with that update.</p>
+                <label for="notes">Update Notes</label>
+                <textarea id="notes" name="notes" rows="5" placeholder="Example: Finished drywall repair in hallway. Uploaded before, during, and after photos."></textarea>
+
+                <label for="images">Update Photos</label>
+                <input id="images" name="images" type="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple>
+                <p class="help-text">Select multiple photos at once. They will appear together under this note.</p>
+
+                {% if can_manage_receipts %}
+                    <label for="receipts">Receipts / Bills</label>
+                    <input id="receipts" name="receipts" type="file" accept="image/png,image/jpeg,image/gif,image/webp,application/pdf,.doc,.docx,.xls,.xlsx" multiple>
+                    <p class="help-text">Upload receipts, material bills, supplier invoices, or cost documents separately from job photos.</p>
+                {% endif %}
+            </section>
+
+            <button class="button button-primary button-full" type="submit">Save Update</button>
+        </form>
+    {% elif g.user.role == "client" %}
+        <form class="form-card" method="post" action="{{ url_for('client_comment', job_id=job.id) }}">
+            <section class="form-section">
+                <h2>Add Comment</h2>
+                <label for="comment">Message to the office</label>
+                <textarea id="comment" name="comment" rows="4" placeholder="Ask a question or leave feedback about this job."></textarea>
+            </section>
+            <button class="button button-primary button-full" type="submit">Send Comment</button>
+        </form>
+    {% endif %}
+</section>
+
+<section class="updates">
+    <h2>Update History</h2>
+    {% if updates %}
+        {% for update in updates %}
+            <article class="update-card">
+                <div class="update-card-header">
+                    <time datetime="{{ update.timestamp }}">{{ update.timestamp|replace('T', ' ') }}</time>
+                    <span>
+                        {{ update.photos|length }} photo{% if update.photos|length != 1 %}s{% endif %}
+                        {% if can_manage_receipts %} / {{ update.receipts|length }} receipt{% if update.receipts|length != 1 %}s{% endif %}{% endif %}
+                    </span>
+                </div>
+                {% if update.author_role == "client" %}
+                    <p class="eyebrow">Client Comment</p>
+                {% endif %}
+                {% if update.notes %}
+                    <p class="update-notes">{{ update.notes }}</p>
+                {% else %}
+                    <p class="muted">Photos or CRM changes were added with this update.</p>
+                {% endif %}
+                {% if update.photos %}
+                    <div class="photo-grid">
+                        {% for photo in update.photos %}
+                            <a href="{{ url_for('uploaded_file', filename=photo.replace('uploads/', '')) }}" target="_blank" rel="noopener">
+                                <img src="{{ url_for('uploaded_file', filename=photo.replace('uploads/', '')) }}" alt="Job update photo">
+                            </a>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+                {% if can_manage_receipts and update.receipts %}
+                    <div class="receipt-list">
+                        <h3>Receipts / Bills</h3>
+                        {% for receipt in update.receipts %}
+                            <a href="{{ url_for('uploaded_file', filename=receipt.replace('uploads/', '')) }}" target="_blank" rel="noopener">
+                                {{ receipt.replace('uploads/', '') }}
+                            </a>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </article>
+        {% endfor %}
+    {% else %}
+        <p class="muted">No updates have been submitted for this job yet.</p>
+    {% endif %}
+</section>
+{% endblock %}
