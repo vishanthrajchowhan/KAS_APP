@@ -1,14 +1,15 @@
 import os
-import sqlite3
 import uuid
 from datetime import datetime
 from functools import wraps
 from pathlib import Path
 
+from dotenv import load_dotenv
 from flask import (
     Flask,
     flash,
     g,
+    jsonify,
     redirect,
     render_template,
     request,
@@ -16,12 +17,16 @@ from flask import (
     session,
     url_for,
 )
+from psycopg import errors
+from psycopg.rows import dict_row
+from psycopg_pool import ConnectionPool
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 
 
 BASE_DIR = Path(__file__).resolve().parent
-DATABASE = BASE_DIR / "database.db"
+load_dotenv(BASE_DIR / ".env")
+
 UPLOAD_FOLDER = BASE_DIR / "uploads"
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
 ALLOWED_RECEIPT_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp", "pdf", "doc", "docx", "xls", "xlsx"}
@@ -68,11 +73,90 @@ app.config["UPLOAD_FOLDER"] = str(UPLOAD_FOLDER)
 app.config["MAX_CONTENT_LENGTH"] = 25 * 1024 * 1024
 
 
+def build_postgres_conninfo():
+    database_url = os.environ.get("DATABASE_URL", "").strip()
+    if not database_url:
+        return None
+
+    if database_url.startswith("postgres://"):
+        database_url = "postgresql://" + database_url[len("postgres://") :]
+
+    if "sslmode=" not in database_url:
+        separator = "&" if "?" in database_url else "?"
+        database_url = f"{database_url}{separator}sslmode=require"
+
+    return database_url
+
+
+POSTGRES_CONNINFO = build_postgres_conninfo()
+POSTGRES_POOL = None
+if POSTGRES_CONNINFO:
+    POSTGRES_POOL = ConnectionPool(
+        conninfo=POSTGRES_CONNINFO,
+        min_size=int(os.environ.get("DB_POOL_MIN_SIZE", "1")),
+        max_size=int(os.environ.get("DB_POOL_MAX_SIZE", "5")),
+        open=False,
+        kwargs={"row_factory": dict_row},
+    )
+
+
+def get_postgres_pool():
+    if POSTGRES_POOL is None:
+        raise RuntimeError(
+            "DATABASE_URL is not configured. Set it in environment or .env file."
+        )
+    if POSTGRES_POOL.closed:
+        POSTGRES_POOL.open(wait=True)
+    return POSTGRES_POOL
+
+
+def postgres_now():
+    pool = get_postgres_pool()
+    with pool.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT NOW()")
+            return cur.fetchone()[0]
+
+
+def test_postgres_connection():
+    try:
+        now_value = postgres_now()
+        return True, str(now_value)
+    except Exception as exc:
+        return False, str(exc)
+
+
+class PgConnection:
+    def __init__(self, pool):
+        self.pool = pool
+        self._pool_ctx = None
+        self.conn = None
+
+    def __enter__(self):
+        self._pool_ctx = self.pool.connection()
+        self.conn = self._pool_ctx.__enter__()
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        if self.conn:
+            if exc_type:
+                self.conn.rollback()
+            else:
+                self.conn.commit()
+        return self._pool_ctx.__exit__(exc_type, exc, tb)
+
+    @staticmethod
+    def _to_postgres_placeholders(query):
+        return query.replace("?", "%s")
+
+    def execute(self, query, params=None):
+        cursor = self.conn.cursor()
+        cursor.execute(self._to_postgres_placeholders(query), tuple(params or ()))
+        return cursor
+
+
 def get_db_connection():
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
-    return conn
+    return PgConnection(get_postgres_pool())
 
 
 def init_db():
@@ -81,7 +165,7 @@ def init_db():
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id BIGSERIAL PRIMARY KEY,
                 name TEXT NOT NULL,
                 email TEXT NOT NULL UNIQUE,
                 password TEXT NOT NULL,
@@ -93,7 +177,7 @@ def init_db():
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS workers (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id BIGSERIAL PRIMARY KEY,
                 username TEXT NOT NULL UNIQUE,
                 password_hash TEXT NOT NULL,
                 created_at TEXT NOT NULL
@@ -103,7 +187,7 @@ def init_db():
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS jobs (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id BIGSERIAL PRIMARY KEY,
                 name TEXT NOT NULL,
                 location TEXT NOT NULL,
                 description TEXT NOT NULL,
@@ -115,8 +199,8 @@ def init_db():
                 rejection_reason TEXT,
                 invoice_amount REAL,
                 payment_status TEXT NOT NULL DEFAULT 'Not Paid',
-                assigned_to INTEGER,
-                client_id INTEGER,
+                assigned_to BIGINT REFERENCES users(id) ON DELETE SET NULL,
+                client_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
                 created_at TEXT NOT NULL
             )
             """
@@ -125,16 +209,17 @@ def init_db():
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS updates (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                job_id INTEGER NOT NULL,
+                id BIGSERIAL PRIMARY KEY,
+                job_id BIGINT NOT NULL,
                 notes TEXT,
                 image_path TEXT,
                 receipt_path TEXT,
                 update_group TEXT,
-                user_id INTEGER,
+                user_id BIGINT,
                 author_role TEXT,
                 timestamp TEXT NOT NULL,
-                FOREIGN KEY (job_id) REFERENCES jobs (id) ON DELETE CASCADE
+                FOREIGN KEY (job_id) REFERENCES jobs (id) ON DELETE CASCADE,
+                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE SET NULL
             )
             """
         )
@@ -178,25 +263,15 @@ def seed_default_users(conn):
 
 
 def migrate_jobs_table(conn):
-    existing_columns = {
-        row["name"]
-        for row in conn.execute("PRAGMA table_info(jobs)").fetchall()
-    }
-    new_columns = {
-        "client_name": "TEXT",
-        "proposal_amount": "REAL",
-        "proposal_sent_date": "TEXT",
-        "decision_date": "TEXT",
-        "rejection_reason": "TEXT",
-        "invoice_amount": "REAL",
-        "payment_status": "TEXT NOT NULL DEFAULT 'Not Paid'",
-        "assigned_to": "INTEGER",
-        "client_id": "INTEGER",
-    }
-
-    for column, definition in new_columns.items():
-        if column not in existing_columns:
-            conn.execute(f"ALTER TABLE jobs ADD COLUMN {column} {definition}")
+    conn.execute("ALTER TABLE jobs ADD COLUMN IF NOT EXISTS client_name TEXT")
+    conn.execute("ALTER TABLE jobs ADD COLUMN IF NOT EXISTS proposal_amount DOUBLE PRECISION")
+    conn.execute("ALTER TABLE jobs ADD COLUMN IF NOT EXISTS proposal_sent_date TEXT")
+    conn.execute("ALTER TABLE jobs ADD COLUMN IF NOT EXISTS decision_date TEXT")
+    conn.execute("ALTER TABLE jobs ADD COLUMN IF NOT EXISTS rejection_reason TEXT")
+    conn.execute("ALTER TABLE jobs ADD COLUMN IF NOT EXISTS invoice_amount DOUBLE PRECISION")
+    conn.execute("ALTER TABLE jobs ADD COLUMN IF NOT EXISTS payment_status TEXT")
+    conn.execute("ALTER TABLE jobs ADD COLUMN IF NOT EXISTS assigned_to BIGINT")
+    conn.execute("ALTER TABLE jobs ADD COLUMN IF NOT EXISTS client_id BIGINT")
 
     conn.execute(
         """
@@ -215,18 +290,10 @@ def migrate_jobs_table(conn):
 
 
 def migrate_updates_table(conn):
-    existing_columns = {
-        row["name"]
-        for row in conn.execute("PRAGMA table_info(updates)").fetchall()
-    }
-    if "update_group" not in existing_columns:
-        conn.execute("ALTER TABLE updates ADD COLUMN update_group TEXT")
-    if "receipt_path" not in existing_columns:
-        conn.execute("ALTER TABLE updates ADD COLUMN receipt_path TEXT")
-    if "user_id" not in existing_columns:
-        conn.execute("ALTER TABLE updates ADD COLUMN user_id INTEGER")
-    if "author_role" not in existing_columns:
-        conn.execute("ALTER TABLE updates ADD COLUMN author_role TEXT")
+    conn.execute("ALTER TABLE updates ADD COLUMN IF NOT EXISTS update_group TEXT")
+    conn.execute("ALTER TABLE updates ADD COLUMN IF NOT EXISTS receipt_path TEXT")
+    conn.execute("ALTER TABLE updates ADD COLUMN IF NOT EXISTS user_id BIGINT")
+    conn.execute("ALTER TABLE updates ADD COLUMN IF NOT EXISTS author_role TEXT")
 
 
 def allowed_file(filename):
@@ -681,7 +748,7 @@ def users():
                         datetime.now().isoformat(timespec="seconds"),
                     ),
                 )
-        except sqlite3.IntegrityError:
+        except errors.UniqueViolation:
             flash("A user with that email already exists.", "error")
             return redirect(url_for("users"))
 
@@ -1062,6 +1129,25 @@ def uploaded_file(filename):
     return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
 
 
+@app.route("/health/db")
+@login_required
+@role_required("admin")
+def health_db():
+    ok, result = test_postgres_connection()
+    return (
+        jsonify(
+            {
+                "ok": ok,
+                "database": "postgres",
+                "query": "SELECT NOW()",
+                "now": result if ok else None,
+                "error": None if ok else result,
+            }
+        ),
+        200 if ok else 500,
+    )
+
+
 @app.errorhandler(413)
 def file_too_large(_error):
     flash("Upload is too large. Please upload fewer or smaller photos.", "error")
@@ -1079,5 +1165,21 @@ def server_error(_error):
 
 
 if __name__ == "__main__":
+    if not POSTGRES_CONNINFO:
+        raise RuntimeError(
+            "DATABASE_URL is required for PostgreSQL mode. Add DATABASE_URL in .env or environment variables."
+        )
+
+    if POSTGRES_CONNINFO:
+        ok, result = test_postgres_connection()
+        if ok:
+            app.logger.info("PostgreSQL connected. SELECT NOW() => %s", result)
+        else:
+            app.logger.warning("PostgreSQL connection failed: %s", result)
+    else:
+        app.logger.info("DATABASE_URL not set. PostgreSQL checks skipped.")
+
     init_db()
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", "5000"))
+    is_production = os.environ.get("RENDER") == "true" or os.environ.get("FLASK_ENV") == "production"
+    app.run(host="0.0.0.0", port=port, debug=not is_production)
