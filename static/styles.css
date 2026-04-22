@@ -59,6 +59,10 @@ body {
     min-height: 100%;
 }
 
+html {
+    -webkit-text-size-adjust: 100%;
+}
+
 body {
     background:
         radial-gradient(circle at top left, rgba(15, 106, 71, 0.08), transparent 40%),
@@ -67,6 +71,7 @@ body {
     color: var(--ink);
     font-family: "Manrope", "Segoe UI", Tahoma, sans-serif;
     line-height: 1.62;
+    -webkit-tap-highlight-color: transparent;
 }
 
 a {
@@ -1356,6 +1361,41 @@ tbody tr:last-child td {
     display: grid;
 }
 
+.install-cta,
+.ios-install-tip {
+    position: fixed;
+    z-index: 45;
+    right: 18px;
+    bottom: 84px;
+    width: min(380px, calc(100vw - 24px));
+    padding: 14px;
+    border-radius: 14px;
+    border: 1px solid var(--line-strong);
+    background: color-mix(in srgb, var(--surface) 92%, transparent);
+    box-shadow: var(--shadow-md);
+    backdrop-filter: blur(8px);
+}
+
+.install-cta {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 10px;
+    align-items: center;
+}
+
+.install-cta p,
+.ios-install-tip p {
+    margin: 4px 0 0;
+    color: var(--muted);
+    font-size: 0.86rem;
+}
+
+.ios-install-tip {
+    display: grid;
+    gap: 10px;
+    width: min(330px, calc(100vw - 24px));
+}
+
 .skeleton-loader {
     width: min(280px, 78vw);
     height: 16px;
@@ -1456,12 +1496,13 @@ tbody tr:last-child td {
         border-top: 1px solid var(--line);
         background: color-mix(in srgb, var(--surface) 94%, transparent);
         backdrop-filter: blur(8px);
+        padding-bottom: max(0px, env(safe-area-inset-bottom));
     }
 
     .mobile-bottom-nav a,
     .mobile-bottom-nav form,
     .mobile-bottom-nav button {
-        min-height: 58px;
+        min-height: 62px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -1479,6 +1520,10 @@ tbody tr:last-child td {
 
     .page {
         padding: 22px 16px 106px;
+    }
+
+    .topbar {
+        padding-top: max(12px, env(safe-area-inset-top));
     }
 
     .auth-shell {
@@ -1499,6 +1544,35 @@ tbody tr:last-child td {
     .job-actions {
         grid-template-columns: 1fr;
         gap: 12px;
+    }
+
+    .job-list {
+        scroll-snap-type: y proximity;
+        gap: 14px;
+    }
+
+    .job-card,
+    .estimate-card,
+    .update-card {
+        scroll-snap-align: start;
+        touch-action: pan-y;
+    }
+
+    .install-cta,
+    .ios-install-tip {
+        left: 12px;
+        right: 12px;
+        bottom: calc(76px + env(safe-area-inset-bottom));
+        width: auto;
+    }
+
+    .install-cta {
+        grid-template-columns: 1fr;
+    }
+
+    .install-cta .button,
+    .ios-install-tip .button {
+        width: 100%;
     }
 
     .estimate-card {
@@ -1570,6 +1644,16 @@ tbody tr:last-child td {
 
     .photo-grid {
         grid-template-columns: 1fr;
+    }
+}
+
+@media (display-mode: standalone) {
+    .topbar {
+        padding-top: calc(14px + env(safe-area-inset-top));
+    }
+
+    .mobile-bottom-nav {
+        padding-bottom: max(8px, env(safe-area-inset-bottom));
     }
 }
 

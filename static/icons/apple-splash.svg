@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1290 2796">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0f1714"/>
+      <stop offset="1" stop-color="#153328"/>
+    </linearGradient>
+    <linearGradient id="badge" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1aa36f"/>
+      <stop offset="1" stop-color="#0f6a47"/>
+    </linearGradient>
+  </defs>
+  <rect width="1290" height="2796" fill="url(#bg)"/>
+  <g transform="translate(645,1320)">
+    <rect x="-220" y="-220" width="440" height="440" rx="120" fill="url(#badge)"/>
+    <text x="0" y="28" font-family="Manrope, Segoe UI, sans-serif" font-size="164" font-weight="800" fill="#ffffff" text-anchor="middle">KAS</text>
+  </g>
+  <text x="645" y="1810" font-family="Manrope, Segoe UI, sans-serif" font-size="74" font-weight="700" fill="#e9f3ee" text-anchor="middle">KAS App</text>
+  <text x="645" y="1898" font-family="Manrope, Segoe UI, sans-serif" font-size="42" font-weight="500" fill="#b7cdc3" text-anchor="middle">Waterproofing &amp; Building Services</text>
+</svg>

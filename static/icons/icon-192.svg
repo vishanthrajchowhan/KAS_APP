@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">KAS App Icon</title>
+  <desc id="desc">KAS Waterproofing and Building Services app icon.</desc>
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1aa36f"/>
+      <stop offset="1" stop-color="#0f6a47"/>
+    </linearGradient>
+  </defs>
+  <rect x="24" y="24" width="464" height="464" rx="120" fill="#0f1714"/>
+  <rect x="56" y="56" width="400" height="400" rx="96" fill="url(#g)"/>
+  <path d="M110 384V128h56v108l96-108h68l-96 108 104 148h-68l-74-104-30 33v71z" fill="#ffffff"/>
+  <rect x="338" y="128" width="64" height="256" rx="32" fill="#ffffff"/>
+</svg>
