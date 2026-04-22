@@ -5,8 +5,28 @@
 {% block content %}
 <section class="page-title">
     <div>
+        <p class="eyebrow">Access Management</p>
         <h1>Users</h1>
         <p>Create admin, employee, and client accounts for secure access.</p>
+    </div>
+</section>
+
+<section class="dashboard-stats" aria-label="User summary">
+    <div>
+        <span>{{ users|length }}</span>
+        <p>Total Users</p>
+    </div>
+    <div>
+        <span>{{ users|selectattr('role', 'equalto', 'admin')|list|length }}</span>
+        <p>Admins</p>
+    </div>
+    <div>
+        <span>{{ users|selectattr('role', 'equalto', 'employee')|list|length }}</span>
+        <p>Employees</p>
+    </div>
+    <div>
+        <span>{{ users|selectattr('role', 'equalto', 'client')|list|length }}</span>
+        <p>Clients</p>
     </div>
 </section>
 
@@ -46,8 +66,12 @@
 <section class="updates">
     <h2>Existing Users</h2>
     {% if users %}
+        <div class="form-section">
+            <label for="user-table-search">Search users</label>
+            <input id="user-table-search" type="search" placeholder="Filter by name, email, or role" oninput="(function(v){document.querySelectorAll('#users-table tbody tr').forEach(function(r){r.style.display=r.textContent.toLowerCase().indexOf(v.toLowerCase())>-1?'':'none';});})(this.value)">
+        </div>
         <div class="table-card">
-            <table>
+            <table id="users-table">
                 <thead>
                     <tr>
                         <th>Name</th>

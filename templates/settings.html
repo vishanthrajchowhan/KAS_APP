@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+
+{% block title %}Settings | KAS{% endblock %}
+
+{% block content %}
+<section class="page-title">
+    <div>
+        <p class="eyebrow">Workspace Preferences</p>
+        <h1>Settings</h1>
+        <p>Configure company profile, brand colors, notifications, and user controls.</p>
+    </div>
+</section>
+
+<form method="post" class="settings-grid">
+    <section class="settings-section">
+        <h3>Company Profile</h3>
+        <div class="form-grid">
+            <div>
+                <label for="company_name">Company Name</label>
+                <input id="company_name" name="company_name" value="KAS Waterproofing & Building Services LLC">
+            </div>
+            <div>
+                <label for="company_city">City</label>
+                <input id="company_city" name="company_city" value="Fort Lauderdale, Florida">
+            </div>
+            <div>
+                <label for="company_phone">Phone</label>
+                <input id="company_phone" name="company_phone" placeholder="(954) ...">
+            </div>
+            <div>
+                <label for="company_email">Email</label>
+                <input id="company_email" name="company_email" type="email" placeholder="office@kasbuild.com">
+            </div>
+        </div>
+    </section>
+
+    <section class="settings-section">
+        <h3>Brand and Theme</h3>
+        <div class="form-grid">
+            <div>
+                <label for="logo">Company Logo</label>
+                <input id="logo" name="logo" type="file" accept="image/png,image/jpeg,image/webp">
+            </div>
+            <div>
+                <label>Theme Colors</label>
+                <div class="theme-swatches">
+                    <span style="background:#0f6a47;"></span>
+                    <span style="background:#1f2623;"></span>
+                    <span style="background:#ffffff;"></span>
+                    <span style="background:#eef2ef;"></span>
+                </div>
+            </div>
+            <label class="material-card"><input type="checkbox" name="dark_mode_default"> Enable dark mode by default</label>
+        </div>
+    </section>
+
+    <section class="settings-section">
+        <h3>Notifications</h3>
+        <div class="material-cards">
+            <label class="material-card"><input type="checkbox" name="notify_new_lead" checked> New lead created</label>
+            <label class="material-card"><input type="checkbox" name="notify_estimate_approved" checked> Estimate approved</label>
+            <label class="material-card"><input type="checkbox" name="notify_payment_received" checked> Payment received</label>
+            <label class="material-card"><input type="checkbox" name="notify_photo_upload"> Photo upload by field crew</label>
+        </div>
+    </section>
+
+    <section class="settings-section">
+        <h3>User Management</h3>
+        <p class="muted">Manage admins, employees, and clients from the users workspace.</p>
+        <div class="form-grid two">
+            <a class="button" href="{{ url_for('users') }}">Open Users</a>
+            <a class="button" href="{{ url_for('index') }}">Back to Dashboard</a>
+        </div>
+    </section>
+
+    <section class="settings-section" style="grid-column: 1 / -1;">
+        <div class="form-grid two">
+            <button class="button button-primary button-full" type="submit">Save Settings</button>
+            <a class="button button-full" href="{{ url_for('index') }}">Cancel</a>
+        </div>
+    </section>
+</form>
+{% endblock %}

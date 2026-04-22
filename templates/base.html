@@ -4,51 +4,229 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}KAS{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body>
-    <header class="site-header">
-        <a class="brand" href="{{ url_for('index') }}">KAS</a>
-        {% if g.user %}
-            <div class="header-actions">
-                <span class="worker-pill">{{ g.user.name }} · {{ g.user.role|title }}</span>
-                <nav class="top-nav" aria-label="Main navigation">
-                    <a href="{{ url_for('index') }}">Pipeline</a>
-                    {% if g.user.role == "admin" %}
-                        <form class="view-as-form" method="get" action="{{ url_for('index') }}">
-                            <label for="view-as">View As</label>
-                            <select id="view-as" name="view_as" onchange="this.form.submit()">
-                                {% set selected_view = request.args.get('view_as', 'admin') %}
-                                <option value="admin" {% if selected_view == 'admin' %}selected{% endif %}>Admin</option>
-                                <option value="employee" {% if selected_view == 'employee' %}selected{% endif %}>Employee</option>
-                                <option value="client" {% if selected_view == 'client' %}selected{% endif %}>Client</option>
-                            </select>
-                        </form>
-                        <a href="{{ url_for('add_job') }}">Add Lead</a>
-                        <a href="{{ url_for('estimates') }}">Estimates</a>
-                        <a href="{{ url_for('create_estimate') }}">Create Quote</a>
-                        <a href="{{ url_for('users') }}">Users</a>
+    {% set rendered_content %}{% block content %}{% endblock %}{% endset %}
+    {% if g.user %}
+        {% set selected_view = request.args.get('view_as', 'admin') %}
+        <div class="app-shell" id="app-shell">
+            <aside class="sidebar" id="sidebar" aria-label="Primary navigation">
+                <div class="sidebar-brand-row">
+                    <a class="brand" href="{{ url_for('index') }}">
+                        <span class="brand-mark">KAS</span>
+                        <span class="brand-meta">
+                            <strong>Waterproofing</strong>
+                            <small>Fort Lauderdale, FL</small>
+                        </span>
+                    </a>
+                    <button class="icon-button sidebar-close" type="button" id="sidebar-close" aria-label="Close menu">✕</button>
+                </div>
+
+                <nav class="sidebar-nav">
+                    <a class="nav-link {% if request.endpoint == 'index' %}active{% endif %}" href="{{ url_for('index') }}">Dashboard</a>
+                    <a class="nav-link {% if request.endpoint in ['add_job', 'update_job', 'job_progress', 'submit_update'] %}active{% endif %}" href="{{ url_for('index') }}">Jobs</a>
+                    {% if g.user.role == 'admin' %}
+                        <a class="nav-link {% if request.endpoint == 'users' %}active{% endif %}" href="{{ url_for('users') }}">Clients</a>
+                        <a class="nav-link {% if request.endpoint == 'users' %}active{% endif %}" href="{{ url_for('users') }}">Employees</a>
+                        <a class="nav-link {% if request.endpoint in ['estimates', 'create_estimate', 'view_estimate', 'edit_estimate'] %}active{% endif %}" href="{{ url_for('estimates') }}">Estimates</a>
+                        <a class="nav-link {% if request.endpoint in ['update_job', 'job_progress'] %}active{% endif %}" href="{{ url_for('index', sort='updated') }}">Updates</a>
+                        <a class="nav-link {% if request.endpoint == 'analytics' %}active{% endif %}" href="{{ url_for('analytics') }}">Analytics</a>
+                        <a class="nav-link {% if request.endpoint == 'settings' %}active{% endif %}" href="{{ url_for('settings') }}">Settings</a>
                     {% endif %}
                 </nav>
-                <form method="post" action="{{ url_for('logout') }}">
-                    <button class="button button-small" type="submit">Sign Out</button>
-                </form>
+
+                {% if g.user.role == 'admin' %}
+                    <form class="view-as-form" method="get" action="{{ url_for('index') }}">
+                        <label for="view-as">View As</label>
+                        <select id="view-as" name="view_as" onchange="this.form.submit()">
+                            <option value="admin" {% if selected_view == 'admin' %}selected{% endif %}>Admin</option>
+                            <option value="employee" {% if selected_view == 'employee' %}selected{% endif %}>Employee</option>
+                            <option value="client" {% if selected_view == 'client' %}selected{% endif %}>Client</option>
+                        </select>
+                    </form>
+                {% endif %}
+            </aside>
+
+            <div class="workspace">
+                <header class="topbar">
+                    <div class="topbar-left">
+                        <button class="icon-button sidebar-toggle" type="button" id="sidebar-toggle" aria-label="Open menu">☰</button>
+                        <form class="global-search" method="get" action="{{ url_for('index') }}">
+                            {% if request.args.get('view_as') %}
+                                <input type="hidden" name="view_as" value="{{ request.args.get('view_as') }}">
+                            {% endif %}
+                            <input type="search" name="q" placeholder="Search jobs, clients, addresses" value="{{ request.args.get('q', '') }}" aria-label="Search">
+                        </form>
+                    </div>
+
+                    <div class="topbar-right">
+                        <button class="icon-button" type="button" id="theme-toggle" aria-label="Toggle dark mode">◐</button>
+                        <button class="icon-button notification-dot" type="button" aria-label="Notifications">🔔</button>
+                        <div class="profile-menu" id="profile-menu">
+                            <button class="profile-trigger" type="button" id="profile-trigger" aria-expanded="false">
+                                <span class="avatar">{{ g.user.name[:1]|upper }}</span>
+                                <span class="profile-meta">
+                                    <strong>{{ g.user.name }}</strong>
+                                    <small>{{ g.user.role|title }}</small>
+                                </span>
+                            </button>
+                            <div class="profile-dropdown" id="profile-dropdown">
+                                <a href="{{ url_for('index') }}">My Dashboard</a>
+                                {% if g.user.role == 'admin' %}
+                                    <a href="{{ url_for('settings') }}">Company Settings</a>
+                                {% endif %}
+                                <form method="post" action="{{ url_for('logout') }}">
+                                    <button class="button button-danger button-full" type="submit">Sign Out</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </header>
+
+                <main class="page fade-in">
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                        {% if messages %}
+                            <div class="messages" role="status" aria-live="polite">
+                                {% for category, message in messages %}
+                                    <p class="message {{ category }}">{{ message }}</p>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    {% endwith %}
+
+                    {{ rendered_content }}
+                </main>
             </div>
-        {% endif %}
-    </header>
 
-    <main class="page">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                <div class="messages" role="status" aria-live="polite">
-                    {% for category, message in messages %}
-                        <p class="message {{ category }}">{{ message }}</p>
-                    {% endfor %}
-                </div>
-            {% endif %}
-        {% endwith %}
+            <nav class="mobile-bottom-nav" aria-label="Mobile navigation">
+                <a href="{{ url_for('index') }}" class="{% if request.endpoint == 'index' %}active{% endif %}">Dashboard</a>
+                <a href="{{ url_for('index') }}" class="{% if request.endpoint in ['add_job', 'update_job', 'job_progress', 'submit_update'] %}active{% endif %}">Jobs</a>
+                {% if g.user.role == 'admin' %}
+                    <a href="{{ url_for('estimates') }}" class="{% if request.endpoint in ['estimates', 'create_estimate', 'view_estimate', 'edit_estimate'] %}active{% endif %}">Estimates</a>
+                    <a href="{{ url_for('settings') }}" class="{% if request.endpoint == 'settings' %}active{% endif %}">Settings</a>
+                {% else %}
+                    <a href="{{ url_for('index', sort='updated') }}">Updates</a>
+                    <form method="post" action="{{ url_for('logout') }}"><button type="submit">Sign Out</button></form>
+                {% endif %}
+            </nav>
+        </div>
+    {% else %}
+        <main class="page auth-page fade-in">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="messages" role="status" aria-live="polite">
+                        {% for category, message in messages %}
+                            <p class="message {{ category }}">{{ message }}</p>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+            {{ rendered_content }}
+        </main>
+    {% endif %}
 
-        {% block content %}{% endblock %}
-    </main>
+    <div class="loading-overlay" id="loading-overlay" aria-hidden="true">
+        <div class="skeleton-loader"></div>
+        <p>Loading workspace...</p>
+    </div>
+
+    <script>
+    (function () {
+        const body = document.body;
+        const shell = document.getElementById("app-shell");
+        const sidebar = document.getElementById("sidebar");
+        const openBtn = document.getElementById("sidebar-toggle");
+        const closeBtn = document.getElementById("sidebar-close");
+        const profileTrigger = document.getElementById("profile-trigger");
+        const profileMenu = document.getElementById("profile-menu");
+        const themeToggle = document.getElementById("theme-toggle");
+        const loadingOverlay = document.getElementById("loading-overlay");
+
+        const savedTheme = localStorage.getItem("kas-theme");
+        if (savedTheme === "dark") {
+            body.classList.add("theme-dark");
+        }
+
+        if (themeToggle) {
+            themeToggle.addEventListener("click", function () {
+                body.classList.toggle("theme-dark");
+                localStorage.setItem("kas-theme", body.classList.contains("theme-dark") ? "dark" : "light");
+            });
+        }
+
+        if (openBtn && shell) {
+            openBtn.addEventListener("click", function () {
+                shell.classList.add("sidebar-open");
+            });
+        }
+        if (closeBtn && shell) {
+            closeBtn.addEventListener("click", function () {
+                shell.classList.remove("sidebar-open");
+            });
+        }
+
+        if (profileTrigger && profileMenu) {
+            profileTrigger.addEventListener("click", function () {
+                const expanded = profileTrigger.getAttribute("aria-expanded") === "true";
+                profileTrigger.setAttribute("aria-expanded", expanded ? "false" : "true");
+                profileMenu.classList.toggle("open");
+            });
+            document.addEventListener("click", function (event) {
+                if (!profileMenu.contains(event.target)) {
+                    profileMenu.classList.remove("open");
+                    profileTrigger.setAttribute("aria-expanded", "false");
+                }
+            });
+        }
+
+        const actionLinks = document.querySelectorAll("a.button, .sidebar-nav a, .mobile-bottom-nav a");
+        actionLinks.forEach(function (link) {
+            link.addEventListener("click", function () {
+                if (loadingOverlay) {
+                    loadingOverlay.classList.add("visible");
+                }
+            });
+        });
+
+        const tables = document.querySelectorAll(".table-card table");
+        tables.forEach(function (table) {
+            const headers = Array.from(table.querySelectorAll("thead th")).map(function (th) {
+                return th.textContent.trim();
+            });
+            table.querySelectorAll("tbody tr").forEach(function (row) {
+                row.querySelectorAll("td").forEach(function (cell, idx) {
+                    if (headers[idx]) {
+                        cell.setAttribute("data-label", headers[idx]);
+                    }
+                });
+            });
+        });
+
+        const compare = function (a, b, dir) {
+            return a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }) * dir;
+        };
+        document.querySelectorAll(".table-card table").forEach(function (table) {
+            table.querySelectorAll("thead th").forEach(function (header, index) {
+                header.addEventListener("click", function () {
+                    const tbody = table.querySelector("tbody");
+                    const rows = Array.from(tbody.querySelectorAll("tr"));
+                    const currentDir = header.dataset.dir === "asc" ? "desc" : "asc";
+                    header.dataset.dir = currentDir;
+                    const dir = currentDir === "asc" ? 1 : -1;
+                    rows.sort(function (rowA, rowB) {
+                        const a = rowA.children[index] ? rowA.children[index].textContent.trim() : "";
+                        const b = rowB.children[index] ? rowB.children[index].textContent.trim() : "";
+                        return compare(a, b, dir);
+                    });
+                    rows.forEach(function (row) { tbody.appendChild(row); });
+                });
+            });
+        });
+    })();
+    </script>
 </body>
 </html>

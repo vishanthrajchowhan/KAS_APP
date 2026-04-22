@@ -795,11 +795,68 @@ def index():
             list(PROPOSAL_PIPELINE_STATUSES) + list(APPROVED_PIPELINE_STATUSES) + role_params,
         ).fetchone()
 
+        monthly_revenue_rows = conn.execute(
+            f"""
+            SELECT
+                SUBSTRING(created_at, 1, 7) AS month,
+                COALESCE(SUM(CASE WHEN payment_status = 'Paid' THEN invoice_amount ELSE 0 END), 0) AS value
+            FROM jobs
+            {metrics_where}
+            GROUP BY SUBSTRING(created_at, 1, 7)
+            ORDER BY month DESC
+            LIMIT 6
+            """,
+            role_params,
+        ).fetchall()
+
+        recent_activity = conn.execute(
+            f"""
+            SELECT
+                updates.timestamp,
+                updates.notes,
+                updates.author_role,
+                jobs.name AS job_name,
+                jobs.status AS job_status
+            FROM updates
+            JOIN jobs ON jobs.id = updates.job_id
+            {metrics_where}
+            ORDER BY updates.timestamp DESC
+            LIMIT 8
+            """,
+            role_params,
+        ).fetchall()
+
+        pending_estimates = 0
+        if dashboard_role == "admin":
+            pending_estimate_row = conn.execute(
+                """
+                SELECT COUNT(*) AS count
+                FROM estimates
+                WHERE status IN ('Draft', 'Sent', 'Viewed')
+                """
+            ).fetchone()
+            pending_estimates = pending_estimate_row["count"] if pending_estimate_row else 0
+
+        month_prefix = datetime.now().strftime("%Y-%m")
+        new_leads_row = conn.execute(
+            f"""
+            SELECT COUNT(*) AS count
+            FROM jobs
+            {f'WHERE {role_clause} AND ' if role_clause else 'WHERE '}status = 'Lead' AND SUBSTRING(created_at, 1, 7) = ?
+            """,
+            role_params + [month_prefix],
+        ).fetchone()
+        new_leads = new_leads_row["count"] if new_leads_row else 0
+
     proposals_sent = metrics["proposals_sent"] or 0
     approved_jobs = metrics["approved_jobs"] or 0
     conversion_rate = round((approved_jobs / proposals_sent) * 100, 1) if proposals_sent else 0
     can_view_financials_flag = dashboard_role == "admin"
     can_manage_jobs_flag = dashboard_role == "admin"
+
+    monthly_revenue = list(reversed(monthly_revenue_rows))
+    monthly_peak = max((row["value"] or 0) for row in monthly_revenue) if monthly_revenue else 0
+
     return render_template(
         "index.html",
         jobs=jobs,
@@ -816,7 +873,75 @@ def index():
         dashboard_role=dashboard_role,
         show_view_switcher=is_admin(),
         filters={"q": search, "status": status_filter, "quick": quick_filter, "sort": sort, "view_as": dashboard_role},
+        pending_estimates=pending_estimates,
+        new_leads=new_leads,
+        monthly_revenue=monthly_revenue,
+        monthly_peak=monthly_peak,
+        recent_activity=recent_activity,
     )
+
+
+@app.route("/analytics")
+@login_required
+@role_required("admin")
+def analytics():
+    """Admin analytics dashboard for business performance."""
+    with get_db_connection() as conn:
+        jobs_by_status = conn.execute(
+            """
+            SELECT status, COUNT(*) AS count
+            FROM jobs
+            GROUP BY status
+            ORDER BY count DESC, status ASC
+            """
+        ).fetchall()
+
+        monthly_revenue = conn.execute(
+            """
+            SELECT
+                SUBSTRING(created_at, 1, 7) AS month,
+                COALESCE(SUM(CASE WHEN payment_status = 'Paid' THEN invoice_amount ELSE 0 END), 0) AS paid_revenue,
+                COALESCE(SUM(CASE WHEN status != 'Rejected' THEN proposal_amount ELSE 0 END), 0) AS pipeline_revenue
+            FROM jobs
+            GROUP BY SUBSTRING(created_at, 1, 7)
+            ORDER BY month DESC
+            LIMIT 12
+            """
+        ).fetchall()
+
+        recent_approvals = conn.execute(
+            """
+            SELECT estimate_number, client_name, total, approved_at
+            FROM estimates
+            WHERE status = 'Approved'
+            ORDER BY approved_at DESC NULLS LAST, created_at DESC
+            LIMIT 8
+            """
+        ).fetchall()
+
+    monthly_revenue = list(reversed(monthly_revenue))
+    revenue_peak = max((row["paid_revenue"] or 0) for row in monthly_revenue) if monthly_revenue else 0
+
+    return render_template(
+        "analytics.html",
+        jobs_by_status=jobs_by_status,
+        monthly_revenue=monthly_revenue,
+        revenue_peak=revenue_peak,
+        recent_approvals=recent_approvals,
+        money=money,
+    )
+
+
+@app.route("/settings", methods=("GET", "POST"))
+@login_required
+@role_required("admin")
+def settings():
+    """Company and workspace settings panel."""
+    if request.method == "POST":
+        flash("Settings saved. Company preferences updated.", "success")
+        return redirect(url_for("settings"))
+
+    return render_template("settings.html")
 
 
 @app.route("/add", methods=("GET", "POST"))

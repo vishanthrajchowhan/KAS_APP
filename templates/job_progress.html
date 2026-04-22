@@ -48,6 +48,32 @@
     </div>
 </section>
 
+{% set media = namespace(before=None, after=None) %}
+{% if updates %}
+    {% for entry in updates %}
+        {% if not media.before and entry.photos %}
+            {% set media.before = entry.photos[0] %}
+        {% endif %}
+        {% if entry.photos and entry.photos|length > 1 and not media.after %}
+            {% set media.after = entry.photos[-1] %}
+        {% endif %}
+    {% endfor %}
+{% endif %}
+
+{% if media.before and media.after %}
+<section class="before-after" aria-label="Before and after slider">
+    <h3>Before / After View</h3>
+    <div class="before-after-stage" id="before-after-stage">
+        <img src="{{ url_for('uploaded_file', filename=media.before.replace('uploads/', '')) }}" alt="Before progress image">
+        <div class="after-layer" id="after-layer">
+            <img src="{{ url_for('uploaded_file', filename=media.after.replace('uploads/', '')) }}" alt="After progress image">
+        </div>
+    </div>
+    <label for="before-after-slider">Slide to compare</label>
+    <input id="before-after-slider" type="range" min="1" max="99" value="50" oninput="document.getElementById('after-layer').style.width = this.value + '%'">
+</section>
+{% endif %}
+
 <section class="updates progress-timeline">
     <h2>Progress Timeline</h2>
     {% if updates %}

@@ -6,10 +6,11 @@
 <section class="form-shell">
     <div class="page-title">
         <div>
+            <p class="eyebrow">Client Proposal</p>
             <h1>{{ estimate.estimate_number }}</h1>
             <p>{{ estimate.client_name }} · {{ estimate.service_type }}</p>
         </div>
-        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+        <div class="estimate-actions">
             <span class="status status-{{ estimate.status|lower|replace(' ', '-') }}">{{ estimate.status }}</span>
             <a href="{{ url_for('edit_estimate', estimate_id=estimate.id) }}" class="button button-small">Edit</a>
             <form method="post" action="{{ url_for('duplicate_estimate', estimate_id=estimate.id) }}" style="display: contents;">
@@ -34,7 +35,7 @@
         </div>
     </div>
 
-    <div class="job-summary" style="padding: 20px;">
+    <div class="job-summary">
         <div class="estimate-branding">
             <div class="company-name">KAS Waterproofing & Building Services</div>
             <div class="company-location">Fort Lauderdale, Florida</div>
@@ -73,7 +74,7 @@
             <h3>Project Location</h3>
             <div class="estimate-info">
                 {% if estimate.address %}
-                <div class="info-group" style="grid-column: 1 / -1;">
+                <div class="info-group">
                     <label>Address</label>
                     <span>{{ estimate.address }}</span>
                 </div>
@@ -92,7 +93,7 @@
             <h3>Scope of Work</h3>
             <div>{{ estimate.service_type }}</div>
             {% if estimate.project_description %}
-            <div style="margin-top: 10px; color: var(--muted);">{{ estimate.project_description }}</div>
+            <div class="estimate-service">{{ estimate.project_description }}</div>
             {% endif %}
         </div>
 
@@ -114,7 +115,7 @@
                     <tr>
                         <td>
                             <strong>{{ item.item_name }}</strong>
-                            {% if item.description %}<div style="color: var(--muted); font-size: 0.9rem;">{{ item.description }}</div>{% endif %}
+                            {% if item.description %}<div class="estimate-service">{{ item.description }}</div>{% endif %}
                         </td>
                         <td style="text-align: right;">{{ item.quantity }}</td>
                         <td style="text-align: center;">{{ item.unit }}</td>
@@ -145,18 +146,18 @@
         {% if estimate.notes %}
         <div class="estimate-section">
             <h3>Terms & Conditions</h3>
-            <div style="white-space: pre-wrap;">{{ estimate.notes }}</div>
+            <div class="update-notes">{{ estimate.notes }}</div>
         </div>
         {% endif %}
 
-        <div style="margin-top: 40px; padding-top: 20px; border-top: 2px solid var(--line); text-align: center;">
-            <div style="margin-bottom: 40px;">
-                <p style="margin: 0; color: var(--muted); font-size: 0.9rem;">Authorized by:</p>
+        <div class="estimate-section" style="text-align:center; border-top:2px solid var(--line); padding-top:20px; margin-top:20px;">
+            <div>
+                <p class="muted" style="margin:0;">Authorized by:</p>
                 <div style="height: 60px; margin: 20px 0; border-bottom: 1px solid var(--ink);"></div>
-                <p style="margin: 0; color: var(--muted); font-size: 0.9rem;">Client Signature</p>
+                <p class="muted" style="margin:0;">Client Signature</p>
             </div>
             {% if estimate.created_at %}
-            <p style="color: var(--muted); font-size: 0.85rem;">Estimate created: {{ estimate.created_at[:10] }}</p>
+            <p class="muted" style="font-size: 0.85rem;">Estimate created: {{ estimate.created_at[:10] }}</p>
             {% endif %}
         </div>
     </div>

@@ -6,6 +6,7 @@
 <section class="form-shell">
     <div class="page-title compact">
         <div>
+            <p class="eyebrow">Pipeline Intake</p>
             <h1>Add Lead</h1>
             <p>Create a sales pipeline record before it becomes a scheduled job.</p>
         </div>
@@ -63,7 +64,10 @@
         <label for="description">Description</label>
         <textarea id="description" name="description" rows="5" required>{{ description or '' }}</textarea>
 
-        <button class="button button-primary button-full" type="submit">Create Lead</button>
+        <div class="form-grid two">
+            <button class="button button-primary button-full" type="submit">Create Lead</button>
+            <a class="button button-full" href="{{ url_for('index') }}">Cancel</a>
+        </div>
     </form>
 </section>
 {% endblock %}

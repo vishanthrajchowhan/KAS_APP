@@ -6,6 +6,7 @@
 <section class="form-shell">
     <div class="page-title">
         <div>
+            <p class="eyebrow">Sales Quotes</p>
             <h1>Estimates</h1>
             <p>Create and manage professional quotes for clients.</p>
         </div>
@@ -73,6 +74,7 @@
                             by {{ est.created_by_name }}
                         {% endif %}
                     </div>
+                    <div class="estimate-service">Created {{ est.created_at[:10] if est.created_at else '-' }}</div>
                     <div class="estimate-actions">
                         <a href="{{ url_for('view_estimate', estimate_id=est.id) }}" class="button button-small">View</a>
                         {% if est.status != 'Rejected' %}

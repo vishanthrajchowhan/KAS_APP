@@ -23,6 +23,39 @@
         {% endif %}
     </div>
 
+    <section class="analytics-grid" aria-label="Construction workspace">
+        <article class="panel">
+            <h3>Crew Status Board</h3>
+            <div class="crew-board">
+                <div class="crew-card">
+                    <strong>Assigned Crew Lead</strong>
+                    <p class="muted" style="margin:4px 0 6px;">{{ employees|selectattr('id', 'equalto', job.assigned_to)|map(attribute='name')|first if job.assigned_to else 'Unassigned' }}</p>
+                    <span class="crew-status">On schedule</span>
+                </div>
+                <div class="crew-card">
+                    <strong>Field Updates</strong>
+                    <p class="muted" style="margin:4px 0 6px;">{{ updates|length }} timeline entries</p>
+                    <span class="crew-status">Reporting active</span>
+                </div>
+                <div class="crew-card">
+                    <strong>Client Communication</strong>
+                    <p class="muted" style="margin:4px 0 6px;">Portal{% if job.client_id %} linked{% else %} not linked{% endif %}</p>
+                    <span class="crew-status">Monitored</span>
+                </div>
+            </div>
+        </article>
+
+        <article class="panel">
+            <h3>Material Checklist</h3>
+            <div class="material-cards">
+                <label class="material-card"><input type="checkbox">Surface prep complete</label>
+                <label class="material-card"><input type="checkbox">Waterproofing materials delivered</label>
+                <label class="material-card"><input type="checkbox">Crew safety check complete</label>
+                <label class="material-card"><input type="checkbox">Final inspection scheduled</label>
+            </div>
+        </article>
+    </section>
+
     {% if can_edit_job %}
         <form class="form-card" method="post" action="{{ url_for('submit_update') }}" enctype="multipart/form-data">
             <input type="hidden" name="job_id" value="{{ job.id }}">

@@ -6,6 +6,7 @@
 <section class="form-shell">
     <div class="page-title compact">
         <div>
+            <p class="eyebrow">Quote Builder</p>
             <h1>Create Quote</h1>
             <p>Build a professional estimate for your client.</p>
         </div>
@@ -66,7 +67,7 @@
             <textarea id="notes" name="notes" rows="3" placeholder="Private notes (not shown on quote)">{{ notes or '' }}</textarea>
         </div>
 
-        <div style="display: grid; gap: 10px;">
+        <div class="form-grid two">
             <button class="button button-primary button-full" type="submit">Create Quote</button>
             <a href="{{ url_for('estimates') }}" class="button button-full">Cancel</a>
         </div>

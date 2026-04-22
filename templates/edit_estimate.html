@@ -6,6 +6,7 @@
 <section class="form-shell">
     <div class="page-title compact">
         <div>
+            <p class="eyebrow">Quote Management</p>
             <h1>Edit Quote</h1>
             <p>{{ estimate.estimate_number }} · {{ estimate.client_name }}</p>
         </div>
@@ -62,7 +63,7 @@
         <button class="button button-primary button-full" type="submit">Update Estimate</button>
     </form>
 
-    <div class="form-section" style="margin-top: 20px;">
+    <div class="form-section">
         <h2>Line Items</h2>
         
         {% if items %}
@@ -82,7 +83,7 @@
                 <tr>
                     <td>
                         <strong>{{ item.item_name }}</strong>
-                        {% if item.description %}<div style="color: var(--muted); font-size: 0.9rem;">{{ item.description }}</div>{% endif %}
+                        {% if item.description %}<div class="estimate-service">{{ item.description }}</div>{% endif %}
                     </td>
                     <td style="text-align: right;">{{ item.quantity }}</td>
                     <td style="text-align: center;">{{ item.unit }}</td>
@@ -99,8 +100,8 @@
         </table>
         {% endif %}
 
-        <div style="margin-top: 20px; padding: 16px; background: #fbfcfb; border: 1px solid var(--line); border-radius: 8px;">
-            <h3 style="margin-top: 0;">Add Line Item</h3>
+        <div class="form-section">
+            <h3>Add Line Item</h3>
             <form method="post" action="{{ url_for('add_estimate_item', estimate_id=estimate.id) }}">
                 <div class="form-grid two">
                     <div>
@@ -141,7 +142,7 @@
             </form>
         </div>
 
-        <div class="estimate-totals" style="margin-top: 20px;">
+        <div class="estimate-totals">
             <div class="totals-row">
                 <label>Subtotal:</label>
                 <span>{{ money(totals.subtotal) }}</span>
