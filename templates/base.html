@@ -177,7 +177,47 @@
         const iosTipDismiss = document.getElementById("ios-tip-dismiss");
         const supportsStandalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone;
         const isIos = /iphone|ipad|ipod/i.test(window.navigator.userAgent);
+        const installDismissed = localStorage.getItem("kas-install-dismissed") === "true";
         let deferredInstallPrompt = null;
+
+        function hideInstallPrompts() {
+            if (installCta) {
+                installCta.hidden = true;
+            }
+            if (iosInstallTip) {
+                iosInstallTip.hidden = true;
+            }
+        }
+
+        function showInstallPrompt() {
+            if (supportsStandalone || installDismissed) {
+                hideInstallPrompts();
+                return;
+            }
+
+            if (isIos) {
+                if (iosInstallTip) {
+                    iosInstallTip.hidden = false;
+                }
+                if (installCta) {
+                    installCta.hidden = true;
+                }
+                return;
+            }
+
+            if (deferredInstallPrompt && installCta) {
+                installCta.hidden = false;
+                if (installBtn) {
+                    installBtn.disabled = false;
+                }
+                if (iosInstallTip) {
+                    iosInstallTip.hidden = true;
+                }
+                return;
+            }
+
+            hideInstallPrompts();
+        }
 
         const savedTheme = localStorage.getItem("kas-theme");
         if (savedTheme === "dark") {
@@ -332,45 +372,43 @@
         window.addEventListener("beforeinstallprompt", function (event) {
             event.preventDefault();
             deferredInstallPrompt = event;
-            if (installCta && !supportsStandalone) {
-                installCta.hidden = false;
-            }
+            showInstallPrompt();
         });
 
         if (installBtn) {
+            installBtn.disabled = true;
             installBtn.addEventListener("click", async function () {
                 if (!deferredInstallPrompt) {
+                    showInstallPrompt();
                     return;
                 }
                 deferredInstallPrompt.prompt();
                 await deferredInstallPrompt.userChoice;
                 deferredInstallPrompt = null;
-                if (installCta) {
-                    installCta.hidden = true;
-                }
+                hideInstallPrompts();
             });
         }
 
         if (installDismiss) {
             installDismiss.addEventListener("click", function () {
-                if (installCta) {
-                    installCta.hidden = true;
-                }
+                localStorage.setItem("kas-install-dismissed", "true");
+                hideInstallPrompts();
             });
-        }
-
-        if (isIos && !supportsStandalone && iosInstallTip && !localStorage.getItem("kas-ios-tip-dismissed")) {
-            iosInstallTip.hidden = false;
         }
 
         if (iosTipDismiss) {
             iosTipDismiss.addEventListener("click", function () {
-                if (iosInstallTip) {
-                    iosInstallTip.hidden = true;
-                }
-                localStorage.setItem("kas-ios-tip-dismissed", "true");
+                localStorage.setItem("kas-install-dismissed", "true");
+                hideInstallPrompts();
             });
         }
+
+        window.addEventListener("appinstalled", function () {
+            localStorage.removeItem("kas-install-dismissed");
+            hideInstallPrompts();
+        });
+
+        showInstallPrompt();
 
         registerServiceWorker().then(function (registration) {
             if (registration) {

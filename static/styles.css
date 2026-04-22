@@ -1366,7 +1366,7 @@ tbody tr:last-child td {
     position: fixed;
     z-index: 45;
     right: 18px;
-    bottom: 84px;
+    bottom: 90px;
     width: min(380px, calc(100vw - 24px));
     padding: 14px;
     border-radius: 14px;
@@ -1388,6 +1388,13 @@ tbody tr:last-child td {
     margin: 4px 0 0;
     color: var(--muted);
     font-size: 0.86rem;
+}
+
+.install-cta .button:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
 }
 
 .ios-install-tip {
@@ -1562,7 +1569,7 @@ tbody tr:last-child td {
     .ios-install-tip {
         left: 12px;
         right: 12px;
-        bottom: calc(76px + env(safe-area-inset-bottom));
+        bottom: calc(84px + env(safe-area-inset-bottom));
         width: auto;
     }
 
