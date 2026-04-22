@@ -159,6 +159,7 @@ app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-change-this-secret")
 app.config["UPLOAD_FOLDER"] = str(UPLOAD_FOLDER)
 app.config["MAX_CONTENT_LENGTH"] = 25 * 1024 * 1024
+app.config["VAPID_PUBLIC_KEY"] = os.environ.get("VAPID_PUBLIC_KEY", "").strip()
 
 
 def build_postgres_conninfo():
@@ -650,6 +651,50 @@ def ensure_database():
                 "SELECT id, name, email, role FROM users WHERE id = ?",
                 (user_id,),
             ).fetchone()
+
+
+@app.route("/manifest.json")
+def pwa_manifest():
+    return send_from_directory(
+        BASE_DIR / "static",
+        "manifest.json",
+        mimetype="application/manifest+json",
+    )
+
+
+@app.route("/sw.js")
+def pwa_service_worker():
+    response = send_from_directory(BASE_DIR / "static", "sw.js", mimetype="application/javascript")
+    response.headers["Cache-Control"] = "no-cache"
+    return response
+
+
+@app.route("/api/push/vapid-public-key", methods=("GET",))
+def vapid_public_key():
+    return jsonify({"publicKey": app.config.get("VAPID_PUBLIC_KEY", "")})
+
+
+@app.route("/api/push/subscribe", methods=("POST",))
+@login_required
+def save_push_subscription():
+    payload = request.get_json(silent=True) or {}
+    subscription = payload.get("subscription")
+    if not subscription:
+        return jsonify({"ok": False, "error": "Missing subscription payload."}), 400
+
+    # Push persistence can later be migrated to a table keyed by user id.
+    session["push_subscription"] = subscription
+    return jsonify(
+        {
+            "ok": True,
+            "message": "Subscription received. Server push dispatch can be enabled with VAPID keys.",
+            "events_ready": [
+                "new_job_assigned",
+                "estimate_approved",
+                "new_update_uploaded",
+            ],
+        }
+    )
 
 
 @app.route("/login", methods=("GET", "POST"))
