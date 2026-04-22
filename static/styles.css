@@ -1376,6 +1376,11 @@ tbody tr:last-child td {
     backdrop-filter: blur(8px);
 }
 
+.install-cta[hidden],
+.ios-install-tip[hidden] {
+    display: none !important;
+}
+
 .install-cta {
     display: grid;
     grid-template-columns: 1fr auto auto;

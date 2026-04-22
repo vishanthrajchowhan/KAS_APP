@@ -175,7 +175,9 @@
         const installDismiss = document.getElementById("install-dismiss");
         const iosInstallTip = document.getElementById("ios-install-tip");
         const iosTipDismiss = document.getElementById("ios-tip-dismiss");
-        const supportsStandalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone;
+        const standaloneMatch = window.matchMedia("(display-mode: standalone)").matches;
+        const launchedFromAndroidApp = document.referrer.startsWith("android-app://");
+        const supportsStandalone = standaloneMatch || window.navigator.standalone || launchedFromAndroidApp;
         const isIos = /iphone|ipad|ipod/i.test(window.navigator.userAgent);
         const installDismissed = localStorage.getItem("kas-install-dismissed") === "true";
         let deferredInstallPrompt = null;
@@ -406,6 +408,12 @@
         window.addEventListener("appinstalled", function () {
             localStorage.removeItem("kas-install-dismissed");
             hideInstallPrompts();
+        });
+
+        document.addEventListener("visibilitychange", function () {
+            if (!document.hidden) {
+                showInstallPrompt();
+            }
         });
 
         showInstallPrompt();
