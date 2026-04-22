@@ -1099,7 +1099,7 @@ tbody tr:last-child td {
 
 .analytics-main {
     display: grid;
-    gap: 22px;
+    gap: 18px;
 }
 
 .panel {
@@ -1113,7 +1113,11 @@ tbody tr:last-child td {
 }
 
 .panel h3 {
-    margin-bottom: 14px;
+    margin: 0 0 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid color-mix(in srgb, var(--line) 85%, transparent);
+    font-size: 1.06rem;
+    letter-spacing: 0.01em;
 }
 
 .bar-list {
@@ -1147,9 +1151,32 @@ tbody tr:last-child td {
 }
 
 .panel-activity .activity-feed {
-    max-height: 420px;
+    max-height: 400px;
     overflow: auto;
     padding-right: 4px;
+}
+
+.panel-status,
+.panel-revenue {
+    position: relative;
+}
+
+.panel-status::before,
+.panel-revenue::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 18px;
+    bottom: 18px;
+    width: 3px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--primary) 46%, transparent);
+}
+
+.panel-status,
+.panel-revenue,
+.panel-activity {
+    overflow: hidden;
 }
 
 .panel-status .bar-list,
