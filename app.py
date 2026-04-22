@@ -573,8 +573,8 @@ def index():
         jobs = conn.execute(
             f"""
             SELECT jobs.*,
-                   employee.name AS assigned_employee,
-                   client.name AS client_user_name,
+                 MAX(employee.name) AS assigned_employee,
+                 MAX(client.name) AS client_user_name,
                    COUNT(updates.id) AS update_count,
                    MAX(updates.timestamp) AS last_update
             FROM jobs
