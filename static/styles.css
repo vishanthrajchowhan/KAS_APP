@@ -1097,6 +1097,11 @@ tbody tr:last-child td {
     align-items: start;
 }
 
+.analytics-main {
+    display: grid;
+    gap: 22px;
+}
+
 .panel {
     padding: 22px;
     border: 1px solid var(--line);
@@ -1142,7 +1147,7 @@ tbody tr:last-child td {
 }
 
 .panel-activity .activity-feed {
-    max-height: 460px;
+    max-height: 420px;
     overflow: auto;
     padding-right: 4px;
 }
@@ -1360,6 +1365,14 @@ tbody tr:last-child td {
 
     .analytics-grid {
         grid-template-columns: 1fr;
+    }
+
+    .analytics-main {
+        gap: 18px;
+    }
+
+    .panel-activity .activity-feed {
+        max-height: 340px;
     }
 }
 

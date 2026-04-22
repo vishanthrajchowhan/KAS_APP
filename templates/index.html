@@ -77,24 +77,46 @@
 {% endif %}
 
 <div class="analytics-grid">
-    <section class="panel panel-status" aria-label="Jobs by status">
-        <h3>Jobs by Status</h3>
-        <div class="bar-list">
-            {% set total_jobs = jobs|length if jobs else 1 %}
-            {% for status_name, count in status_counts.items() %}
-                {% set ratio = (count / total_jobs * 100) if total_jobs else 0 %}
-                <div class="bar-row">
-                    <div style="display:flex; justify-content:space-between; gap:8px;">
-                        <strong>{{ status_name }}</strong>
-                        <span class="muted">{{ count }}</span>
+    <div class="analytics-main">
+        <section class="panel panel-status" aria-label="Jobs by status">
+            <h3>Jobs by Status</h3>
+            <div class="bar-list">
+                {% set total_jobs = jobs|length if jobs else 1 %}
+                {% for status_name, count in status_counts.items() %}
+                    {% set ratio = (count / total_jobs * 100) if total_jobs else 0 %}
+                    <div class="bar-row">
+                        <div style="display:flex; justify-content:space-between; gap:8px;">
+                            <strong>{{ status_name }}</strong>
+                            <span class="muted">{{ count }}</span>
+                        </div>
+                        <div class="bar-track">
+                            <div class="bar-fill" style="--bar-width: {{ '%.1f'|format(ratio) }}%;"></div>
+                        </div>
                     </div>
-                    <div class="bar-track">
-                        <div class="bar-fill" style="--bar-width: {{ '%.1f'|format(ratio) }}%;"></div>
+                {% endfor %}
+            </div>
+        </section>
+
+        {% if monthly_revenue and dashboard_role == "admin" %}
+        <section class="panel panel-revenue" aria-label="Monthly revenue trend">
+            <h3>Monthly Revenue</h3>
+            <div class="bar-list">
+                {% for row in monthly_revenue %}
+                    {% set ratio = (row.value / monthly_peak * 100) if monthly_peak else 0 %}
+                    <div class="bar-row">
+                        <div style="display:flex; justify-content:space-between; gap:8px;">
+                            <strong>{{ row.month }}</strong>
+                            <span class="muted">{{ money(row.value or 0) }}</span>
+                        </div>
+                        <div class="bar-track">
+                            <div class="bar-fill" style="--bar-width: {{ '%.1f'|format(ratio) }}%;"></div>
+                        </div>
                     </div>
-                </div>
-            {% endfor %}
-        </div>
-    </section>
+                {% endfor %}
+            </div>
+        </section>
+        {% endif %}
+    </div>
 
     <section class="panel panel-activity" aria-label="Recent activity">
         <h3>Recent Activity</h3>
@@ -116,26 +138,6 @@
         </div>
     </section>
 </div>
-
-{% if monthly_revenue and dashboard_role == "admin" %}
-<section class="panel panel-revenue" aria-label="Monthly revenue trend" style="margin-top:14px;">
-    <h3>Monthly Revenue</h3>
-    <div class="bar-list">
-        {% for row in monthly_revenue %}
-            {% set ratio = (row.value / monthly_peak * 100) if monthly_peak else 0 %}
-            <div class="bar-row">
-                <div style="display:flex; justify-content:space-between; gap:8px;">
-                    <strong>{{ row.month }}</strong>
-                    <span class="muted">{{ money(row.value or 0) }}</span>
-                </div>
-                <div class="bar-track">
-                    <div class="bar-fill" style="--bar-width: {{ '%.1f'|format(ratio) }}%;"></div>
-                </div>
-            </div>
-        {% endfor %}
-    </div>
-</section>
-{% endif %}
 
 {% if dashboard_role != "client" %}
 <section class="quick-filters" aria-label="Quick filters">
