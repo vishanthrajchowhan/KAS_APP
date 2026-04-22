@@ -66,7 +66,7 @@ body {
         linear-gradient(180deg, var(--bg-accent), var(--bg));
     color: var(--ink);
     font-family: "Manrope", "Segoe UI", Tahoma, sans-serif;
-    line-height: 1.5;
+    line-height: 1.62;
 }
 
 a {
@@ -100,7 +100,7 @@ h3 {
 
 .app-shell {
     display: grid;
-    grid-template-columns: 280px 1fr;
+    grid-template-columns: 300px 1fr;
     min-height: 100vh;
 }
 
@@ -108,13 +108,13 @@ h3 {
     position: sticky;
     top: 0;
     height: 100vh;
-    padding: 18px 14px;
+    padding: 24px 16px;
     background: linear-gradient(180deg, #15211d 0%, #172722 100%);
     color: #e8f0ec;
     border-right: 1px solid rgba(255, 255, 255, 0.08);
     display: grid;
     grid-template-rows: auto 1fr auto;
-    gap: 18px;
+    gap: 24px;
     z-index: 20;
 }
 
@@ -162,16 +162,16 @@ h3 {
 
 .sidebar-nav {
     display: grid;
-    gap: 6px;
+    gap: 10px;
     align-content: start;
 }
 
 .nav-link {
-    min-height: 44px;
+    min-height: 48px;
     display: flex;
     align-items: center;
-    padding: 10px 12px;
-    border-radius: 10px;
+    padding: 12px 14px;
+    border-radius: 12px;
     color: rgba(232, 240, 236, 0.86);
     font-weight: 700;
     transition: all 0.22s ease;
@@ -355,9 +355,9 @@ h3 {
 }
 
 .page {
-    width: min(1280px, 100%);
+    width: min(1460px, 100%);
     margin: 0 auto;
-    padding: 22px 20px 92px;
+    padding: 30px 34px 110px;
 }
 
 .auth-page {
@@ -370,12 +370,12 @@ h3 {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    gap: 16px;
-    margin-bottom: 18px;
+    gap: 18px;
+    margin-bottom: 30px;
 }
 
 .page-title.compact {
-    margin-bottom: 10px;
+    margin-bottom: 16px;
 }
 
 .page-title p,
@@ -421,13 +421,13 @@ h3 {
 }
 
 .button {
-    min-height: 44px;
+    min-height: 48px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: 10px 16px;
+    padding: 11px 18px;
     border: 1px solid transparent;
-    border-radius: 10px;
+    border-radius: 12px;
     background: var(--surface-2);
     color: var(--ink);
     font-size: 0.95rem;
@@ -467,7 +467,7 @@ h3 {
 .job-list,
 .updates {
     display: grid;
-    gap: 16px;
+    gap: 24px;
 }
 
 .form-card,
@@ -493,7 +493,7 @@ h3 {
 .empty-state,
 .progress-hero,
 .auth-card {
-    padding: 18px;
+    padding: 24px;
 }
 
 .job-card,
@@ -554,6 +554,7 @@ h3 {
 
 label {
     display: block;
+    margin-bottom: 7px;
     color: var(--muted);
     font-size: 0.77rem;
     font-weight: 800;
@@ -565,8 +566,8 @@ input,
 select,
 textarea {
     width: 100%;
-    min-height: 46px;
-    padding: 11px 12px;
+    min-height: 48px;
+    padding: 12px 14px;
     border: 1px solid var(--line-strong);
     border-radius: 10px;
     background: var(--surface);
@@ -597,12 +598,13 @@ input[type="file"] {
 .progress-stats {
     display: grid;
     grid-template-columns: repeat(6, minmax(0, 1fr));
-    gap: 12px;
+    gap: 18px;
+    margin-bottom: 30px;
 }
 
 .dashboard-stats > div,
 .progress-stats > div {
-    padding: 14px;
+    padding: 20px 18px;
     border-radius: var(--radius-sm);
     background: var(--surface);
     border: 1px solid var(--line);
@@ -619,7 +621,7 @@ input[type="file"] {
 
 .dashboard-stats p,
 .progress-stats p {
-    margin: 8px 0 0;
+    margin: 10px 0 0;
     color: var(--muted);
     font-size: 0.84rem;
     font-weight: 700;
@@ -628,14 +630,15 @@ input[type="file"] {
 .quick-filters {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: 12px;
+    margin: 4px 0 18px;
 }
 
 .quick-filter {
-    min-height: 38px;
+    min-height: 42px;
     display: inline-flex;
     align-items: center;
-    padding: 8px 12px;
+    padding: 10px 14px;
     border-radius: 999px;
     border: 1px solid var(--line);
     background: var(--surface);
@@ -652,17 +655,33 @@ input[type="file"] {
 
 .filters {
     display: grid;
-    grid-template-columns: minmax(220px, 1fr) minmax(140px, 180px) minmax(140px, 180px) auto auto;
+    grid-template-columns: minmax(280px, 1fr) minmax(170px, 220px) minmax(170px, 220px) auto auto;
     align-items: end;
-    gap: 10px;
-    padding: 14px;
+    gap: 14px;
+    padding: 20px;
+    margin-bottom: 24px;
+}
+
+.filters > div {
+    display: grid;
+    gap: 6px;
 }
 
 .job-card-top {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    gap: 12px;
+    gap: 16px;
+    margin-bottom: 12px;
+}
+
+.job-card-top h2 {
+    margin-bottom: 8px;
+}
+
+.job-card-top .client,
+.job-card-top .location {
+    margin-bottom: 6px;
 }
 
 .client {
@@ -721,8 +740,8 @@ input[type="file"] {
 .pipeline-money {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
-    margin: 12px 0;
+    gap: 10px;
+    margin: 16px 0 18px;
 }
 
 .pipeline-money span {
@@ -751,19 +770,30 @@ input[type="file"] {
 .job-meta {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px 12px;
-    margin: 10px 0 14px;
+    gap: 10px 16px;
+    margin: 14px 0 18px;
     font-size: 0.88rem;
+    line-height: 1.6;
 }
 
 .job-actions {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 10px;
+    gap: 14px;
 }
 
 .job-actions form {
     display: grid;
+}
+
+.job-actions .button {
+    width: 100%;
+    min-height: 48px;
+    border-radius: 12px;
+}
+
+.job-actions .button:hover {
+    background: color-mix(in srgb, var(--surface-2) 60%, var(--surface));
 }
 
 .progress-hero h2 {
@@ -1041,11 +1071,12 @@ tbody tr:last-child td {
 .analytics-grid {
     display: grid;
     grid-template-columns: 1.6fr 1fr;
-    gap: 14px;
+    gap: 22px;
+    margin-bottom: 24px;
 }
 
 .panel {
-    padding: 16px;
+    padding: 22px;
     border: 1px solid var(--line);
     border-radius: var(--radius-md);
     background: var(--surface);
@@ -1053,7 +1084,7 @@ tbody tr:last-child td {
 }
 
 .panel h3 {
-    margin-bottom: 10px;
+    margin-bottom: 14px;
 }
 
 .bar-list {
@@ -1083,11 +1114,11 @@ tbody tr:last-child td {
 
 .activity-feed {
     display: grid;
-    gap: 10px;
+    gap: 12px;
 }
 
 .activity-item {
-    padding: 10px 12px;
+    padding: 14px;
     border: 1px solid var(--line);
     border-radius: 10px;
     background: var(--surface-2);
@@ -1099,7 +1130,8 @@ tbody tr:last-child td {
 
 .job-progress {
     display: grid;
-    gap: 7px;
+    gap: 9px;
+    margin: 12px 0 18px;
 }
 
 .job-progress .track {
@@ -1190,6 +1222,15 @@ tbody tr:last-child td {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 14px;
+}
+
+.info-group label {
+    margin-bottom: 6px;
+}
+
+.info-group span {
+    display: inline-block;
+    line-height: 1.55;
 }
 
 .settings-section {
@@ -1292,7 +1333,7 @@ tbody tr:last-child td {
         left: 0;
         top: 0;
         bottom: 0;
-        width: min(82vw, 320px);
+        width: min(84vw, 340px);
         transform: translateX(-100%);
         transition: transform 0.25s ease;
     }
@@ -1357,7 +1398,7 @@ tbody tr:last-child td {
     }
 
     .page {
-        padding: 16px 12px 96px;
+        padding: 22px 16px 106px;
     }
 
     .auth-shell {
@@ -1368,10 +1409,16 @@ tbody tr:last-child td {
 
     .filters {
         grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    .filters .button {
+        width: 100%;
     }
 
     .job-actions {
         grid-template-columns: 1fr;
+        gap: 12px;
     }
 
     .estimate-card {
@@ -1455,6 +1502,6 @@ tbody tr:last-child td {
     }
 
     .global-search input {
-        min-height: 40px;
+        min-height: 44px;
     }
 }
