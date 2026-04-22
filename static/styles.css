@@ -1094,6 +1094,7 @@ tbody tr:last-child td {
     grid-template-columns: 1.6fr 1fr;
     gap: 22px;
     margin-bottom: 24px;
+    align-items: start;
 }
 
 .panel {
@@ -1102,6 +1103,8 @@ tbody tr:last-child td {
     border-radius: var(--radius-md);
     background: var(--surface);
     box-shadow: var(--shadow-sm);
+    display: grid;
+    align-content: start;
 }
 
 .panel h3 {
@@ -1136,6 +1139,22 @@ tbody tr:last-child td {
 .activity-feed {
     display: grid;
     gap: 12px;
+}
+
+.panel-activity .activity-feed {
+    max-height: 460px;
+    overflow: auto;
+    padding-right: 4px;
+}
+
+.panel-status .bar-list,
+.panel-revenue .bar-list {
+    gap: 12px;
+}
+
+.panel-status .bar-row,
+.panel-revenue .bar-row {
+    gap: 8px;
 }
 
 .activity-item {

@@ -77,7 +77,7 @@
 {% endif %}
 
 <div class="analytics-grid">
-    <section class="panel" aria-label="Jobs by status">
+    <section class="panel panel-status" aria-label="Jobs by status">
         <h3>Jobs by Status</h3>
         <div class="bar-list">
             {% set total_jobs = jobs|length if jobs else 1 %}
@@ -96,7 +96,7 @@
         </div>
     </section>
 
-    <section class="panel" aria-label="Recent activity">
+    <section class="panel panel-activity" aria-label="Recent activity">
         <h3>Recent Activity</h3>
         <div class="activity-feed">
             {% if recent_activity %}
@@ -118,7 +118,7 @@
 </div>
 
 {% if monthly_revenue and dashboard_role == "admin" %}
-<section class="panel" aria-label="Monthly revenue trend" style="margin-top:14px;">
+<section class="panel panel-revenue" aria-label="Monthly revenue trend" style="margin-top:14px;">
     <h3>Monthly Revenue</h3>
     <div class="bar-list">
         {% for row in monthly_revenue %}
