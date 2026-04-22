@@ -1439,7 +1439,7 @@ def create_estimate():
                     address, city, state, zip, service_type, project_description,
                     status, notes, created_by, created_at, updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     estimate_number,
