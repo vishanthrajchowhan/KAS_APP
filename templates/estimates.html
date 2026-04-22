@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+
+{% block title %}Estimates | KAS{% endblock %}
+
+{% block content %}
+<section class="form-shell">
+    <div class="page-title">
+        <div>
+            <h1>Estimates</h1>
+            <p>Create and manage professional quotes for clients.</p>
+        </div>
+        <a href="{{ url_for('create_estimate') }}" class="button button-primary">Create Quote</a>
+    </div>
+
+    {% if metrics %}
+    <div class="dashboard-stats">
+        <div>
+            <span>{{ metrics.total_estimates or 0 }}</span>
+            <p>Total Estimates</p>
+        </div>
+        <div>
+            <span>{{ metrics.draft_count or 0 }}</span>
+            <p>Drafts</p>
+        </div>
+        <div>
+            <span>{{ metrics.pending_count or 0 }}</span>
+            <p>Pending</p>
+        </div>
+        <div>
+            <span>{{ money(metrics.approved_value or 0) }}</span>
+            <p>Approved Value</p>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="filters">
+        <form method="get" action="{{ url_for('estimates') }}" style="display: contents;">
+            <input type="text" name="q" placeholder="Search client, company, estimate #..." value="{{ filters.q or '' }}">
+            <select name="status">
+                <option value="">All Statuses</option>
+                {% for status in statuses %}
+                    <option value="{{ status }}" {% if filters.status == status %}selected{% endif %}>{{ status }}</option>
+                {% endfor %}
+            </select>
+            <select name="sort">
+                <option value="newest" {% if filters.sort == 'newest' %}selected{% endif %}>Newest First</option>
+                <option value="oldest" {% if filters.sort == 'oldest' %}selected{% endif %}>Oldest First</option>
+                <option value="name" {% if filters.sort == 'name' %}selected{% endif %}>Client Name</option>
+                <option value="value" {% if filters.sort == 'value' %}selected{% endif %}>Highest Value</option>
+            </select>
+            <button type="submit" class="button">Filter</button>
+            <a href="{{ url_for('estimates') }}" class="button">Clear</a>
+        </form>
+    </div>
+
+    {% if estimates %}
+        <div class="job-list">
+            {% for est in estimates %}
+            <div class="estimate-card">
+                <div class="estimate-header">
+                    <div class="estimate-number">{{ est.estimate_number }}</div>
+                    <div class="estimate-client">{{ est.client_name }}</div>
+                    {% if est.company_name %}
+                        <div class="estimate-service">{{ est.company_name }}</div>
+                    {% endif %}
+                    <div class="estimate-service">{{ est.service_type }}</div>
+                    <span class="status status-{{ est.status|lower|replace(' ', '-')|replace('/', '-') }}">{{ est.status }}</span>
+                </div>
+                <div class="estimate-amount">
+                    <div class="estimate-total">{{ money(est.total or 0) }}</div>
+                    <div class="estimate-service">
+                        {% if est.created_by_name %}
+                            by {{ est.created_by_name }}
+                        {% endif %}
+                    </div>
+                    <div class="estimate-actions">
+                        <a href="{{ url_for('view_estimate', estimate_id=est.id) }}" class="button button-small">View</a>
+                        {% if est.status != 'Rejected' %}
+                            <a href="{{ url_for('edit_estimate', estimate_id=est.id) }}" class="button button-small">Edit</a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="empty-state">
+            <h2>No estimates yet</h2>
+            <p>Create your first quote to get started.</p>
+            <a href="{{ url_for('create_estimate') }}" class="button button-primary">Create Quote</a>
+        </div>
+    {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Quote - {{ estimate.estimate_number }} | KAS{% endblock %}
+
+{% block content %}
+<section class="form-shell">
+    <div class="page-title compact">
+        <div>
+            <h1>Edit Quote</h1>
+            <p>{{ estimate.estimate_number }} · {{ estimate.client_name }}</p>
+        </div>
+        <a href="{{ url_for('view_estimate', estimate_id=estimate.id) }}" class="button button-small">View Quote</a>
+    </div>
+
+    <form class="form-card" method="post" action="{{ url_for('edit_estimate', estimate_id=estimate.id) }}">
+        <div class="form-section">
+            <h2>Client Information</h2>
+            <label for="client_name">Client Name *</label>
+            <input id="client_name" name="client_name" type="text" value="{{ estimate.client_name or '' }}" required maxlength="200">
+
+            <label for="company_name">Company Name</label>
+            <input id="company_name" name="company_name" type="text" value="{{ estimate.company_name or '' }}" maxlength="200">
+
+            <div class="form-grid two">
+                <div>
+                    <label for="phone">Phone</label>
+                    <input id="phone" name="phone" type="tel" value="{{ estimate.phone or '' }}">
+                </div>
+                <div>
+                    <label for="email">Email</label>
+                    <input id="email" name="email" type="email" value="{{ estimate.email or '' }}">
+                </div>
+            </div>
+
+            <label for="address">Address</label>
+            <input id="address" name="address" type="text" value="{{ estimate.address or '' }}" maxlength="300">
+
+            <div class="form-grid two">
+                <div>
+                    <label for="city">City</label>
+                    <input id="city" name="city" type="text" value="{{ estimate.city or '' }}">
+                </div>
+                <div>
+                    <label for="state">State</label>
+                    <input id="state" name="state" type="text" value="{{ estimate.state or 'FL' }}">
+                </div>
+            </div>
+
+            <label for="zip">ZIP Code</label>
+            <input id="zip" name="zip" type="text" value="{{ estimate.zip or '' }}">
+        </div>
+
+        <div class="form-section">
+            <h2>Project Information</h2>
+            <label for="project_description">Project Description</label>
+            <textarea id="project_description" name="project_description" rows="4">{{ estimate.project_description or '' }}</textarea>
+
+            <label for="notes">Terms & Conditions</label>
+            <textarea id="notes" name="notes" rows="3">{{ estimate.notes or '' }}</textarea>
+        </div>
+
+        <button class="button button-primary button-full" type="submit">Update Estimate</button>
+    </form>
+
+    <div class="form-section" style="margin-top: 20px;">
+        <h2>Line Items</h2>
+        
+        {% if items %}
+        <table class="line-items">
+            <thead>
+                <tr>
+                    <th>Description</th>
+                    <th style="text-align: right;">Qty</th>
+                    <th style="text-align: center;">Unit</th>
+                    <th style="text-align: right;">Price</th>
+                    <th style="text-align: right;">Total</th>
+                    <th style="text-align: center;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in items %}
+                <tr>
+                    <td>
+                        <strong>{{ item.item_name }}</strong>
+                        {% if item.description %}<div style="color: var(--muted); font-size: 0.9rem;">{{ item.description }}</div>{% endif %}
+                    </td>
+                    <td style="text-align: right;">{{ item.quantity }}</td>
+                    <td style="text-align: center;">{{ item.unit }}</td>
+                    <td style="text-align: right;">{{ money(item.unit_price) }}</td>
+                    <td style="text-align: right;"><strong>{{ money(item.line_total) }}</strong></td>
+                    <td style="text-align: center;">
+                        <form method="post" action="{{ url_for('delete_estimate_item', estimate_id=estimate.id, item_id=item.id) }}" style="display: inline;">
+                            <button type="submit" class="button button-small button-danger" onclick="return confirm('Delete this item?')">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+
+        <div style="margin-top: 20px; padding: 16px; background: #fbfcfb; border: 1px solid var(--line); border-radius: 8px;">
+            <h3 style="margin-top: 0;">Add Line Item</h3>
+            <form method="post" action="{{ url_for('add_estimate_item', estimate_id=estimate.id) }}">
+                <div class="form-grid two">
+                    <div>
+                        <label for="item_name">Item Name *</label>
+                        <input id="item_name" name="item_name" type="text" required placeholder="Labor, Materials, etc." maxlength="200">
+                    </div>
+                    <div>
+                        <label for="unit">Unit *</label>
+                        <select id="unit" name="unit" required>
+                            <option value="">-- Select Unit --</option>
+                            <option value="hour">Hour</option>
+                            <option value="sqft">Square Foot</option>
+                            <option value="linear_ft">Linear Foot</option>
+                            <option value="day">Day</option>
+                            <option value="each">Each</option>
+                            <option value="lump_sum">Lump Sum</option>
+                            <option value="gallon">Gallon</option>
+                            <option value="tube">Tube</option>
+                        </select>
+                    </div>
+                </div>
+
+                <label for="description">Description</label>
+                <textarea id="description" name="description" rows="2" placeholder="Optional details about this line item"></textarea>
+
+                <div class="form-grid two">
+                    <div>
+                        <label for="quantity">Quantity *</label>
+                        <input id="quantity" name="quantity" type="number" step="0.01" min="0" required placeholder="10">
+                    </div>
+                    <div>
+                        <label for="unit_price">Unit Price *</label>
+                        <input id="unit_price" name="unit_price" type="number" step="0.01" min="0" required placeholder="95.00">
+                    </div>
+                </div>
+
+                <button type="submit" class="button button-primary button-full">Add Item</button>
+            </form>
+        </div>
+
+        <div class="estimate-totals" style="margin-top: 20px;">
+            <div class="totals-row">
+                <label>Subtotal:</label>
+                <span>{{ money(totals.subtotal) }}</span>
+            </div>
+            <div class="totals-row">
+                <label>Tax (6.5%):</label>
+                <span>{{ money(totals.tax) }}</span>
+            </div>
+            <div class="total-grand">
+                <label>Total:</label>
+                <span>{{ money(totals.total) }}</span>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

@@ -798,3 +798,233 @@ tr:last-child td {
         width: fit-content;
     }
 }
+
+/* Estimate styles */
+.estimate-card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 16px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 12px;
+    align-items: start;
+}
+
+.estimate-header {
+    display: grid;
+    gap: 8px;
+}
+
+.estimate-number {
+    color: var(--primary);
+    font-weight: 900;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.estimate-client {
+    font-size: 1.15rem;
+    font-weight: 800;
+}
+
+.estimate-service {
+    color: var(--muted);
+    font-size: 0.95rem;
+}
+
+.estimate-amount {
+    text-align: right;
+}
+
+.estimate-total {
+    font-size: 1.25rem;
+    font-weight: 900;
+}
+
+.estimate-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-end;
+    min-width: max-content;
+}
+
+.estimate-actions .button {
+    min-height: 42px;
+    padding: 8px 12px;
+    font-size: 0.9rem;
+}
+
+.line-items {
+    width: 100%;
+    margin: 20px 0;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.line-items table {
+    width: 100%;
+    margin: 0;
+}
+
+.line-items th,
+.line-items td {
+    padding: 12px;
+    border-bottom: 1px solid var(--line);
+    font-size: 0.95rem;
+}
+
+.line-items th {
+    background: #f8faf9;
+}
+
+.line-items tr:last-child td {
+    border-bottom: 0;
+}
+
+.line-item-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr auto;
+    gap: 12px;
+    align-items: end;
+    padding: 14px;
+    border-bottom: 1px solid var(--line);
+}
+
+.line-item-row input,
+.line-item-row select {
+    margin: 0;
+}
+
+.line-item-remove {
+    min-height: 36px;
+    padding: 6px 10px;
+}
+
+.estimate-totals {
+    display: grid;
+    gap: 10px;
+    width: 100%;
+    max-width: 320px;
+    margin-left: auto;
+    padding: 16px;
+    background: #f8faf9;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+}
+
+.totals-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.totals-row label {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.95rem;
+}
+
+.totals-row span {
+    font-weight: 800;
+    font-size: 1rem;
+}
+
+.total-grand {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 10px;
+    border-top: 2px solid var(--primary);
+}
+
+.total-grand label {
+    color: var(--primary);
+}
+
+.total-grand span {
+    color: var(--primary);
+    font-size: 1.25rem;
+}
+
+.estimate-branding {
+    margin-bottom: 20px;
+    padding-bottom: 20px;
+    border-bottom: 2px solid var(--primary);
+}
+
+.company-name {
+    font-size: 1.5rem;
+    font-weight: 900;
+    color: var(--primary);
+}
+
+.company-location {
+    color: var(--muted);
+    font-size: 0.9rem;
+}
+
+.estimate-section {
+    display: grid;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.estimate-section h3 {
+    margin: 0;
+    color: var(--primary);
+    font-size: 1rem;
+    text-transform: uppercase;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+}
+
+.estimate-info {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+.info-group label {
+    display: block;
+    margin-bottom: 4px;
+    color: var(--muted);
+    font-size: 0.85rem;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.info-group span {
+    display: block;
+    font-weight: 600;
+}
+
+@media (max-width: 640px) {
+    .estimate-card {
+        grid-template-columns: 1fr;
+    }
+
+    .estimate-amount {
+        text-align: left;
+    }
+
+    .estimate-actions {
+        justify-content: flex-start;
+    }
+
+    .line-item-row {
+        grid-template-columns: 1fr;
+    }
+
+    .estimate-totals {
+        max-width: 100%;
+    }
+
+    .estimate-info {
+        grid-template-columns: 1fr;
+    }
+}
+

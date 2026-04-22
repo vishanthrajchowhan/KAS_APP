@@ -66,6 +66,94 @@ PAYMENT_STATUSES = ("Not Paid", "Paid")
 ROLES = ("admin", "employee", "client")
 PUBLIC_ENDPOINTS = {"login", "static"}
 
+# Estimate statuses
+ESTIMATE_STATUSES = ("Draft", "Sent", "Viewed", "Approved", "Rejected", "Expired")
+
+# Service types for estimates
+SERVICE_TYPES = (
+    "Waterproofing",
+    "Roof Coating",
+    "Exterior Painting",
+    "Interior Painting",
+    "Caulking / Sealants",
+    "Concrete Repair",
+    "Stucco Repair",
+    "Balcony Waterproofing",
+    "Garage / Deck Coating",
+    "Pressure Cleaning",
+    "Commercial Building Maintenance",
+    "Custom Construction Services",
+)
+
+# Service templates - common line items by service type
+SERVICE_TEMPLATES = {
+    "Waterproofing": [
+        {"name": "Surface Preparation", "description": "Clean and prep surface", "unit": "sqft"},
+        {"name": "Waterproofing Coating", "description": "Apply waterproofing coating", "unit": "sqft"},
+        {"name": "Labor - Waterproofing", "description": "Labor", "unit": "hour"},
+    ],
+    "Roof Coating": [
+        {"name": "Surface Cleaning", "description": "Pressure clean roof surface", "unit": "sqft"},
+        {"name": "Repair & Patching", "description": "Roof repair and patching", "unit": "sqft"},
+        {"name": "Coating Application", "description": "Apply roof coating", "unit": "sqft"},
+        {"name": "Labor - Roof Coating", "description": "Labor", "unit": "hour"},
+    ],
+    "Exterior Painting": [
+        {"name": "Surface Prep", "description": "Pressure wash and prep", "unit": "sqft"},
+        {"name": "Primer", "description": "Primer application", "unit": "sqft"},
+        {"name": "Paint - Exterior", "description": "Paint application (2 coats)", "unit": "sqft"},
+        {"name": "Labor - Painting", "description": "Labor", "unit": "hour"},
+    ],
+    "Interior Painting": [
+        {"name": "Surface Prep", "description": "Prep and patch drywall", "unit": "sqft"},
+        {"name": "Primer", "description": "Primer application", "unit": "sqft"},
+        {"name": "Paint - Interior", "description": "Paint application (2 coats)", "unit": "sqft"},
+        {"name": "Labor - Painting", "description": "Labor", "unit": "hour"},
+    ],
+    "Caulking / Sealants": [
+        {"name": "Sealant Removal", "description": "Remove old sealant", "unit": "linear_ft"},
+        {"name": "Joint Prep", "description": "Clean and prep joints", "unit": "linear_ft"},
+        {"name": "Sealant Install", "description": "Install new sealant", "unit": "linear_ft"},
+        {"name": "Labor - Caulking", "description": "Labor", "unit": "hour"},
+    ],
+    "Concrete Repair": [
+        {"name": "Surface Prep", "description": "Clean and prepare concrete", "unit": "sqft"},
+        {"name": "Concrete Patching", "description": "Patch and repair concrete", "unit": "sqft"},
+        {"name": "Sealant", "description": "Seal repaired concrete", "unit": "sqft"},
+        {"name": "Labor - Concrete", "description": "Labor", "unit": "hour"},
+    ],
+    "Stucco Repair": [
+        {"name": "Surface Prep", "description": "Prepare stucco surface", "unit": "sqft"},
+        {"name": "Stucco Patching", "description": "Patch damaged stucco", "unit": "sqft"},
+        {"name": "Finishing", "description": "Match and finish stucco", "unit": "sqft"},
+        {"name": "Labor - Stucco", "description": "Labor", "unit": "hour"},
+    ],
+    "Balcony Waterproofing": [
+        {"name": "Surface Prep", "description": "Clean and prep balcony", "unit": "sqft"},
+        {"name": "Waterproofing Membrane", "description": "Install waterproofing", "unit": "sqft"},
+        {"name": "Labor - Balcony", "description": "Labor", "unit": "hour"},
+    ],
+    "Garage / Deck Coating": [
+        {"name": "Surface Prep", "description": "Clean and degrease", "unit": "sqft"},
+        {"name": "Primer", "description": "Primer application", "unit": "sqft"},
+        {"name": "Coating Application", "description": "Epoxy/Polyurethane coating", "unit": "sqft"},
+        {"name": "Labor - Coating", "description": "Labor", "unit": "hour"},
+    ],
+    "Pressure Cleaning": [
+        {"name": "Pressure Cleaning Service", "description": "Professional pressure washing", "unit": "sqft"},
+        {"name": "Labor - Cleaning", "description": "Labor", "unit": "hour"},
+    ],
+    "Commercial Building Maintenance": [
+        {"name": "General Maintenance", "description": "Building maintenance service", "unit": "hour"},
+        {"name": "Materials", "description": "Materials and supplies", "unit": "lump_sum"},
+    ],
+    "Custom Construction Services": [
+        {"name": "Labor", "description": "Labor", "unit": "hour"},
+        {"name": "Materials", "description": "Materials and supplies", "unit": "lump_sum"},
+    ],
+}
+
+
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-change-this-secret")
@@ -229,6 +317,49 @@ def init_db():
             """
         )
         migrate_updates_table(conn)
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS estimates (
+                id BIGSERIAL PRIMARY KEY,
+                estimate_number TEXT NOT NULL UNIQUE,
+                client_name TEXT NOT NULL,
+                company_name TEXT,
+                phone TEXT,
+                email TEXT,
+                address TEXT,
+                city TEXT,
+                state TEXT,
+                zip TEXT,
+                service_type TEXT NOT NULL,
+                project_description TEXT,
+                status TEXT NOT NULL DEFAULT 'Draft',
+                subtotal DOUBLE PRECISION NOT NULL DEFAULT 0,
+                tax DOUBLE PRECISION DEFAULT 0,
+                total DOUBLE PRECISION NOT NULL DEFAULT 0,
+                notes TEXT,
+                created_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT,
+                sent_at TEXT,
+                approved_at TEXT
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS estimate_items (
+                id BIGSERIAL PRIMARY KEY,
+                estimate_id BIGINT NOT NULL REFERENCES estimates(id) ON DELETE CASCADE,
+                item_name TEXT NOT NULL,
+                description TEXT,
+                quantity DOUBLE PRECISION NOT NULL,
+                unit TEXT NOT NULL,
+                unit_price DOUBLE PRECISION NOT NULL,
+                line_total DOUBLE PRECISION NOT NULL,
+                sort_order INTEGER DEFAULT 0
+            )
+            """
+        )
         seed_default_users(conn)
 
 
@@ -327,6 +458,52 @@ def parse_date(value):
 
 def money(value):
     return f"${value:,.2f}" if value is not None else "-"
+
+
+def generate_estimate_number(conn):
+    """Generate next estimate number like KAS-1001, KAS-1002, etc."""
+    result = conn.execute(
+        "SELECT COUNT(*) AS total FROM estimates"
+    ).fetchone()
+    next_num = 1001 + (result["total"] or 0)
+    return f"KAS-{next_num}"
+
+
+def get_estimate_or_404(estimate_id):
+    with get_db_connection() as conn:
+        estimate = conn.execute(
+            "SELECT * FROM estimates WHERE id = ?", (estimate_id,)
+        ).fetchone()
+    if estimate is None:
+        flash("Estimate not found.", "error")
+        return None
+    return estimate
+
+
+def get_estimate_items(conn, estimate_id):
+    """Get all line items for an estimate."""
+    items = conn.execute(
+        """
+        SELECT * FROM estimate_items
+        WHERE estimate_id = ?
+        ORDER BY sort_order, id
+        """,
+        (estimate_id,),
+    ).fetchall()
+    return items
+
+
+def calculate_estimate_totals(items):
+    """Calculate subtotal, tax, and total from items."""
+    subtotal = sum(item.get("line_total", 0) for item in items)
+    tax = subtotal * 0.065  # Florida 6.5% tax (can be made configurable)
+    total = subtotal + tax
+    return {
+        "subtotal": subtotal,
+        "tax": tax,
+        "total": total,
+    }
+
 
 
 def group_updates(update_rows):
@@ -1134,10 +1311,584 @@ def uploaded_file(filename):
     return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
 
 
-@app.route("/health/db")
+@app.route("/estimates")
 @login_required
 @role_required("admin")
-def health_db():
+def estimates():
+    """List all estimates with filters."""
+    search = request.args.get("q", "").strip()
+    status_filter = request.args.get("status", "").strip()
+    sort = request.args.get("sort", "newest").strip()
+    
+    where_clauses = []
+    params = []
+    
+    if status_filter in ESTIMATE_STATUSES:
+        where_clauses.append("status = ?")
+        params.append(status_filter)
+    
+    if search:
+        where_clauses.append(
+            "(client_name LIKE ? OR company_name LIKE ? OR estimate_number LIKE ?)"
+        )
+        like_search = f"%{search}%"
+        params.extend([like_search, like_search, like_search])
+    
+    where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+    order_by = "created_at DESC"
+    if sort == "oldest":
+        order_by = "created_at ASC"
+    elif sort == "name":
+        order_by = "client_name ASC"
+    elif sort == "value":
+        order_by = "total DESC"
+    
+    with get_db_connection() as conn:
+        estimate_list = conn.execute(
+            f"""
+            SELECT e.*, u.name as created_by_name
+            FROM estimates e
+            LEFT JOIN users u ON u.id = e.created_by
+            {where_sql}
+            ORDER BY {order_by}
+            """,
+            params,
+        ).fetchall()
+        
+        status_counts = {
+            row["status"]: row["count"]
+            for row in conn.execute(
+                f"""
+                SELECT status, COUNT(*) AS count
+                FROM estimates
+                {where_sql}
+                GROUP BY status
+                """,
+                params,
+            ).fetchall()
+        }
+        
+        metrics = conn.execute(
+            """
+            SELECT
+                COUNT(*) AS total_estimates,
+                SUM(CASE WHEN status = 'Draft' THEN 1 ELSE 0 END) AS draft_count,
+                SUM(CASE WHEN status IN ('Sent', 'Viewed') THEN 1 ELSE 0 END) AS pending_count,
+                SUM(CASE WHEN status = 'Approved' THEN 1 ELSE 0 END) AS approved_count,
+                COALESCE(SUM(CASE WHEN status = 'Approved' THEN total ELSE 0 END), 0) AS approved_value,
+                COALESCE(SUM(total), 0) AS total_value
+            FROM estimates
+            """
+        ).fetchone()
+    
+    return render_template(
+        "estimates.html",
+        estimates=estimate_list,
+        statuses=ESTIMATE_STATUSES,
+        status_counts=status_counts,
+        metrics=metrics,
+        money=money,
+        filters={"q": search, "status": status_filter, "sort": sort},
+    )
+
+
+@app.route("/estimate/create", methods=("GET", "POST"))
+@login_required
+@role_required("admin")
+def create_estimate():
+    """Create a new estimate."""
+    if request.method == "POST":
+        client_name = request.form.get("client_name", "").strip()
+        company_name = request.form.get("company_name", "").strip()
+        phone = request.form.get("phone", "").strip()
+        email = request.form.get("email", "").strip()
+        address = request.form.get("address", "").strip()
+        city = request.form.get("city", "").strip()
+        state = request.form.get("state", "").strip()
+        zip_code = request.form.get("zip", "").strip()
+        service_type = request.form.get("service_type", "").strip()
+        project_description = request.form.get("project_description", "").strip()
+        notes = request.form.get("notes", "").strip()
+        
+        if not client_name or not service_type:
+            flash("Client name and service type are required.", "error")
+            return render_template(
+                "create_estimate.html",
+                service_types=SERVICE_TYPES,
+                service_templates=SERVICE_TEMPLATES,
+                client_name=client_name,
+                company_name=company_name,
+                phone=phone,
+                email=email,
+                address=address,
+                city=city,
+                state=state,
+                zip_code=zip_code,
+                service_type=service_type,
+                project_description=project_description,
+                notes=notes,
+            )
+        
+        now = datetime.now().isoformat(timespec="seconds")
+        with get_db_connection() as conn:
+            estimate_number = generate_estimate_number(conn)
+            conn.execute(
+                """
+                INSERT INTO estimates (
+                    estimate_number, client_name, company_name, phone, email,
+                    address, city, state, zip, service_type, project_description,
+                    status, notes, created_by, created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    estimate_number,
+                    client_name,
+                    company_name,
+                    phone,
+                    email,
+                    address,
+                    city,
+                    state,
+                    zip_code,
+                    service_type,
+                    project_description,
+                    "Draft",
+                    notes,
+                    g.user["id"],
+                    now,
+                    now,
+                ),
+            )
+            # Get the ID of the newly created estimate
+            estimate = conn.execute(
+                "SELECT id FROM estimates WHERE estimate_number = ?",
+                (estimate_number,),
+            ).fetchone()
+        
+        flash(f"Estimate {estimate_number} created.", "success")
+        return redirect(url_for("edit_estimate", estimate_id=estimate["id"]))
+    
+    return render_template(
+        "create_estimate.html",
+        service_types=SERVICE_TYPES,
+        service_templates=SERVICE_TEMPLATES,
+    )
+
+
+@app.route("/estimate/<int:estimate_id>")
+@login_required
+@role_required("admin")
+def view_estimate(estimate_id):
+    """View an estimate."""
+    estimate = get_estimate_or_404(estimate_id)
+    if estimate is None:
+        return redirect(url_for("estimates"))
+    
+    with get_db_connection() as conn:
+        items = get_estimate_items(conn, estimate_id)
+    
+    totals = calculate_estimate_totals(items)
+    
+    return render_template(
+        "view_estimate.html",
+        estimate=estimate,
+        items=items,
+        totals=totals,
+        money=money,
+        statuses=ESTIMATE_STATUSES,
+    )
+
+
+@app.route("/estimate/<int:estimate_id>/edit", methods=("GET", "POST"))
+@login_required
+@role_required("admin")
+def edit_estimate(estimate_id):
+    """Edit an estimate."""
+    estimate = get_estimate_or_404(estimate_id)
+    if estimate is None:
+        return redirect(url_for("estimates"))
+    
+    if request.method == "POST":
+        # Handle estimate header updates
+        client_name = request.form.get("client_name", "").strip()
+        company_name = request.form.get("company_name", "").strip()
+        phone = request.form.get("phone", "").strip()
+        email = request.form.get("email", "").strip()
+        address = request.form.get("address", "").strip()
+        city = request.form.get("city", "").strip()
+        state = request.form.get("state", "").strip()
+        zip_code = request.form.get("zip", "").strip()
+        project_description = request.form.get("project_description", "").strip()
+        notes = request.form.get("notes", "").strip()
+        
+        if not client_name:
+            flash("Client name is required.", "error")
+        else:
+            now = datetime.now().isoformat(timespec="seconds")
+            with get_db_connection() as conn:
+                conn.execute(
+                    """
+                    UPDATE estimates
+                    SET client_name = ?, company_name = ?, phone = ?, email = ?,
+                        address = ?, city = ?, state = ?, zip = ?,
+                        project_description = ?, notes = ?, updated_at = ?
+                    WHERE id = ?
+                    """,
+                    (
+                        client_name,
+                        company_name,
+                        phone,
+                        email,
+                        address,
+                        city,
+                        state,
+                        zip_code,
+                        project_description,
+                        notes,
+                        now,
+                        estimate_id,
+                    ),
+                )
+            flash("Estimate updated.", "success")
+            return redirect(url_for("view_estimate", estimate_id=estimate_id))
+    
+    with get_db_connection() as conn:
+        items = get_estimate_items(conn, estimate_id)
+    
+    totals = calculate_estimate_totals(items)
+    
+    return render_template(
+        "edit_estimate.html",
+        estimate=estimate,
+        items=items,
+        totals=totals,
+        money=money,
+        service_types=SERVICE_TYPES,
+        service_templates=SERVICE_TEMPLATES,
+    )
+
+
+@app.route("/estimate/<int:estimate_id>/item/add", methods=("POST",))
+@login_required
+@role_required("admin")
+def add_estimate_item(estimate_id):
+    """Add a line item to an estimate."""
+    estimate = get_estimate_or_404(estimate_id)
+    if estimate is None:
+        return redirect(url_for("estimates"))
+    
+    item_name = request.form.get("item_name", "").strip()
+    description = request.form.get("description", "").strip()
+    quantity = request.form.get("quantity", type=float)
+    unit = request.form.get("unit", "").strip()
+    unit_price = request.form.get("unit_price", type=float)
+    
+    if not item_name or quantity is None or unit_price is None or not unit:
+        flash("All fields are required for line items.", "error")
+        return redirect(url_for("edit_estimate", estimate_id=estimate_id))
+    
+    line_total = quantity * unit_price
+    
+    with get_db_connection() as conn:
+        # Get max sort order
+        max_sort = conn.execute(
+            "SELECT MAX(sort_order) AS max_sort FROM estimate_items WHERE estimate_id = ?",
+            (estimate_id,),
+        ).fetchone()
+        next_sort = (max_sort["max_sort"] or 0) + 1
+        
+        conn.execute(
+            """
+            INSERT INTO estimate_items (
+                estimate_id, item_name, description, quantity, unit,
+                unit_price, line_total, sort_order
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                estimate_id,
+                item_name,
+                description,
+                quantity,
+                unit,
+                unit_price,
+                line_total,
+                next_sort,
+            ),
+        )
+        
+        # Update estimate totals
+        items = get_estimate_items(conn, estimate_id)
+        totals = calculate_estimate_totals(items)
+        now = datetime.now().isoformat(timespec="seconds")
+        
+        conn.execute(
+            """
+            UPDATE estimates
+            SET subtotal = ?, tax = ?, total = ?, updated_at = ?
+            WHERE id = ?
+            """,
+            (totals["subtotal"], totals["tax"], totals["total"], now, estimate_id),
+        )
+    
+    flash("Line item added.", "success")
+    return redirect(url_for("edit_estimate", estimate_id=estimate_id))
+
+
+@app.route("/estimate/<int:estimate_id>/item/<int:item_id>/delete", methods=("POST",))
+@login_required
+@role_required("admin")
+def delete_estimate_item(estimate_id, item_id):
+    """Delete a line item from an estimate."""
+    estimate = get_estimate_or_404(estimate_id)
+    if estimate is None:
+        return redirect(url_for("estimates"))
+    
+    with get_db_connection() as conn:
+        conn.execute(
+            "DELETE FROM estimate_items WHERE id = ? AND estimate_id = ?",
+            (item_id, estimate_id),
+        )
+        
+        # Update estimate totals
+        items = get_estimate_items(conn, estimate_id)
+        totals = calculate_estimate_totals(items)
+        now = datetime.now().isoformat(timespec="seconds")
+        
+        conn.execute(
+            """
+            UPDATE estimates
+            SET subtotal = ?, tax = ?, total = ?, updated_at = ?
+            WHERE id = ?
+            """,
+            (totals["subtotal"], totals["tax"], totals["total"], now, estimate_id),
+        )
+    
+    flash("Line item deleted.", "success")
+    return redirect(url_for("edit_estimate", estimate_id=estimate_id))
+
+
+@app.route("/estimate/<int:estimate_id>/send", methods=("POST",))
+@login_required
+@role_required("admin")
+def send_estimate(estimate_id):
+    """Mark estimate as sent and optionally email it."""
+    estimate = get_estimate_or_404(estimate_id)
+    if estimate is None:
+        return redirect(url_for("estimates"))
+    
+    send_email = request.form.get("send_email") == "on"
+    
+    now = datetime.now().isoformat(timespec="seconds")
+    with get_db_connection() as conn:
+        conn.execute(
+            """
+            UPDATE estimates
+            SET status = ?, sent_at = ?, updated_at = ?
+            WHERE id = ?
+            """,
+            ("Sent", now, now, estimate_id),
+        )
+    
+    if send_email and estimate["email"]:
+        flash(f"Estimate sent to {estimate['email']}. (Email integration coming soon)", "success")
+    else:
+        flash("Estimate marked as sent.", "success")
+    
+    return redirect(url_for("view_estimate", estimate_id=estimate_id))
+
+
+@app.route("/estimate/<int:estimate_id>/approve", methods=("POST",))
+@login_required
+@role_required("admin")
+def approve_estimate(estimate_id):
+    """Mark estimate as approved."""
+    estimate = get_estimate_or_404(estimate_id)
+    if estimate is None:
+        return redirect(url_for("estimates"))
+    
+    now = datetime.now().isoformat(timespec="seconds")
+    with get_db_connection() as conn:
+        conn.execute(
+            """
+            UPDATE estimates
+            SET status = ?, approved_at = ?, updated_at = ?
+            WHERE id = ?
+            """,
+            ("Approved", now, now, estimate_id),
+        )
+    
+    flash("Estimate approved.", "success")
+    return redirect(url_for("view_estimate", estimate_id=estimate_id))
+
+
+@app.route("/estimate/<int:estimate_id>/reject", methods=("POST",))
+@login_required
+@role_required("admin")
+def reject_estimate(estimate_id):
+    """Mark estimate as rejected."""
+    estimate = get_estimate_or_404(estimate_id)
+    if estimate is None:
+        return redirect(url_for("estimates"))
+    
+    now = datetime.now().isoformat(timespec="seconds")
+    with get_db_connection() as conn:
+        conn.execute(
+            """
+            UPDATE estimates
+            SET status = ?, updated_at = ?
+            WHERE id = ?
+            """,
+            ("Rejected", now, estimate_id),
+        )
+    
+    flash("Estimate rejected.", "success")
+    return redirect(url_for("view_estimate", estimate_id=estimate_id))
+
+
+@app.route("/estimate/<int:estimate_id>/convert", methods=("POST",))
+@login_required
+@role_required("admin")
+def convert_estimate_to_job(estimate_id):
+    """Convert an approved estimate to a job in the pipeline."""
+    estimate = get_estimate_or_404(estimate_id)
+    if estimate is None:
+        return redirect(url_for("estimates"))
+    
+    if estimate["status"] != "Approved":
+        flash("Only approved estimates can be converted to jobs.", "error")
+        return redirect(url_for("view_estimate", estimate_id=estimate_id))
+    
+    # Create a job from the estimate
+    now = datetime.now().isoformat(timespec="seconds")
+    job_name = f"{estimate['service_type']} - {estimate['client_name']}"
+    
+    with get_db_connection() as conn:
+        conn.execute(
+            """
+            INSERT INTO jobs (
+                name, client_name, location, description, status,
+                proposal_amount, proposal_sent_date, payment_status,
+                created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                job_name,
+                estimate["client_name"],
+                estimate["address"] or "See estimate",
+                estimate["project_description"] or f"{estimate['service_type']} project",
+                "Scheduled",
+                estimate["total"],
+                now[:10],  # Extract date from datetime
+                "Not Paid",
+                now,
+            ),
+        )
+        
+        # Get the newly created job ID
+        job = conn.execute(
+            "SELECT id FROM jobs WHERE client_name = ? AND created_at = ? ORDER BY id DESC LIMIT 1",
+            (estimate["client_name"], now),
+        ).fetchone()
+    
+    flash(f"Estimate converted to job. You can now track it in the Pipeline.", "success")
+    return redirect(url_for("update_job", job_id=job["id"]))
+
+
+@app.route("/estimate/<int:estimate_id>/duplicate", methods=("POST",))
+@login_required
+@role_required("admin")
+def duplicate_estimate(estimate_id):
+    """Duplicate an estimate."""
+    estimate = get_estimate_or_404(estimate_id)
+    if estimate is None:
+        return redirect(url_for("estimates"))
+    
+    now = datetime.now().isoformat(timespec="seconds")
+    
+    with get_db_connection() as conn:
+        # Generate new estimate number
+        estimate_number = generate_estimate_number(conn)
+        
+        # Create new estimate
+        conn.execute(
+            """
+            INSERT INTO estimates (
+                estimate_number, client_name, company_name, phone, email,
+                address, city, state, zip, service_type, project_description,
+                status, notes, created_by, created_at, updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                estimate_number,
+                estimate["client_name"],
+                estimate["company_name"],
+                estimate["phone"],
+                estimate["email"],
+                estimate["address"],
+                estimate["city"],
+                estimate["state"],
+                estimate["zip"],
+                estimate["service_type"],
+                estimate["project_description"],
+                "Draft",
+                estimate["notes"],
+                g.user["id"],
+                now,
+                now,
+            ),
+        )
+        
+        # Get the new estimate ID
+        new_estimate = conn.execute(
+            "SELECT id FROM estimates WHERE estimate_number = ?",
+            (estimate_number,),
+        ).fetchone()
+        
+        # Copy line items
+        items = get_estimate_items(conn, estimate_id)
+        for idx, item in enumerate(items):
+            conn.execute(
+                """
+                INSERT INTO estimate_items (
+                    estimate_id, item_name, description, quantity, unit,
+                    unit_price, line_total, sort_order
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    new_estimate["id"],
+                    item["item_name"],
+                    item["description"],
+                    item["quantity"],
+                    item["unit"],
+                    item["unit_price"],
+                    item["line_total"],
+                    idx,
+                ),
+            )
+        
+        # Update totals
+        new_items = get_estimate_items(conn, new_estimate["id"])
+        totals = calculate_estimate_totals(new_items)
+        
+        conn.execute(
+            """
+            UPDATE estimates
+            SET subtotal = ?, tax = ?, total = ?
+            WHERE id = ?
+            """,
+            (totals["subtotal"], totals["tax"], totals["total"], new_estimate["id"]),
+        )
+    
+    flash(f"Estimate duplicated as {estimate_number}.", "success")
+    return redirect(url_for("edit_estimate", estimate_id=new_estimate["id"]))
+
+
+
     ok, result = test_postgres_connection()
     return (
         jsonify(

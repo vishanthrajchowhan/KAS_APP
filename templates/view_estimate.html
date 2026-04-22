@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+
+{% block title %}{{ estimate.estimate_number }} | KAS{% endblock %}
+
+{% block content %}
+<section class="form-shell">
+    <div class="page-title">
+        <div>
+            <h1>{{ estimate.estimate_number }}</h1>
+            <p>{{ estimate.client_name }} · {{ estimate.service_type }}</p>
+        </div>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <span class="status status-{{ estimate.status|lower|replace(' ', '-') }}">{{ estimate.status }}</span>
+            <a href="{{ url_for('edit_estimate', estimate_id=estimate.id) }}" class="button button-small">Edit</a>
+            <form method="post" action="{{ url_for('duplicate_estimate', estimate_id=estimate.id) }}" style="display: contents;">
+                <button class="button button-small" type="submit">Duplicate</button>
+            </form>
+            {% if estimate.status == 'Draft' %}
+                <form method="post" action="{{ url_for('send_estimate', estimate_id=estimate.id) }}" style="display: contents;">
+                    <button class="button button-small" type="submit">Send</button>
+                </form>
+            {% elif estimate.status == 'Sent' and estimate.status != 'Approved' %}
+                <form method="post" action="{{ url_for('approve_estimate', estimate_id=estimate.id) }}" style="display: contents;">
+                    <button class="button button-small button-primary" type="submit">Approve</button>
+                </form>
+                <form method="post" action="{{ url_for('reject_estimate', estimate_id=estimate.id) }}" style="display: contents;">
+                    <button class="button button-small button-danger" type="submit">Reject</button>
+                </form>
+            {% elif estimate.status == 'Approved' %}
+                <form method="post" action="{{ url_for('convert_estimate_to_job', estimate_id=estimate.id) }}" style="display: contents;">
+                    <button class="button button-small button-primary" type="submit">Convert to Job</button>
+                </form>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="job-summary" style="padding: 20px;">
+        <div class="estimate-branding">
+            <div class="company-name">KAS Waterproofing & Building Services</div>
+            <div class="company-location">Fort Lauderdale, Florida</div>
+        </div>
+
+        <div class="estimate-section">
+            <h3>Client Information</h3>
+            <div class="estimate-info">
+                <div class="info-group">
+                    <label>Name</label>
+                    <span>{{ estimate.client_name }}</span>
+                </div>
+                {% if estimate.company_name %}
+                <div class="info-group">
+                    <label>Company</label>
+                    <span>{{ estimate.company_name }}</span>
+                </div>
+                {% endif %}
+                {% if estimate.phone %}
+                <div class="info-group">
+                    <label>Phone</label>
+                    <span>{{ estimate.phone }}</span>
+                </div>
+                {% endif %}
+                {% if estimate.email %}
+                <div class="info-group">
+                    <label>Email</label>
+                    <span><a href="mailto:{{ estimate.email }}">{{ estimate.email }}</a></span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if estimate.address or estimate.city %}
+        <div class="estimate-section">
+            <h3>Project Location</h3>
+            <div class="estimate-info">
+                {% if estimate.address %}
+                <div class="info-group" style="grid-column: 1 / -1;">
+                    <label>Address</label>
+                    <span>{{ estimate.address }}</span>
+                </div>
+                {% endif %}
+                {% if estimate.city %}
+                <div class="info-group">
+                    <label>City</label>
+                    <span>{{ estimate.city }}{% if estimate.state %}, {{ estimate.state }}{% endif %}{% if estimate.zip %} {{ estimate.zip }}{% endif %}</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="estimate-section">
+            <h3>Scope of Work</h3>
+            <div>{{ estimate.service_type }}</div>
+            {% if estimate.project_description %}
+            <div style="margin-top: 10px; color: var(--muted);">{{ estimate.project_description }}</div>
+            {% endif %}
+        </div>
+
+        {% if items %}
+        <div class="estimate-section">
+            <h3>Line Items</h3>
+            <table class="line-items">
+                <thead>
+                    <tr>
+                        <th>Description</th>
+                        <th style="text-align: right;">Qty</th>
+                        <th style="text-align: center;">Unit</th>
+                        <th style="text-align: right;">Price</th>
+                        <th style="text-align: right;">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in items %}
+                    <tr>
+                        <td>
+                            <strong>{{ item.item_name }}</strong>
+                            {% if item.description %}<div style="color: var(--muted); font-size: 0.9rem;">{{ item.description }}</div>{% endif %}
+                        </td>
+                        <td style="text-align: right;">{{ item.quantity }}</td>
+                        <td style="text-align: center;">{{ item.unit }}</td>
+                        <td style="text-align: right;">{{ money(item.unit_price) }}</td>
+                        <td style="text-align: right;"><strong>{{ money(item.line_total) }}</strong></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        <div class="estimate-totals">
+            <div class="totals-row">
+                <label>Subtotal:</label>
+                <span>{{ money(totals.subtotal) }}</span>
+            </div>
+            <div class="totals-row">
+                <label>Tax (6.5%):</label>
+                <span>{{ money(totals.tax) }}</span>
+            </div>
+            <div class="total-grand">
+                <label>Total:</label>
+                <span>{{ money(totals.total) }}</span>
+            </div>
+        </div>
+
+        {% if estimate.notes %}
+        <div class="estimate-section">
+            <h3>Terms & Conditions</h3>
+            <div style="white-space: pre-wrap;">{{ estimate.notes }}</div>
+        </div>
+        {% endif %}
+
+        <div style="margin-top: 40px; padding-top: 20px; border-top: 2px solid var(--line); text-align: center;">
+            <div style="margin-bottom: 40px;">
+                <p style="margin: 0; color: var(--muted); font-size: 0.9rem;">Authorized by:</p>
+                <div style="height: 60px; margin: 20px 0; border-bottom: 1px solid var(--ink);"></div>
+                <p style="margin: 0; color: var(--muted); font-size: 0.9rem;">Client Signature</p>
+            </div>
+            {% if estimate.created_at %}
+            <p style="color: var(--muted); font-size: 0.85rem;">Estimate created: {{ estimate.created_at[:10] }}</p>
+            {% endif %}
+        </div>
+    </div>
+</section>
+{% endblock %}
