@@ -96,7 +96,11 @@ if POSTGRES_CONNINFO:
         min_size=int(os.environ.get("DB_POOL_MIN_SIZE", "1")),
         max_size=int(os.environ.get("DB_POOL_MAX_SIZE", "5")),
         open=False,
-        kwargs={"row_factory": dict_row},
+        kwargs={
+            "row_factory": dict_row,
+            "autocommit": True,
+            "prepare_threshold": None,
+        },
     )
 
 
@@ -114,8 +118,9 @@ def postgres_now():
     pool = get_postgres_pool()
     with pool.connection() as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT NOW()")
-            return cur.fetchone()[0]
+            cur.execute("SELECT NOW() AS now")
+            row = cur.fetchone()
+            return row["now"]
 
 
 def test_postgres_connection():
