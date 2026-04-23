@@ -22,6 +22,7 @@ create table if not exists public.jobs (
     name text not null,
     location text not null,
     service_type text,
+    other_service_details text,
     description text not null,
     status text not null default 'Lead',
     client_name text,

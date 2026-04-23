@@ -1685,31 +1685,16 @@ tbody tr:last-child td {
     }
 }
 
-.service-grid{
-display:grid;
-grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
-gap:12px;
-margin-bottom:20px;
+.service-type-section {
+    gap: 8px;
+    margin-bottom: 4px;
 }
 
-.service-box{
-border:1px solid #dcdcdc;
-padding:14px;
-border-radius:12px;
-display:flex;
-gap:10px;
-align-items:center;
-cursor:pointer;
-background:white;
-transition:.2s;
+.service-type-section .help-text {
+    margin: 0;
+    font-size: 0.84rem;
 }
 
-.service-box:hover{
-border-color:#0f6b46;
-background:#f7fffb;
-}
-
-.service-box input{
-width:18px;
-height:18px;
+#other-service-wrapper {
+    margin-top: 6px;
 }

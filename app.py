@@ -297,6 +297,7 @@ def init_db():
                 name TEXT NOT NULL,
                 location TEXT NOT NULL,
                 service_type TEXT,
+                other_service_details TEXT,
                 description TEXT NOT NULL,
                 status TEXT NOT NULL DEFAULT 'Lead',
                 client_name TEXT,
@@ -415,6 +416,7 @@ def seed_default_users(conn):
 def migrate_jobs_table(conn):
     conn.execute("ALTER TABLE jobs ADD COLUMN IF NOT EXISTS client_name TEXT")
     conn.execute("ALTER TABLE jobs ADD COLUMN IF NOT EXISTS service_type TEXT")
+    conn.execute("ALTER TABLE jobs ADD COLUMN IF NOT EXISTS other_service_details TEXT")
     conn.execute("ALTER TABLE jobs ADD COLUMN IF NOT EXISTS proposal_amount DOUBLE PRECISION")
     conn.execute("ALTER TABLE jobs ADD COLUMN IF NOT EXISTS proposal_sent_date TEXT")
     conn.execute("ALTER TABLE jobs ADD COLUMN IF NOT EXISTS decision_date TEXT")
@@ -1011,8 +1013,8 @@ def add_job():
         name = request.form.get("name", "").strip()
         client_name = request.form.get("client_name", "").strip()
         location = request.form.get("location", "").strip()
-        selected_services = request.form.getlist("service_type")
-        service_type = ", ".join(selected_services)
+        service_type = request.form.get("service_type", "").strip()
+        other_service_details = request.form.get("other_service_details", "").strip()
         description = request.form.get("description", "").strip()
         status = request.form.get("status", "Lead").strip()
         proposal_amount = parse_money(request.form.get("proposal_amount"))
@@ -1022,8 +1024,10 @@ def add_job():
 
         if status not in STATUSES:
             status = "Lead"
-        if not selected_services:
-           service_type = ""
+        if service_type not in JOB_SERVICE_TYPES:
+            service_type = ""
+        if service_type != "Other Related Services":
+            other_service_details = ""
 
         with get_db_connection() as conn:
             employees = conn.execute(
@@ -1033,14 +1037,26 @@ def add_job():
                 "SELECT id, name, email FROM users WHERE role = 'client' ORDER BY name"
             ).fetchall()
 
-        if not name or not client_name or not location or not description or not service_type:
-            flash("Please fill out the job, client, location, service type, and description.", "error")
+        is_missing_required = (
+            not name
+            or not client_name
+            or not location
+            or not description
+            or not service_type
+            or (service_type == "Other Related Services" and not other_service_details)
+        )
+        if is_missing_required:
+            flash(
+                "Please fill out the job, client, location, service type, description, and other service details when Other is selected.",
+                "error",
+            )
             return render_template(
                 "add_job.html",
                 name=name,
                 client_name=client_name,
                 location=location,
                 service_type=service_type,
+                other_service_details=other_service_details,
                 description=description,
                 status=status,
                 proposal_amount=proposal_amount,
@@ -1058,17 +1074,18 @@ def add_job():
             conn.execute(
                 """
                 INSERT INTO jobs (
-                    name, client_name, location, service_type, description, status,
+                    name, client_name, location, service_type, other_service_details, description, status,
                     proposal_amount, proposal_sent_date, payment_status,
                     assigned_to, client_id, created_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     name,
                     client_name,
                     location,
                     service_type,
+                    other_service_details,
                     description,
                     status,
                     proposal_amount,

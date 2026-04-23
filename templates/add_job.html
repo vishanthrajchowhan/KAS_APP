@@ -22,19 +22,21 @@
         <label for="location">Location</label>
         <input id="location" name="location" type="text" value="{{ location or '' }}" required maxlength="180" autocomplete="street-address">
 
-        <label for="service_type">Service Type</label>
-        <label>Service Types</label>
+        <div class="form-section service-type-section">
+            <label for="service_type">Service Type</label>
+            <select id="service_type" name="service_type" required>
+                <option value="">Select one service</option>
+                {% for option in service_types %}
+                    <option value="{{ option }}" {% if service_type == option %}selected{% endif %}>{{ option }}</option>
+                {% endfor %}
+            </select>
+            <p class="help-text">Pick the primary service for this lead.</p>
 
-<div class="service-grid">
-
-{% for option in service_types %}
-<label class="service-box">
-<input type="checkbox" name="service_type" value="{{ option }}">
-<span>{{ option }}</span>
-</label>
-{% endfor %}
-
-</div>
+            <div id="other-service-wrapper" {% if service_type != 'Other Related Services' %}hidden{% endif %}>
+                <label for="other_service_details">Other Service Details</label>
+                <textarea id="other_service_details" name="other_service_details" rows="3" placeholder="Describe the requested service (e.g. stucco patching + elastomeric coating)">{{ other_service_details or '' }}</textarea>
+            </div>
+        </div>
 
         <label for="status">Starting Stage</label>
         <select id="status" name="status" required>
@@ -84,4 +86,29 @@
         </div>
     </form>
 </section>
+<script>
+(() => {
+    const serviceTypeSelect = document.getElementById("service_type");
+    const otherServiceWrapper = document.getElementById("other-service-wrapper");
+    const otherServiceDetailsInput = document.getElementById("other_service_details");
+    const otherServiceOption = "Other Related Services";
+
+    if (!serviceTypeSelect || !otherServiceWrapper || !otherServiceDetailsInput) {
+        return;
+    }
+
+    const updateOtherServiceVisibility = () => {
+        const isOtherSelected = serviceTypeSelect.value === otherServiceOption;
+        otherServiceWrapper.hidden = !isOtherSelected;
+        otherServiceDetailsInput.required = isOtherSelected;
+
+        if (!isOtherSelected) {
+            otherServiceDetailsInput.value = "";
+        }
+    };
+
+    serviceTypeSelect.addEventListener("change", updateOtherServiceVisibility);
+    updateOtherServiceVisibility();
+})();
+</script>
 {% endblock %}
