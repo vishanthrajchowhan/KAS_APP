@@ -1011,7 +1011,8 @@ def add_job():
         name = request.form.get("name", "").strip()
         client_name = request.form.get("client_name", "").strip()
         location = request.form.get("location", "").strip()
-        service_type = request.form.get("service_type", "").strip()
+        selected_services = request.form.getlist("service_type")
+        service_type = ", ".join(selected_services)
         description = request.form.get("description", "").strip()
         status = request.form.get("status", "Lead").strip()
         proposal_amount = parse_money(request.form.get("proposal_amount"))
@@ -1021,8 +1022,8 @@ def add_job():
 
         if status not in STATUSES:
             status = "Lead"
-        if service_type not in JOB_SERVICE_TYPES:
-            service_type = "Other Related Services"
+        if not selected_services:
+           service_type = ""
 
         with get_db_connection() as conn:
             employees = conn.execute(

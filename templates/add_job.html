@@ -23,12 +23,18 @@
         <input id="location" name="location" type="text" value="{{ location or '' }}" required maxlength="180" autocomplete="street-address">
 
         <label for="service_type">Service Type</label>
-        <select id="service_type" name="service_type" required>
-            <option value="">-- Select Service Type --</option>
-            {% for option in service_types %}
-                <option value="{{ option }}" {% if service_type == option %}selected{% endif %}>{{ option }}</option>
-            {% endfor %}
-        </select>
+        <label>Service Types</label>
+
+<div class="service-grid">
+
+{% for option in service_types %}
+<label class="service-box">
+<input type="checkbox" name="service_type" value="{{ option }}">
+<span>{{ option }}</span>
+</label>
+{% endfor %}
+
+</div>
 
         <label for="status">Starting Stage</label>
         <select id="status" name="status" required>
