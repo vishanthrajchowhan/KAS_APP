@@ -917,6 +917,7 @@ def index():
 
     monthly_revenue = list(reversed(monthly_revenue_rows))
     monthly_peak = max((row["value"] or 0) for row in monthly_revenue) if monthly_revenue else 0
+    latest_job_id = jobs[0]["id"] if jobs else None
 
     return render_template(
         "index.html",
@@ -934,6 +935,7 @@ def index():
         dashboard_role=dashboard_role,
         show_view_switcher=is_admin(),
         filters={"q": search, "status": status_filter, "quick": quick_filter, "sort": sort, "view_as": dashboard_role},
+        latest_job_id=latest_job_id,
         pending_estimates=pending_estimates,
         new_leads=new_leads,
         monthly_revenue=monthly_revenue,
@@ -1119,6 +1121,7 @@ def add_job():
 @login_required
 @role_required("admin")
 def users():
+    default_role = request.args.get("role", "").strip().lower()
     if request.method == "POST":
         name = request.form.get("name", "").strip()
         email = request.form.get("email", "").strip().lower()
@@ -1155,7 +1158,7 @@ def users():
         users_list = conn.execute(
             "SELECT id, name, email, role, created_at FROM users ORDER BY role, name"
         ).fetchall()
-    return render_template("users.html", users=users_list, roles=ROLES)
+    return render_template("users.html", users=users_list, roles=ROLES, default_role=default_role)
 
 
 @app.route("/update/<int:job_id>")

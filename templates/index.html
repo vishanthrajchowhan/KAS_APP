@@ -3,89 +3,211 @@
 {% block title %}Dashboard | KAS{% endblock %}
 
 {% block content %}
-<section class="page-title">
-    <div>
+{% set active_jobs = status_counts.get('Scheduled', 0) + status_counts.get('Started', 0) + status_counts.get('In Progress', 0) %}
+{% set completed_jobs = status_counts.get('Completed', 0) + status_counts.get('Paid', 0) %}
+{% set revenue_this_month = (monthly_revenue[-1].value if monthly_revenue else 0) or 0 %}
+
+<section class="dashboard-hero">
+    <div class="dashboard-hero-copy">
         <p class="eyebrow">Operations Workspace</p>
         <h1>Pipeline Dashboard</h1>
         {% if dashboard_role == "admin" %}
-            <p>Manage leads, execution, and revenue for KAS Waterproofing & Building Services.</p>
+            <p>Manage leads, execution, and revenue for KAS Waterproofing &amp; Building Services from one premium command center.</p>
         {% elif dashboard_role == "employee" %}
-            <p>Your assigned field jobs, updates, and timeline visibility.</p>
+            <p>Your assigned field jobs, updates, and timeline visibility in a mobile-ready workspace.</p>
         {% else %}
-            <p>Track your project progress, updates, and completion milestones.</p>
+            <p>Track your project progress, updates, and completion milestones from your client portal view.</p>
         {% endif %}
+
+        <div class="dashboard-tags" aria-label="Workspace context">
+            <span class="dashboard-tag">KAS Waterproofing &amp; Building Services</span>
+            <span class="dashboard-tag">Fort Lauderdale, Florida</span>
+            <span class="dashboard-tag">{{ dashboard_role|title }} View</span>
+        </div>
     </div>
+
     {% if can_manage_jobs %}
-        <a class="button button-primary" href="{{ url_for('add_job') }}">Add Lead</a>
+        <div class="dashboard-hero-actions" aria-label="Quick actions">
+            <a class="button button-primary" href="{{ url_for('add_job') }}">+ Add Lead</a>
+            <a class="button" href="{{ url_for('create_estimate') }}">Create Estimate</a>
+            <a class="button" href="{{ url_for('users', role='client') }}">Add Client</a>
+            <a class="button" href="{{ url_for('users', role='employee') }}">Assign Employee</a>
+            {% if latest_job_id %}
+                <a class="button" href="{{ url_for('update_job', job_id=latest_job_id) }}">Upload Update</a>
+            {% else %}
+                <span class="button button-disabled" aria-disabled="true">Upload Update</span>
+            {% endif %}
+        </div>
     {% endif %}
 </section>
 
-{% if dashboard_role == "admin" %}
-<section class="dashboard-stats crm-stats" aria-label="Business summary">
-    <div>
-        <span>{{ jobs|length }}</span>
-        <p>Total Projects</p>
-    </div>
-    <div>
-        <span>{{ status_counts.get('Scheduled', 0) + status_counts.get('Started', 0) + status_counts.get('In Progress', 0) }}</span>
-        <p>Active Jobs</p>
-    </div>
-    <div>
-        <span>{{ status_counts.get('Completed', 0) + status_counts.get('Paid', 0) }}</span>
-        <p>Completed Jobs</p>
-    </div>
-    <div>
-        <span>{{ pending_estimates }}</span>
-        <p>Pending Estimates</p>
-    </div>
-    <div>
-        <span>{{ money((monthly_revenue[-1].value if monthly_revenue else 0) or 0) }}</span>
-        <p>Revenue This Month</p>
-    </div>
-    <div>
-        <span>{{ new_leads }}</span>
-        <p>New Leads</p>
-    </div>
+<section class="dashboard-kpis" aria-label="Business summary">
+    {% if dashboard_role == "admin" %}
+        <article class="kpi-card kpi-primary">
+            <div class="kpi-icon">◫</div>
+            <div class="kpi-copy">
+                <span class="kpi-value">{{ jobs|length }}</span>
+                <p>Total Projects</p>
+                <small>All visible jobs in the current workspace</small>
+            </div>
+        </article>
+        <article class="kpi-card">
+            <div class="kpi-icon">⚡</div>
+            <div class="kpi-copy">
+                <span class="kpi-value">{{ active_jobs }}</span>
+                <p>Active Jobs</p>
+                <small>Scheduled, started, and in progress</small>
+            </div>
+        </article>
+        <article class="kpi-card">
+            <div class="kpi-icon">✓</div>
+            <div class="kpi-copy">
+                <span class="kpi-value">{{ completed_jobs }}</span>
+                <p>Completed Jobs</p>
+                <small>Finished or paid projects</small>
+            </div>
+        </article>
+        <article class="kpi-card">
+            <div class="kpi-icon">⌁</div>
+            <div class="kpi-copy">
+                <span class="kpi-value">{{ pending_estimates }}</span>
+                <p>Pending Estimates</p>
+                <small>Draft, sent, and viewed quotes</small>
+            </div>
+        </article>
+        <article class="kpi-card">
+            <div class="kpi-icon">$</div>
+            <div class="kpi-copy">
+                <span class="kpi-value">{{ money(revenue_this_month) }}</span>
+                <p>Revenue This Month</p>
+                <small>Collected payments for the month</small>
+            </div>
+        </article>
+        <article class="kpi-card">
+            <div class="kpi-icon">＋</div>
+            <div class="kpi-copy">
+                <span class="kpi-value">{{ new_leads }}</span>
+                <p>New Leads</p>
+                <small>Lead stage entries created this month</small>
+            </div>
+        </article>
+    {% elif dashboard_role == "employee" %}
+        <article class="kpi-card kpi-primary">
+            <div class="kpi-icon">◫</div>
+            <div class="kpi-copy">
+                <span class="kpi-value">{{ jobs|length }}</span>
+                <p>Assigned Projects</p>
+                <small>Your visible field workload</small>
+            </div>
+        </article>
+        <article class="kpi-card">
+            <div class="kpi-icon">⚡</div>
+            <div class="kpi-copy">
+                <span class="kpi-value">{{ status_counts.get('In Progress', 0) }}</span>
+                <p>In Progress</p>
+                <small>Active jobs in motion</small>
+            </div>
+        </article>
+        <article class="kpi-card">
+            <div class="kpi-icon">✓</div>
+            <div class="kpi-copy">
+                <span class="kpi-value">{{ completed_jobs }}</span>
+                <p>Completed</p>
+                <small>Closed field work</small>
+            </div>
+        </article>
+        <article class="kpi-card">
+            <div class="kpi-icon">📝</div>
+            <div class="kpi-copy">
+                <span class="kpi-value">{{ jobs|sum(attribute='update_count') }}</span>
+                <p>Updates Logged</p>
+                <small>Notes and media uploaded to jobs</small>
+            </div>
+        </article>
+        <article class="kpi-card">
+            <div class="kpi-icon">↗</div>
+            <div class="kpi-copy">
+                <span class="kpi-value">{{ status_counts.get('Scheduled', 0) + status_counts.get('Started', 0) }}</span>
+                <p>Ready to Work</p>
+                <small>Jobs queued for the crew</small>
+            </div>
+        </article>
+        <article class="kpi-card">
+            <div class="kpi-icon">⌛</div>
+            <div class="kpi-copy">
+                <span class="kpi-value">{{ status_counts.get('Proposal Sent', 0) + status_counts.get('Negotiation', 0) }}</span>
+                <p>Awaiting Decision</p>
+                <small>Leads still moving through sales</small>
+            </div>
+        </article>
+    {% else %}
+        <article class="kpi-card kpi-primary">
+            <div class="kpi-icon">◫</div>
+            <div class="kpi-copy">
+                <span class="kpi-value">{{ jobs|length }}</span>
+                <p>My Projects</p>
+                <small>Projects visible to your portal</small>
+            </div>
+        </article>
+        <article class="kpi-card">
+            <div class="kpi-icon">⚡</div>
+            <div class="kpi-copy">
+                <span class="kpi-value">{{ status_counts.get('In Progress', 0) }}</span>
+                <p>In Progress</p>
+                <small>Work currently underway</small>
+            </div>
+        </article>
+        <article class="kpi-card">
+            <div class="kpi-icon">✓</div>
+            <div class="kpi-copy">
+                <span class="kpi-value">{{ completed_jobs }}</span>
+                <p>Completed</p>
+                <small>Finished milestones</small>
+            </div>
+        </article>
+        <article class="kpi-card">
+            <div class="kpi-icon">📝</div>
+            <div class="kpi-copy">
+                <span class="kpi-value">{{ jobs|sum(attribute='update_count') }}</span>
+                <p>Updates Logged</p>
+                <small>Latest status and photos</small>
+            </div>
+        </article>
+        <article class="kpi-card">
+            <div class="kpi-icon">↗</div>
+            <div class="kpi-copy">
+                <span class="kpi-value">{{ status_counts.get('Scheduled', 0) + status_counts.get('Started', 0) }}</span>
+                <p>Ready to Work</p>
+                <small>Upcoming activity</small>
+            </div>
+        </article>
+        <article class="kpi-card">
+            <div class="kpi-icon">⌛</div>
+            <div class="kpi-copy">
+                <span class="kpi-value">{{ status_counts.get('Proposal Sent', 0) + status_counts.get('Negotiation', 0) }}</span>
+                <p>Awaiting Decision</p>
+                <small>Quotes in review</small>
+            </div>
+        </article>
+    {% endif %}
 </section>
-{% else %}
-<section class="dashboard-stats crm-stats" aria-label="Workspace summary">
-    <div>
-        <span>{{ jobs|length }}</span>
-        <p>{% if dashboard_role == "employee" %}Assigned Projects{% else %}My Projects{% endif %}</p>
-    </div>
-    <div>
-        <span>{{ status_counts.get('In Progress', 0) }}</span>
-        <p>In Progress</p>
-    </div>
-    <div>
-        <span>{{ status_counts.get('Completed', 0) + status_counts.get('Paid', 0) }}</span>
-        <p>Completed</p>
-    </div>
-    <div>
-        <span>{{ jobs|sum(attribute='update_count') }}</span>
-        <p>Updates Logged</p>
-    </div>
-    <div>
-        <span>{{ status_counts.get('Scheduled', 0) + status_counts.get('Started', 0) }}</span>
-        <p>Ready to Work</p>
-    </div>
-    <div>
-        <span>{{ status_counts.get('Proposal Sent', 0) + status_counts.get('Negotiation', 0) }}</span>
-        <p>Awaiting Decision</p>
-    </div>
-</section>
-{% endif %}
 
-<div class="analytics-grid">
-    <div class="analytics-main">
-        <section class="panel panel-status" aria-label="Jobs by status">
-            <h3>Jobs by Status</h3>
+<section class="dashboard-workspace">
+    <div class="dashboard-panels">
+        <section class="panel panel-status premium-panel" aria-label="Jobs by status">
+            <div class="panel-header">
+                <div>
+                    <p class="eyebrow">Pipeline Health</p>
+                    <h3>Jobs by Status</h3>
+                </div>
+                <span class="panel-chip">Live</span>
+            </div>
             <div class="bar-list">
                 {% set total_jobs = jobs|length if jobs else 1 %}
                 {% for status_name, count in status_counts.items() %}
                     {% set ratio = (count / total_jobs * 100) if total_jobs else 0 %}
                     <div class="bar-row">
-                        <div style="display:flex; justify-content:space-between; gap:8px;">
+                        <div class="bar-label-row">
                             <strong>{{ status_name }}</strong>
                             <span class="muted">{{ count }}</span>
                         </div>
@@ -98,13 +220,19 @@
         </section>
 
         {% if monthly_revenue and dashboard_role == "admin" %}
-        <section class="panel panel-revenue" aria-label="Monthly revenue trend">
-            <h3>Monthly Revenue</h3>
+        <section class="panel panel-revenue premium-panel" aria-label="Monthly revenue trend">
+            <div class="panel-header">
+                <div>
+                    <p class="eyebrow">Revenue Pulse</p>
+                    <h3>Monthly Revenue</h3>
+                </div>
+                <span class="panel-chip">12 mo</span>
+            </div>
             <div class="bar-list">
                 {% for row in monthly_revenue %}
                     {% set ratio = (row.value / monthly_peak * 100) if monthly_peak else 0 %}
                     <div class="bar-row">
-                        <div style="display:flex; justify-content:space-between; gap:8px;">
+                        <div class="bar-label-row">
                             <strong>{{ row.month }}</strong>
                             <span class="muted">{{ money(row.value or 0) }}</span>
                         </div>
@@ -118,29 +246,35 @@
         {% endif %}
     </div>
 
-    <section class="panel panel-activity" aria-label="Recent activity">
-        <h3>Recent Activity</h3>
+    <section class="panel panel-activity premium-panel" aria-label="Recent activity">
+        <div class="panel-header">
+            <div>
+                <p class="eyebrow">Field Activity</p>
+                <h3>Recent Activity</h3>
+            </div>
+            <span class="panel-chip">{{ recent_activity|length }} updates</span>
+        </div>
         <div class="activity-feed">
             {% if recent_activity %}
                 {% for event in recent_activity[:6] %}
-                    <div class="activity-item">
+                    <div class="activity-item premium-activity-item">
                         <strong>{{ event.job_name }}</strong>
-                        <p class="muted" style="margin:4px 0 2px;">{{ event.notes or "Update logged by team" }}</p>
+                        <p class="muted">{{ event.notes or "Update logged by team" }}</p>
                         <small>{{ event.timestamp|replace('T', ' ') }} · {{ (event.author_role or 'staff')|title }}</small>
                     </div>
                 {% endfor %}
             {% else %}
-                <div class="activity-item">
+                <div class="activity-item premium-activity-item">
                     <strong>No activity yet</strong>
-                    <p class="muted" style="margin:4px 0 0;">New updates from jobs and estimates will appear here.</p>
+                    <p class="muted">New updates from jobs and estimates will appear here.</p>
                 </div>
             {% endif %}
         </div>
     </section>
-</div>
+</section>
 
 {% if dashboard_role != "client" %}
-<section class="quick-filters" aria-label="Quick filters">
+<section class="quick-filters premium-filters" aria-label="Quick filters">
     <a class="quick-filter {% if not filters.quick %}active{% endif %}" href="{{ url_for('index', view_as=filters.view_as) }}">All</a>
     {% if dashboard_role == "employee" %}
         <a class="quick-filter {% if filters.quick == 'assigned_work' %}active{% endif %}" href="{{ url_for('index', quick='assigned_work', view_as=filters.view_as) }}">Assigned Work</a>
@@ -155,7 +289,7 @@
 </section>
 {% endif %}
 
-<form class="filters" method="get" action="{{ url_for('index') }}">
+<form class="filters premium-filters-bar" method="get" action="{{ url_for('index') }}">
     <input type="hidden" name="view_as" value="{{ filters.view_as }}">
     <input type="hidden" name="quick" value="{{ filters.quick }}">
 
@@ -201,7 +335,7 @@
 </form>
 
 {% if jobs %}
-<section class="job-list" aria-label="Job list">
+<section class="job-list premium-job-list" aria-label="Job list">
     {% for job in jobs %}
         {% set progress_map = {
             'Lead': 10,
@@ -220,17 +354,22 @@
         <article class="job-card">
             <div class="job-card-top">
                 <div>
+                    <div class="job-card-eyebrow">Project Spotlight</div>
                     <h2>{{ job.name }}</h2>
                     {% if dashboard_role != "employee" %}
                         <p class="client">{{ job.client_name or "Client not set" }}</p>
                     {% endif %}
                     <p class="location">{{ job.location }}</p>
                 </div>
-                <span class="status status-{{ job.status|lower|replace(' ', '-') }}">{{ job.status }}</span>
+                <div class="job-card-side">
+                    <span class="status status-{{ job.status|lower|replace(' ', '-') }}">{{ job.status }}</span>
+                    <span class="job-progress-badge">{{ progress_map.get(job.status, 0) }}% progress</span>
+                </div>
             </div>
 
             <div class="job-meta">
-                <span>Service: {{ job.name.split(' - ')[0] if ' - ' in job.name else 'General Service' }}</span>
+                <span>Service: {{ job.service_type or 'General Service' }}</span>
+                {% if job.other_service_details %}<span>{{ job.other_service_details }}</span>{% endif %}
                 {% if job.assigned_employee %}<span>Assigned: {{ job.assigned_employee }}</span>{% endif %}
                 <span>Updates: {{ job.update_count }}</span>
                 <span>Last update: {{ job.last_update|replace('T', ' ') if job.last_update else 'No updates yet' }}</span>
