@@ -29,6 +29,18 @@
                 <input id="company_city" name="company_city" value="{{ workspace_settings.company_city }}">
             </div>
             <div>
+                <label for="company_address">Address</label>
+                <input id="company_address" name="company_address" value="{{ workspace_settings.company_address or '' }}" placeholder="123 Main St">
+            </div>
+            <div>
+                <label for="company_state">State</label>
+                <input id="company_state" name="company_state" value="{{ workspace_settings.company_state or 'FL' }}" maxlength="20" placeholder="FL">
+            </div>
+            <div>
+                <label for="company_zip">ZIP</label>
+                <input id="company_zip" name="company_zip" value="{{ workspace_settings.company_zip or '' }}" maxlength="20" placeholder="33301">
+            </div>
+            <div>
                 <label for="company_phone">Phone</label>
                 <input id="company_phone" name="company_phone" value="{{ workspace_settings.company_phone }}" placeholder="(954) 555-0123">
             </div>
@@ -49,7 +61,8 @@
         <div class="settings-grid-fields">
             <div>
                 <label for="logo">Company Logo</label>
-                <input id="logo" name="logo" type="file" accept="image/png,image/jpeg,image/gif,image/webp">
+                <input id="logo" name="logo" type="file" accept="image/png,image/jpeg,image/webp">
+                <p class="help-text">Accepted formats: PNG, JPG, JPEG, WEBP. Large files are optimized automatically.</p>
                 {% if workspace_settings.logo_url %}
                     <div class="logo-preview">
                         <img src="{{ workspace_settings.logo_url }}" alt="Current company logo">

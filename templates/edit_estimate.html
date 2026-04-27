@@ -53,6 +53,20 @@
 
         <div class="form-section">
             <h2>Project Information</h2>
+            <label for="service_type">Service Types *</label>
+            <select id="service_type" name="service_type" multiple size="6" required data-other-label="Other">
+                {% for service in service_types %}
+                    <option value="{{ service }}" {% if service in (selected_service_types or []) %}selected{% endif %}>{{ service }}</option>
+                {% endfor %}
+            </select>
+            <p class="help-text">Use Ctrl/Cmd + click for multiple selections.</p>
+            <div id="service-chip-preview" class="service-chip-preview" aria-live="polite"></div>
+
+            <div id="other-service-wrapper" {% if 'Other' not in (selected_service_types or []) %}hidden{% endif %}>
+                <label for="other_service_details">Enter Custom Service</label>
+                <input id="other_service_details" name="other_service_details" type="text" value="{{ estimate.other_service_details or '' }}" placeholder="Garage Door Repair, Window Cleaning, Epoxy Flooring">
+            </div>
+
             <label for="project_description">Project Description</label>
             <textarea id="project_description" name="project_description" rows="4">{{ estimate.project_description or '' }}</textarea>
 
@@ -158,4 +172,40 @@
         </div>
     </div>
 </section>
+<script>
+(() => {
+    const serviceTypeEl = document.getElementById('service_type');
+    const chipPreviewEl = document.getElementById('service-chip-preview');
+    const otherWrapper = document.getElementById('other-service-wrapper');
+    const otherInput = document.getElementById('other_service_details');
+    if (!serviceTypeEl || !chipPreviewEl) {
+        return;
+    }
+
+    const updateView = () => {
+        const selected = Array.from(serviceTypeEl.selectedOptions).map((option) => option.value);
+        chipPreviewEl.innerHTML = '';
+        selected.forEach((service) => {
+            const chip = document.createElement('span');
+            chip.className = 'service-chip';
+            chip.textContent = service;
+            chipPreviewEl.appendChild(chip);
+        });
+
+        const otherSelected = selected.includes(serviceTypeEl.dataset.otherLabel || 'Other');
+        if (otherWrapper) {
+            otherWrapper.hidden = !otherSelected;
+        }
+        if (otherInput) {
+            otherInput.required = otherSelected;
+            if (!otherSelected) {
+                otherInput.value = '';
+            }
+        }
+    };
+
+    serviceTypeEl.addEventListener('change', updateView);
+    updateView();
+})();
+</script>
 {% endblock %}

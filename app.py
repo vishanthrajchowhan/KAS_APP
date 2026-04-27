@@ -28,8 +28,10 @@ BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
 
 UPLOAD_FOLDER = BASE_DIR / "uploads"
-BRANDING_UPLOAD_FOLDER = UPLOAD_FOLDER / "branding"
+STATIC_UPLOAD_FOLDER = BASE_DIR / "static" / "uploads"
+BRANDING_UPLOAD_FOLDER = STATIC_UPLOAD_FOLDER / "branding"
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
+ALLOWED_LOGO_EXTENSIONS = {"png", "jpg", "jpeg", "webp"}
 ALLOWED_RECEIPT_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp", "pdf", "doc", "docx", "xls", "xlsx"}
 PRE_CONSTRUCTION_STATUSES = (
     "Lead",
@@ -84,6 +86,7 @@ SERVICE_TYPES = (
     "Pressure Cleaning",
     "Commercial Building Maintenance",
     "Custom Construction Services",
+    "Other",
 )
 
 # Service types for leads/jobs
@@ -95,12 +98,17 @@ JOB_SERVICE_TYPES = (
     "Caulking",
     "Roofing",
     "Tiles",
-    "Other Related Services",
+    "Other",
 )
+OTHER_SERVICE_LABEL = "Other"
+LEGACY_OTHER_SERVICE_LABEL = "Other Related Services"
 
 DEFAULT_WORKSPACE_SETTINGS = {
     "company_name": "KAS Waterproofing & Building Services",
     "company_city": "Fort Lauderdale, Florida",
+    "company_address": "",
+    "company_state": "FL",
+    "company_zip": "",
     "company_phone": "",
     "company_email": "",
     "theme": "light",
@@ -282,6 +290,7 @@ def get_db_connection():
 
 def init_db():
     UPLOAD_FOLDER.mkdir(exist_ok=True)
+    STATIC_UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
     BRANDING_UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
     with get_db_connection() as conn:
         conn.execute(
@@ -362,6 +371,7 @@ def init_db():
                 state TEXT,
                 zip TEXT,
                 service_type TEXT NOT NULL,
+                other_service_details TEXT,
                 project_description TEXT,
                 status TEXT NOT NULL DEFAULT 'Draft',
                 subtotal DOUBLE PRECISION NOT NULL DEFAULT 0,
@@ -372,10 +382,12 @@ def init_db():
                 created_at TEXT NOT NULL,
                 updated_at TEXT,
                 sent_at TEXT,
-                approved_at TEXT
+                approved_at TEXT,
+                deleted_at TEXT
             )
             """
         )
+        migrate_estimates_table(conn)
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS estimate_items (
@@ -466,6 +478,11 @@ def migrate_updates_table(conn):
     conn.execute("ALTER TABLE updates ADD COLUMN IF NOT EXISTS author_role TEXT")
 
 
+def migrate_estimates_table(conn):
+    conn.execute("ALTER TABLE estimates ADD COLUMN IF NOT EXISTS other_service_details TEXT")
+    conn.execute("ALTER TABLE estimates ADD COLUMN IF NOT EXISTS deleted_at TEXT")
+
+
 def migrate_workspace_settings_table(conn):
     conn.execute(
         """
@@ -473,6 +490,9 @@ def migrate_workspace_settings_table(conn):
             id INTEGER PRIMARY KEY CHECK (id = 1),
             company_name TEXT NOT NULL,
             company_city TEXT NOT NULL,
+            company_address TEXT,
+            company_state TEXT,
+            company_zip TEXT,
             company_phone TEXT,
             company_email TEXT,
             theme TEXT NOT NULL DEFAULT 'light',
@@ -489,6 +509,9 @@ def migrate_workspace_settings_table(conn):
     )
     conn.execute("ALTER TABLE workspace_settings ADD COLUMN IF NOT EXISTS company_name TEXT")
     conn.execute("ALTER TABLE workspace_settings ADD COLUMN IF NOT EXISTS company_city TEXT")
+    conn.execute("ALTER TABLE workspace_settings ADD COLUMN IF NOT EXISTS company_address TEXT")
+    conn.execute("ALTER TABLE workspace_settings ADD COLUMN IF NOT EXISTS company_state TEXT")
+    conn.execute("ALTER TABLE workspace_settings ADD COLUMN IF NOT EXISTS company_zip TEXT")
     conn.execute("ALTER TABLE workspace_settings ADD COLUMN IF NOT EXISTS company_phone TEXT")
     conn.execute("ALTER TABLE workspace_settings ADD COLUMN IF NOT EXISTS company_email TEXT")
     conn.execute("ALTER TABLE workspace_settings ADD COLUMN IF NOT EXISTS theme TEXT")
@@ -507,17 +530,20 @@ def migrate_workspace_settings_table(conn):
         conn.execute(
             """
             INSERT INTO workspace_settings (
-                id, company_name, company_city, company_phone, company_email,
+                id, company_name, company_city, company_address, company_state, company_zip, company_phone, company_email,
                 theme, logo_path, dark_mode_default, notify_new_lead,
                 notify_estimate_approved, notify_payment_received, notify_photo_upload,
                 created_at, updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 1,
                 DEFAULT_WORKSPACE_SETTINGS["company_name"],
                 DEFAULT_WORKSPACE_SETTINGS["company_city"],
+                DEFAULT_WORKSPACE_SETTINGS["company_address"],
+                DEFAULT_WORKSPACE_SETTINGS["company_state"],
+                DEFAULT_WORKSPACE_SETTINGS["company_zip"],
                 DEFAULT_WORKSPACE_SETTINGS["company_phone"],
                 DEFAULT_WORKSPACE_SETTINGS["company_email"],
                 DEFAULT_WORKSPACE_SETTINGS["theme"],
@@ -549,10 +575,18 @@ def load_workspace_settings(conn):
     settings["notify_payment_received"] = normalize_bool(settings.get("notify_payment_received"))
     settings["notify_photo_upload"] = normalize_bool(settings.get("notify_photo_upload"))
     settings["theme"] = settings.get("theme") or "light"
+    settings["company_state"] = (settings.get("company_state") or "FL").strip()[:20]
     settings["logo_url"] = ""
-    if settings.get("logo_path"):
-        logo_filename = settings["logo_path"].replace("uploads/", "")
-        settings["logo_url"] = url_for("uploaded_file", filename=logo_filename)
+    settings["favicon_url"] = url_for("static", filename="icons/favicon.svg")
+    logo_path = (settings.get("logo_path") or "").strip()
+    if logo_path.startswith("static/"):
+        static_filename = logo_path[len("static/") :].lstrip("/")
+        settings["logo_url"] = url_for("static", filename=static_filename)
+    elif logo_path.startswith("uploads/branding/"):
+        settings["logo_url"] = url_for("public_branding_file", filename=logo_path.replace("uploads/branding/", ""))
+
+    if settings["logo_url"]:
+        settings["favicon_url"] = settings["logo_url"]
     return settings
 
 
@@ -561,7 +595,7 @@ def save_workspace_settings(conn, data):
     conn.execute(
         """
         UPDATE workspace_settings
-        SET company_name = ?, company_city = ?, company_phone = ?, company_email = ?,
+        SET company_name = ?, company_city = ?, company_address = ?, company_state = ?, company_zip = ?, company_phone = ?, company_email = ?,
             theme = ?, logo_path = ?, dark_mode_default = ?, notify_new_lead = ?,
             notify_estimate_approved = ?, notify_payment_received = ?, notify_photo_upload = ?,
             updated_at = ?
@@ -570,6 +604,9 @@ def save_workspace_settings(conn, data):
         (
             data["company_name"],
             data["company_city"],
+            data["company_address"],
+            data["company_state"],
+            data["company_zip"],
             data["company_phone"],
             data["company_email"],
             data["theme"],
@@ -622,7 +659,7 @@ def build_notifications_for_user(user, settings):
                     """
                     SELECT id, estimate_number, client_name, approved_at
                     FROM estimates
-                    WHERE status = 'Approved'
+                    WHERE status = 'Approved' AND deleted_at IS NULL
                     ORDER BY approved_at DESC NULLS LAST, created_at DESC
                     LIMIT 3
                     """
@@ -680,6 +717,10 @@ def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
+def allowed_logo_file(filename):
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_LOGO_EXTENSIONS
+
+
 def allowed_receipt_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_RECEIPT_EXTENSIONS
 
@@ -720,6 +761,84 @@ def normalize_bool(value, default=False):
     return bool(value)
 
 
+def split_services(value):
+    if not value:
+        return []
+    if isinstance(value, str):
+        raw_items = [part.strip() for part in value.split(",")]
+    else:
+        raw_items = [str(part).strip() for part in value]
+
+    deduped = []
+    seen = set()
+    for item in raw_items:
+        if not item:
+            continue
+        normalized_item = OTHER_SERVICE_LABEL if item == LEGACY_OTHER_SERVICE_LABEL else item
+        if normalized_item in seen:
+            continue
+        seen.add(normalized_item)
+        deduped.append(normalized_item)
+    return deduped
+
+
+def sanitize_selected_services(values, allowed_services):
+    allowed = set(allowed_services)
+    selected = []
+    seen = set()
+    for value in values:
+        item = (value or "").strip()
+        if item == LEGACY_OTHER_SERVICE_LABEL:
+            item = OTHER_SERVICE_LABEL
+        if not item or item not in allowed or item in seen:
+            continue
+        seen.add(item)
+        selected.append(item)
+    return selected
+
+
+def compose_service_text(values):
+    return ", ".join(values)
+
+
+def build_service_chips(service_type, other_details=""):
+    chips = split_services(service_type)
+    if OTHER_SERVICE_LABEL in chips and (other_details or "").strip():
+        chips = [chip for chip in chips if chip != OTHER_SERVICE_LABEL]
+        chips.append((other_details or "").strip())
+    return chips
+
+
+def process_logo_upload(uploaded_file):
+    try:
+        from PIL import Image, ImageOps
+    except ModuleNotFoundError as exc:
+        raise ValueError("Logo processing dependency is missing. Install Pillow in the active environment.") from exc
+
+    original_name = secure_filename(uploaded_file.filename)
+    if not original_name or not allowed_logo_file(original_name):
+        raise ValueError("Logo must be PNG, JPG, JPEG, or WEBP.")
+
+    try:
+        uploaded_file.stream.seek(0)
+        with Image.open(uploaded_file.stream) as raw_image:
+            image = ImageOps.exif_transpose(raw_image)
+            if image.mode not in ("RGB", "RGBA"):
+                image = image.convert("RGBA" if "A" in image.getbands() else "RGB")
+
+            max_size = (640, 640)
+            image.thumbnail(max_size, Image.Resampling.LANCZOS)
+
+            BRANDING_UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
+            logo_file_name = f"kas-logo-{uuid.uuid4().hex}.webp"
+            logo_file_path = BRANDING_UPLOAD_FOLDER / logo_file_name
+            image.save(logo_file_path, format="WEBP", quality=86, method=6)
+    except Exception as exc:
+        raise ValueError("Unable to process logo image. Please upload a valid PNG, JPG, JPEG, or WEBP file.") from exc
+
+    return f"static/uploads/branding/{logo_file_name}"
+
+
 def money(value):
     return f"${value:,.2f}" if value is not None else "-"
 
@@ -736,7 +855,7 @@ def generate_estimate_number(conn):
 def get_estimate_or_404(estimate_id):
     with get_db_connection() as conn:
         estimate = conn.execute(
-            "SELECT * FROM estimates WHERE id = ?", (estimate_id,)
+            "SELECT * FROM estimates WHERE id = ? AND deleted_at IS NULL", (estimate_id,)
         ).fetchone()
     if estimate is None:
         flash("Estimate not found.", "error")
@@ -943,6 +1062,13 @@ def pwa_service_worker():
     response = send_from_directory(BASE_DIR / "static", "sw.js", mimetype="application/javascript")
     response.headers["Cache-Control"] = "no-cache"
     return response
+
+
+@app.route("/brand/logo/<path:filename>")
+def public_branding_file(filename):
+    if not allowed_logo_file(filename):
+        return "", 404
+    return send_from_directory(BRANDING_UPLOAD_FOLDER, filename)
 
 
 @app.route("/api/push/vapid-public-key", methods=("GET",))
@@ -1236,7 +1362,7 @@ def analytics():
             """
             SELECT estimate_number, client_name, total, approved_at
             FROM estimates
-            WHERE status = 'Approved'
+            WHERE status = 'Approved' AND deleted_at IS NULL
             ORDER BY approved_at DESC NULLS LAST, created_at DESC
             LIMIT 8
             """
@@ -1279,6 +1405,9 @@ def settings():
     if request.method == "POST":
         company_name = request.form.get("company_name", "").strip() or DEFAULT_WORKSPACE_SETTINGS["company_name"]
         company_city = request.form.get("company_city", "").strip() or DEFAULT_WORKSPACE_SETTINGS["company_city"]
+        company_address = request.form.get("company_address", "").strip()
+        company_state = request.form.get("company_state", "").strip() or DEFAULT_WORKSPACE_SETTINGS["company_state"]
+        company_zip = request.form.get("company_zip", "").strip()
         company_phone = request.form.get("company_phone", "").strip()
         company_email = request.form.get("company_email", "").strip()
         theme = request.form.get("theme", "light").strip().lower()
@@ -1294,15 +1423,42 @@ def settings():
         logo_path = workspace_settings.get("logo_path", "")
         logo_file = request.files.get("logo")
         if logo_file and logo_file.filename:
-            logo_extension = logo_file.filename.rsplit(".", 1)[-1].lower() if "." in logo_file.filename else ""
-            if logo_extension not in {"png", "jpg", "jpeg", "webp", "gif"}:
-                flash("Logo must be a PNG, JPG, JPEG, GIF, or WEBP image.", "error")
+            if not allowed_logo_file(logo_file.filename):
+                flash("Logo must be a PNG, JPG, JPEG, or WEBP image.", "error")
                 return render_template(
                     "settings.html",
                     workspace_settings={
                         **workspace_settings,
                         "company_name": company_name,
                         "company_city": company_city,
+                        "company_address": company_address,
+                        "company_state": company_state,
+                        "company_zip": company_zip,
+                        "company_phone": company_phone,
+                        "company_email": company_email,
+                        "theme": theme,
+                        "dark_mode_default": dark_mode_default,
+                        "notify_new_lead": notify_new_lead,
+                        "notify_estimate_approved": notify_estimate_approved,
+                        "notify_payment_received": notify_payment_received,
+                        "notify_photo_upload": notify_photo_upload,
+                    },
+                    users_summary=users_summary,
+                    recent_users=recent_users,
+                )
+            try:
+                logo_path = process_logo_upload(logo_file)
+            except ValueError as exc:
+                flash(str(exc), "error")
+                return render_template(
+                    "settings.html",
+                    workspace_settings={
+                        **workspace_settings,
+                        "company_name": company_name,
+                        "company_city": company_city,
+                        "company_address": company_address,
+                        "company_state": company_state,
+                        "company_zip": company_zip,
                         "company_phone": company_phone,
                         "company_email": company_email,
                         "theme": theme,
@@ -1316,20 +1472,15 @@ def settings():
                     recent_users=recent_users,
                 )
 
-            BRANDING_UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
-            logo_name = secure_filename(logo_file.filename)
-            logo_suffix = logo_name.rsplit(".", 1)[-1].lower()
-            logo_file_name = f"kas-logo-{uuid.uuid4().hex}.{logo_suffix}"
-            logo_file_path = BRANDING_UPLOAD_FOLDER / logo_file_name
-            logo_file.save(logo_file_path)
-            logo_path = f"uploads/branding/{logo_file_name}"
-
         with get_db_connection() as conn:
             save_workspace_settings(
                 conn,
                 {
                     "company_name": company_name,
                     "company_city": company_city,
+                    "company_address": company_address,
+                    "company_state": company_state,
+                    "company_zip": company_zip,
                     "company_phone": company_phone,
                     "company_email": company_email,
                     "theme": theme,
@@ -1375,7 +1526,8 @@ def add_job():
         name = request.form.get("name", "").strip()
         client_name = request.form.get("client_name", "").strip()
         location = request.form.get("location", "").strip()
-        service_type = request.form.get("service_type", "").strip()
+        selected_service_types = sanitize_selected_services(request.form.getlist("service_type"), JOB_SERVICE_TYPES)
+        service_type = compose_service_text(selected_service_types)
         other_service_details = request.form.get("other_service_details", "").strip()
         description = request.form.get("description", "").strip()
         status = request.form.get("status", "Lead").strip()
@@ -1386,9 +1538,7 @@ def add_job():
 
         if status not in STATUSES:
             status = "Lead"
-        if service_type not in JOB_SERVICE_TYPES:
-            service_type = ""
-        if service_type != "Other Related Services":
+        if OTHER_SERVICE_LABEL not in selected_service_types:
             other_service_details = ""
 
         with get_db_connection() as conn:
@@ -1405,7 +1555,7 @@ def add_job():
             or not location
             or not description
             or not service_type
-            or (service_type == "Other Related Services" and not other_service_details)
+            or (OTHER_SERVICE_LABEL in selected_service_types and not other_service_details)
         )
         if is_missing_required:
             flash(
@@ -1417,7 +1567,7 @@ def add_job():
                 name=name,
                 client_name=client_name,
                 location=location,
-                service_type=service_type,
+                selected_service_types=selected_service_types,
                 other_service_details=other_service_details,
                 description=description,
                 status=status,
@@ -1472,6 +1622,7 @@ def add_job():
         "add_job.html",
         statuses=STATUSES,
         service_types=JOB_SERVICE_TYPES,
+        selected_service_types=[],
         employees=employees,
         clients=clients,
     )
@@ -1551,8 +1702,10 @@ def update_job(job_id):
     return render_template(
         "update_job.html",
         job=job,
+        selected_service_types=split_services(job.get("service_type")),
         updates=updates,
         statuses=STATUSES,
+        service_types=JOB_SERVICE_TYPES,
         pre_construction_statuses=PRE_CONSTRUCTION_STATUSES,
         execution_statuses=EXECUTION_STATUSES,
         financial_statuses=FINANCIAL_STATUSES,
@@ -1627,6 +1780,9 @@ def submit_update():
     receipt_files = request.files.getlist("receipts")
     assigned_to = request.form.get("assigned_to", type=int)
     client_id = request.form.get("client_id", type=int)
+    selected_service_types = sanitize_selected_services(request.form.getlist("service_type"), JOB_SERVICE_TYPES)
+    service_type = compose_service_text(selected_service_types)
+    other_service_details = request.form.get("other_service_details", "").strip()
 
     if not job_id:
         flash("Please choose a valid job.", "error")
@@ -1661,10 +1817,20 @@ def submit_update():
         payment_status = job["payment_status"] or "Not Paid"
         assigned_to = job["assigned_to"]
         client_id = job["client_id"]
+        service_type = job["service_type"] or ""
+        other_service_details = job["other_service_details"] or ""
     else:
         if not client_name:
             flash("Please enter a client name.", "error")
             return redirect(url_for("update_job", job_id=job_id))
+        if not service_type:
+            flash("Please choose at least one service type.", "error")
+            return redirect(url_for("update_job", job_id=job_id))
+        if OTHER_SERVICE_LABEL in selected_service_types and not other_service_details:
+            flash("Please add custom service details when Other is selected.", "error")
+            return redirect(url_for("update_job", job_id=job_id))
+        if OTHER_SERVICE_LABEL not in selected_service_types:
+            other_service_details = ""
 
     if status == "Rejected" and not rejection_reason:
         flash("Please add a rejection reason before marking a job rejected.", "error")
@@ -1701,6 +1867,8 @@ def submit_update():
             payment_status != (job["payment_status"] or "Not Paid"),
             assigned_to != job["assigned_to"],
             client_id != job["client_id"],
+            service_type != (job["service_type"] or ""),
+            other_service_details != (job["other_service_details"] or ""),
         ]
     )
     if not notes and not valid_files and not valid_receipt_files and not job_fields_changed:
@@ -1747,6 +1915,8 @@ def submit_update():
                 UPDATE jobs
                 SET status = ?,
                     client_name = ?,
+                    service_type = ?,
+                    other_service_details = ?,
                     proposal_amount = ?,
                     proposal_sent_date = ?,
                     decision_date = ?,
@@ -1760,6 +1930,8 @@ def submit_update():
                 (
                     status,
                     client_name,
+                    service_type,
+                    other_service_details,
                     proposal_amount,
                     proposal_sent_date,
                     decision_date,
@@ -1911,7 +2083,9 @@ def estimates():
         like_search = f"%{search}%"
         params.extend([like_search, like_search, like_search])
     
+    where_clauses.insert(0, "e.deleted_at IS NULL")
     where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+    status_where_sql = where_sql.replace("e.", "")
     order_by = "created_at DESC"
     if sort == "oldest":
         order_by = "created_at ASC"
@@ -1921,7 +2095,7 @@ def estimates():
         order_by = "total DESC"
     
     with get_db_connection() as conn:
-        estimate_list = conn.execute(
+        estimate_rows = conn.execute(
             f"""
             SELECT e.*, u.name as created_by_name
             FROM estimates e
@@ -1931,6 +2105,11 @@ def estimates():
             """,
             params,
         ).fetchall()
+        estimate_list = []
+        for row in estimate_rows:
+            record = dict(row)
+            record["service_chips"] = build_service_chips(row["service_type"], row.get("other_service_details"))
+            estimate_list.append(record)
         
         status_counts = {
             row["status"]: row["count"]
@@ -1938,7 +2117,7 @@ def estimates():
                 f"""
                 SELECT status, COUNT(*) AS count
                 FROM estimates
-                {where_sql}
+                {status_where_sql}
                 GROUP BY status
                 """,
                 params,
@@ -1955,6 +2134,7 @@ def estimates():
                 COALESCE(SUM(CASE WHEN status = 'Approved' THEN total ELSE 0 END), 0) AS approved_value,
                 COALESCE(SUM(total), 0) AS total_value
             FROM estimates
+            WHERE deleted_at IS NULL
             """
         ).fetchone()
     
@@ -1983,7 +2163,9 @@ def create_estimate():
         city = request.form.get("city", "").strip()
         state = request.form.get("state", "").strip()
         zip_code = request.form.get("zip", "").strip()
-        service_type = request.form.get("service_type", "").strip()
+        selected_service_types = sanitize_selected_services(request.form.getlist("service_type"), SERVICE_TYPES)
+        service_type = compose_service_text(selected_service_types)
+        other_service_details = request.form.get("other_service_details", "").strip()
         project_description = request.form.get("project_description", "").strip()
         notes = request.form.get("notes", "").strip()
         
@@ -2001,10 +2183,32 @@ def create_estimate():
                 city=city,
                 state=state,
                 zip_code=zip_code,
-                service_type=service_type,
+                selected_service_types=selected_service_types,
+                other_service_details=other_service_details,
                 project_description=project_description,
                 notes=notes,
             )
+        if OTHER_SERVICE_LABEL in selected_service_types and not other_service_details:
+            flash("Please provide custom service details when Other is selected.", "error")
+            return render_template(
+                "create_estimate.html",
+                service_types=SERVICE_TYPES,
+                service_templates=SERVICE_TEMPLATES,
+                client_name=client_name,
+                company_name=company_name,
+                phone=phone,
+                email=email,
+                address=address,
+                city=city,
+                state=state,
+                zip_code=zip_code,
+                selected_service_types=selected_service_types,
+                other_service_details=other_service_details,
+                project_description=project_description,
+                notes=notes,
+            )
+        if OTHER_SERVICE_LABEL not in selected_service_types:
+            other_service_details = ""
         
         now = datetime.now().isoformat(timespec="seconds")
         with get_db_connection() as conn:
@@ -2013,10 +2217,10 @@ def create_estimate():
                 """
                 INSERT INTO estimates (
                     estimate_number, client_name, company_name, phone, email,
-                    address, city, state, zip, service_type, project_description,
+                    address, city, state, zip, service_type, other_service_details, project_description,
                     status, notes, created_by, created_at, updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     estimate_number,
@@ -2029,6 +2233,7 @@ def create_estimate():
                     state,
                     zip_code,
                     service_type,
+                    other_service_details,
                     project_description,
                     "Draft",
                     notes,
@@ -2050,6 +2255,8 @@ def create_estimate():
         "create_estimate.html",
         service_types=SERVICE_TYPES,
         service_templates=SERVICE_TEMPLATES,
+        selected_service_types=[],
+        other_service_details="",
     )
 
 
@@ -2066,10 +2273,12 @@ def view_estimate(estimate_id):
         items = get_estimate_items(conn, estimate_id)
     
     totals = calculate_estimate_totals(items)
+    service_chips = build_service_chips(estimate["service_type"], estimate.get("other_service_details"))
     
     return render_template(
         "view_estimate.html",
         estimate=estimate,
+        service_chips=service_chips,
         items=items,
         totals=totals,
         money=money,
@@ -2085,6 +2294,7 @@ def edit_estimate(estimate_id):
     estimate = get_estimate_or_404(estimate_id)
     if estimate is None:
         return redirect(url_for("estimates"))
+    selected_service_types_for_form = split_services(estimate.get("service_type"))
     
     if request.method == "POST":
         # Handle estimate header updates
@@ -2096,12 +2306,21 @@ def edit_estimate(estimate_id):
         city = request.form.get("city", "").strip()
         state = request.form.get("state", "").strip()
         zip_code = request.form.get("zip", "").strip()
+        selected_service_types = sanitize_selected_services(request.form.getlist("service_type"), SERVICE_TYPES)
+        service_type = compose_service_text(selected_service_types)
+        other_service_details = request.form.get("other_service_details", "").strip()
         project_description = request.form.get("project_description", "").strip()
         notes = request.form.get("notes", "").strip()
         
         if not client_name:
             flash("Client name is required.", "error")
+        elif not service_type:
+            flash("Please choose at least one service type.", "error")
+        elif OTHER_SERVICE_LABEL in selected_service_types and not other_service_details:
+            flash("Please provide custom service details when Other is selected.", "error")
         else:
+            if OTHER_SERVICE_LABEL not in selected_service_types:
+                other_service_details = ""
             now = datetime.now().isoformat(timespec="seconds")
             with get_db_connection() as conn:
                 conn.execute(
@@ -2109,7 +2328,7 @@ def edit_estimate(estimate_id):
                     UPDATE estimates
                     SET client_name = ?, company_name = ?, phone = ?, email = ?,
                         address = ?, city = ?, state = ?, zip = ?,
-                        project_description = ?, notes = ?, updated_at = ?
+                        service_type = ?, other_service_details = ?, project_description = ?, notes = ?, updated_at = ?
                     WHERE id = ?
                     """,
                     (
@@ -2121,6 +2340,8 @@ def edit_estimate(estimate_id):
                         city,
                         state,
                         zip_code,
+                        service_type,
+                        other_service_details,
                         project_description,
                         notes,
                         now,
@@ -2129,6 +2350,23 @@ def edit_estimate(estimate_id):
                 )
             flash("Estimate updated.", "success")
             return redirect(url_for("view_estimate", estimate_id=estimate_id))
+
+        selected_service_types_for_form = selected_service_types
+        estimate = {
+            **dict(estimate),
+            "client_name": client_name,
+            "company_name": company_name,
+            "phone": phone,
+            "email": email,
+            "address": address,
+            "city": city,
+            "state": state,
+            "zip": zip_code,
+            "service_type": service_type,
+            "other_service_details": other_service_details,
+            "project_description": project_description,
+            "notes": notes,
+        }
     
     with get_db_connection() as conn:
         items = get_estimate_items(conn, estimate_id)
@@ -2138,6 +2376,7 @@ def edit_estimate(estimate_id):
     return render_template(
         "edit_estimate.html",
         estimate=estimate,
+        selected_service_types=selected_service_types_for_form,
         items=items,
         totals=totals,
         money=money,
@@ -2345,16 +2584,18 @@ def convert_estimate_to_job(estimate_id):
         conn.execute(
             """
             INSERT INTO jobs (
-                name, client_name, location, description, status,
+                name, client_name, location, service_type, other_service_details, description, status,
                 proposal_amount, proposal_sent_date, payment_status,
                 created_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 job_name,
                 estimate["client_name"],
                 estimate["address"] or "See estimate",
+                estimate["service_type"],
+                estimate["other_service_details"],
                 estimate["project_description"] or f"{estimate['service_type']} project",
                 "Scheduled",
                 estimate["total"],
@@ -2394,10 +2635,10 @@ def duplicate_estimate(estimate_id):
             """
             INSERT INTO estimates (
                 estimate_number, client_name, company_name, phone, email,
-                address, city, state, zip, service_type, project_description,
+                address, city, state, zip, service_type, other_service_details, project_description,
                 status, notes, created_by, created_at, updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 estimate_number,
@@ -2410,6 +2651,7 @@ def duplicate_estimate(estimate_id):
                 estimate["state"],
                 estimate["zip"],
                 estimate["service_type"],
+                estimate["other_service_details"],
                 estimate["project_description"],
                 "Draft",
                 estimate["notes"],
@@ -2463,6 +2705,29 @@ def duplicate_estimate(estimate_id):
     
     flash(f"Estimate duplicated as {estimate_number}.", "success")
     return redirect(url_for("edit_estimate", estimate_id=new_estimate["id"]))
+
+
+@app.route("/estimate/<int:estimate_id>/delete", methods=("POST",))
+@login_required
+@role_required("admin")
+def delete_estimate(estimate_id):
+    estimate = get_estimate_or_404(estimate_id)
+    if estimate is None:
+        return redirect(url_for("estimates"))
+
+    now = datetime.now().isoformat(timespec="seconds")
+    with get_db_connection() as conn:
+        conn.execute(
+            """
+            UPDATE estimates
+            SET deleted_at = ?, updated_at = ?
+            WHERE id = ?
+            """,
+            (now, now, estimate_id),
+        )
+
+    flash("Estimate moved to archive.", "success")
+    return redirect(url_for("estimates"))
 
 
 

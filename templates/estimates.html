@@ -64,7 +64,11 @@
                     {% if est.company_name %}
                         <div class="estimate-service">{{ est.company_name }}</div>
                     {% endif %}
-                    <div class="estimate-service">{{ est.service_type }}</div>
+                    <div class="service-chip-preview inline">
+                        {% for chip in est.service_chips or [est.service_type] %}
+                            <span class="service-chip">{{ chip }}</span>
+                        {% endfor %}
+                    </div>
                     <span class="status status-{{ est.status|lower|replace(' ', '-')|replace('/', '-') }}">{{ est.status }}</span>
                 </div>
                 <div class="estimate-amount">
@@ -80,6 +84,7 @@
                         {% if est.status != 'Rejected' %}
                             <a href="{{ url_for('edit_estimate', estimate_id=est.id) }}" class="button button-small">Edit</a>
                         {% endif %}
+                        <button type="button" class="button button-small button-danger" data-delete-id="{{ est.id }}" data-delete-number="{{ est.estimate_number }}">Delete</button>
                     </div>
                 </div>
             </div>
@@ -93,4 +98,57 @@
         </div>
     {% endif %}
 </section>
+
+<div id="delete-estimate-modal" class="modal-overlay" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="delete-estimate-title">
+        <h2 id="delete-estimate-title">Delete estimate?</h2>
+        <p id="delete-estimate-message" class="muted">This estimate will be archived and removed from active lists.</p>
+        <form id="delete-estimate-form" method="post">
+            <div class="modal-actions">
+                <button type="button" class="button" id="delete-estimate-cancel">Cancel</button>
+                <button type="submit" class="button button-danger">Yes, Delete</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+(() => {
+    const modal = document.getElementById('delete-estimate-modal');
+    const form = document.getElementById('delete-estimate-form');
+    const message = document.getElementById('delete-estimate-message');
+    const cancelButton = document.getElementById('delete-estimate-cancel');
+    if (!modal || !form || !message || !cancelButton) {
+        return;
+    }
+
+    const hideModal = () => {
+        modal.hidden = true;
+        document.body.classList.remove('modal-open');
+    };
+
+    document.querySelectorAll('[data-delete-id]').forEach((button) => {
+        button.addEventListener('click', () => {
+            const estimateId = button.getAttribute('data-delete-id');
+            const estimateNumber = button.getAttribute('data-delete-number');
+            form.action = `{{ url_for('delete_estimate', estimate_id=0) }}`.replace('/0/delete', `/${estimateId}/delete`);
+            message.textContent = `${estimateNumber} will be archived and hidden from active estimates.`;
+            modal.hidden = false;
+            document.body.classList.add('modal-open');
+        });
+    });
+
+    cancelButton.addEventListener('click', hideModal);
+    modal.addEventListener('click', (event) => {
+        if (event.target === modal) {
+            hideModal();
+        }
+    });
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && !modal.hidden) {
+            hideModal();
+        }
+    });
+})();
+</script>
 {% endblock %}

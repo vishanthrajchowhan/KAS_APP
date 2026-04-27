@@ -10,14 +10,15 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="KAS App">
     <meta name="description" content="KAS App - Waterproofing &amp; Building Services">
+    {% set dynamic_favicon = (workspace_settings.favicon_url if workspace_settings is defined and workspace_settings.favicon_url else url_for('static', filename='icons/favicon.svg')) %}
     <title>{% block title %}KAS{% endblock %}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="manifest" href="{{ url_for('pwa_manifest') }}">
-    <link rel="icon" href="{{ url_for('static', filename='icons/favicon.svg') }}" type="image/svg+xml">
+    <link rel="icon" href="{{ dynamic_favicon }}" type="image/svg+xml">
     <link rel="icon" href="{{ url_for('static', filename='icons/icon-192.png') }}" sizes="192x192" type="image/png">
-    <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/icon-192.png') }}">
+    <link rel="apple-touch-icon" href="{{ dynamic_favicon }}">
     <link rel="apple-touch-startup-image" href="{{ url_for('static', filename='icons/apple-splash.svg') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
@@ -31,14 +32,14 @@
                     <a class="brand" href="{{ url_for('index') }}">
                         <span class="brand-mark{% if workspace_settings.logo_url %} has-logo{% endif %}">
                             {% if workspace_settings.logo_url %}
-                                <img class="brand-logo" src="{{ workspace_settings.logo_url }}" alt="KAS logo">
+                                <img class="brand-logo" src="{{ workspace_settings.logo_url }}" alt="{{ workspace_settings.company_name or 'KAS' }} logo" loading="lazy" decoding="async">
                             {% else %}
                                 KAS
                             {% endif %}
                         </span>
                         <span class="brand-meta">
-                            <strong>KAS</strong>
-                            <small>Fort Lauderdale, FL</small>
+                            <strong>{{ workspace_settings.company_name or 'KAS' }}</strong>
+                            <small>{{ workspace_settings.company_city or 'Fort Lauderdale, FL' }}</small>
                         </span>
                     </a>
                     <button class="icon-button sidebar-close" type="button" id="sidebar-close" aria-label="Close menu">✕</button>
@@ -163,6 +164,19 @@
         </div>
     {% else %}
         <main class="page auth-page fade-in">
+            <div class="auth-brand">
+                <span class="brand-mark{% if workspace_settings.logo_url %} has-logo{% endif %}">
+                    {% if workspace_settings.logo_url %}
+                        <img class="brand-logo" src="{{ workspace_settings.logo_url }}" alt="{{ workspace_settings.company_name or 'KAS' }} logo" loading="lazy" decoding="async">
+                    {% else %}
+                        KAS
+                    {% endif %}
+                </span>
+                <div>
+                    <strong>{{ workspace_settings.company_name or 'KAS Waterproofing & Building Services' }}</strong>
+                    <small>{{ workspace_settings.company_city or 'Fort Lauderdale, Florida' }}</small>
+                </div>
+            </div>
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
                     <div class="messages" role="status" aria-live="polite">

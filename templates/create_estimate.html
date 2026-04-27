@@ -52,13 +52,19 @@
 
         <div class="form-section">
             <h2>Project Information</h2>
-            <label for="service_type">Service Type *</label>
-            <select id="service_type" name="service_type" required onchange="updateTemplateItems()">
-                <option value="">-- Select Service Type --</option>
+            <label for="service_type">Service Types *</label>
+            <select id="service_type" name="service_type" multiple size="6" required onchange="updateTemplateItems()" data-other-label="Other">
                 {% for service in service_types %}
-                    <option value="{{ service }}" {% if service_type == service %}selected{% endif %}>{{ service }}</option>
+                    <option value="{{ service }}" {% if service in (selected_service_types or []) %}selected{% endif %}>{{ service }}</option>
                 {% endfor %}
             </select>
+            <p class="help-text">Use Ctrl/Cmd + click to select multiple services.</p>
+            <div id="service-chip-preview" class="service-chip-preview" aria-live="polite"></div>
+
+            <div id="other-service-wrapper" {% if 'Other' not in (selected_service_types or []) %}hidden{% endif %}>
+                <label for="other_service_details">Enter Custom Service</label>
+                <input id="other_service_details" name="other_service_details" type="text" value="{{ other_service_details or '' }}" placeholder="Garage Door Repair, Window Cleaning, Epoxy Flooring">
+            </div>
 
             <label for="project_description">Project Description</label>
             <textarea id="project_description" name="project_description" rows="4">{{ project_description or '' }}</textarea>
@@ -79,12 +85,33 @@
 const serviceTemplates = {{ service_templates|tojson }};
 
 function updateTemplateItems() {
-    // This function can be expanded to auto-populate items when creating new estimates
-    const serviceType = document.getElementById('service_type').value;
-    if (serviceType && serviceTemplates[serviceType]) {
-        // Could auto-populate items in edit form
-        console.log('Templates available for:', serviceType);
+    const serviceTypeEl = document.getElementById('service_type');
+    const chipPreviewEl = document.getElementById('service-chip-preview');
+    const otherWrapper = document.getElementById('other-service-wrapper');
+    const otherInput = document.getElementById('other_service_details');
+    const selected = Array.from(serviceTypeEl.selectedOptions).map((option) => option.value);
+
+    chipPreviewEl.innerHTML = '';
+    selected.forEach((service) => {
+        const chip = document.createElement('span');
+        chip.className = 'service-chip';
+        chip.textContent = service;
+        chipPreviewEl.appendChild(chip);
+    });
+
+    const otherSelected = selected.includes(serviceTypeEl.dataset.otherLabel || 'Other');
+    if (otherWrapper) {
+        otherWrapper.hidden = !otherSelected;
     }
+    if (otherInput) {
+        otherInput.required = otherSelected;
+        if (!otherSelected) {
+            otherInput.value = '';
+        }
+    }
+
 }
+
+document.addEventListener('DOMContentLoaded', updateTemplateItems);
 </script>
 {% endblock %}

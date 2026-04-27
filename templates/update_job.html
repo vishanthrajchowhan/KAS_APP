@@ -92,6 +92,20 @@
                 {% endif %}
 
                 {% if can_manage_jobs %}
+                    <label for="service_type">Service Types</label>
+                    <select id="service_type" name="service_type" multiple size="6" required data-other-option="Other">
+                        {% for option in service_types %}
+                            <option value="{{ option }}" {% if option in (selected_service_types or []) %}selected{% endif %}>{{ option }}</option>
+                        {% endfor %}
+                    </select>
+                    <p class="help-text">Use Ctrl/Cmd + click to select multiple services.</p>
+                    <div id="service-chip-preview" class="service-chip-preview" aria-live="polite"></div>
+
+                    <div id="other-service-wrapper" {% if 'Other' not in (selected_service_types or []) %}hidden{% endif %}>
+                        <label for="other_service_details">Other Service Details</label>
+                        <textarea id="other_service_details" name="other_service_details" rows="3" placeholder="Describe custom services">{{ job.other_service_details or '' }}</textarea>
+                    </div>
+
                     <div class="form-grid two">
                         <div>
                             <label for="assigned_to">Assigned Employee</label>
@@ -237,4 +251,38 @@
         <p class="muted">No updates have been submitted for this job yet.</p>
     {% endif %}
 </section>
+<script>
+(() => {
+    const serviceTypeSelect = document.getElementById('service_type');
+    const chipPreview = document.getElementById('service-chip-preview');
+    const otherWrapper = document.getElementById('other-service-wrapper');
+    const otherInput = document.getElementById('other_service_details');
+
+    if (!serviceTypeSelect || !chipPreview || !otherWrapper || !otherInput) {
+        return;
+    }
+
+    const updateServiceUI = () => {
+        const selected = Array.from(serviceTypeSelect.selectedOptions).map((option) => option.value);
+        chipPreview.innerHTML = '';
+        selected.forEach((value) => {
+            const chip = document.createElement('span');
+            chip.className = 'service-chip';
+            chip.textContent = value;
+            chipPreview.appendChild(chip);
+        });
+
+        const otherValue = serviceTypeSelect.dataset.otherOption || 'Other';
+        const hasOther = selected.includes(otherValue);
+        otherWrapper.hidden = !hasOther;
+        otherInput.required = hasOther;
+        if (!hasOther) {
+            otherInput.value = '';
+        }
+    };
+
+    serviceTypeSelect.addEventListener('change', updateServiceUI);
+    updateServiceUI();
+})();
+</script>
 {% endblock %}

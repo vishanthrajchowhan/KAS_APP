@@ -8,7 +8,12 @@
         <div>
             <p class="eyebrow">Client Proposal</p>
             <h1>{{ estimate.estimate_number }}</h1>
-            <p>{{ estimate.client_name }} · {{ estimate.service_type }}</p>
+            <p>{{ estimate.client_name }}</p>
+            <div class="service-chip-preview inline">
+                {% for chip in service_chips %}
+                    <span class="service-chip">{{ chip }}</span>
+                {% endfor %}
+            </div>
         </div>
         <div class="estimate-actions">
             <span class="status status-{{ estimate.status|lower|replace(' ', '-') }}">{{ estimate.status }}</span>
@@ -37,8 +42,11 @@
 
     <div class="job-summary">
         <div class="estimate-branding">
-            <div class="company-name">KAS Waterproofing & Building Services</div>
-            <div class="company-location">Fort Lauderdale, Florida</div>
+            <div class="company-name">{{ workspace_settings.company_name or 'KAS Waterproofing & Building Services' }}</div>
+            <div class="company-location">{{ workspace_settings.company_city or 'Fort Lauderdale, Florida' }}</div>
+            {% if workspace_settings.logo_url %}
+                <img src="{{ workspace_settings.logo_url }}" alt="Company logo" class="estimate-logo" loading="lazy" decoding="async">
+            {% endif %}
         </div>
 
         <div class="estimate-section">
@@ -91,7 +99,11 @@
 
         <div class="estimate-section">
             <h3>Scope of Work</h3>
-            <div>{{ estimate.service_type }}</div>
+            <div class="service-chip-preview inline">
+                {% for chip in service_chips %}
+                    <span class="service-chip">{{ chip }}</span>
+                {% endfor %}
+            </div>
             {% if estimate.project_description %}
             <div class="estimate-service">{{ estimate.project_description }}</div>
             {% endif %}

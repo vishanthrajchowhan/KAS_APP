@@ -23,16 +23,16 @@
         <input id="location" name="location" type="text" value="{{ location or '' }}" required maxlength="180" autocomplete="street-address">
 
         <div class="form-section service-type-section">
-            <label for="service_type">Service Type</label>
-            <select id="service_type" name="service_type" required>
-                <option value="">Select one service</option>
+            <label for="service_type">Service Types</label>
+            <select id="service_type" name="service_type" multiple size="6" required data-other-option="Other">
                 {% for option in service_types %}
-                    <option value="{{ option }}" {% if service_type == option %}selected{% endif %}>{{ option }}</option>
+                    <option value="{{ option }}" {% if option in (selected_service_types or []) %}selected{% endif %}>{{ option }}</option>
                 {% endfor %}
             </select>
-            <p class="help-text">Pick the primary service for this lead.</p>
+            <p class="help-text">Use Ctrl/Cmd + click to select multiple services.</p>
+            <div id="service-chip-preview" class="service-chip-preview" aria-live="polite"></div>
 
-            <div id="other-service-wrapper" {% if service_type != 'Other Related Services' %}hidden{% endif %}>
+            <div id="other-service-wrapper" {% if 'Other' not in (selected_service_types or []) %}hidden{% endif %}>
                 <label for="other_service_details">Other Service Details</label>
                 <textarea id="other_service_details" name="other_service_details" rows="3" placeholder="Describe the requested service (e.g. stucco patching + elastomeric coating)">{{ other_service_details or '' }}</textarea>
             </div>
@@ -89,16 +89,27 @@
 <script>
 (() => {
     const serviceTypeSelect = document.getElementById("service_type");
+    const serviceChipPreview = document.getElementById("service-chip-preview");
     const otherServiceWrapper = document.getElementById("other-service-wrapper");
     const otherServiceDetailsInput = document.getElementById("other_service_details");
-    const otherServiceOption = "Other Related Services";
+    const otherServiceOption = serviceTypeSelect ? serviceTypeSelect.dataset.otherOption || "Other" : "Other";
 
-    if (!serviceTypeSelect || !otherServiceWrapper || !otherServiceDetailsInput) {
+    if (!serviceTypeSelect || !otherServiceWrapper || !otherServiceDetailsInput || !serviceChipPreview) {
         return;
     }
 
     const updateOtherServiceVisibility = () => {
-        const isOtherSelected = serviceTypeSelect.value === otherServiceOption;
+        const selectedValues = Array.from(serviceTypeSelect.selectedOptions).map((option) => option.value);
+        const isOtherSelected = selectedValues.includes(otherServiceOption);
+
+        serviceChipPreview.innerHTML = "";
+        selectedValues.forEach((value) => {
+            const chip = document.createElement("span");
+            chip.className = "service-chip";
+            chip.textContent = value;
+            serviceChipPreview.appendChild(chip);
+        });
+
         otherServiceWrapper.hidden = !isOtherSelected;
         otherServiceDetailsInput.required = isOtherSelected;
 
