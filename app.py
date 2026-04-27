@@ -578,15 +578,21 @@ def load_workspace_settings(conn):
     settings["company_state"] = (settings.get("company_state") or "FL").strip()[:20]
     settings["logo_url"] = ""
     settings["favicon_url"] = url_for("static", filename="icons/favicon.svg")
+    settings["favicon_mimetype"] = "image/svg+xml"
     logo_path = (settings.get("logo_path") or "").strip()
     if logo_path.startswith("static/"):
         static_filename = logo_path[len("static/") :].lstrip("/")
         settings["logo_url"] = url_for("static", filename=static_filename)
     elif logo_path.startswith("uploads/branding/"):
         settings["logo_url"] = url_for("public_branding_file", filename=logo_path.replace("uploads/branding/", ""))
+    else:
+        fallback_logo = STATIC_UPLOAD_FOLDER / "branding" / "Logo.png"
+        if fallback_logo.exists():
+            settings["logo_url"] = url_for("static", filename="uploads/branding/Logo.png")
 
     if settings["logo_url"]:
         settings["favicon_url"] = settings["logo_url"]
+        settings["favicon_mimetype"] = "image/png" if settings["logo_url"].lower().endswith(".png") else "image/svg+xml"
     return settings
 
 

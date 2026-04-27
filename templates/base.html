@@ -16,7 +16,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="manifest" href="{{ url_for('pwa_manifest') }}">
-    <link rel="icon" href="{{ dynamic_favicon }}" type="image/svg+xml">
+    <link rel="icon" href="{{ dynamic_favicon }}" type="{{ workspace_settings.favicon_mimetype if workspace_settings is defined and workspace_settings.favicon_mimetype else 'image/svg+xml' }}">
     <link rel="icon" href="{{ url_for('static', filename='icons/icon-192.png') }}" sizes="192x192" type="image/png">
     <link rel="apple-touch-icon" href="{{ dynamic_favicon }}">
     <link rel="apple-touch-startup-image" href="{{ url_for('static', filename='icons/apple-splash.svg') }}">
