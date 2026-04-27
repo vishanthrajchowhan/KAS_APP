@@ -579,16 +579,25 @@ def load_workspace_settings(conn):
     settings["logo_url"] = ""
     settings["favicon_url"] = url_for("static", filename="icons/favicon.svg")
     settings["favicon_mimetype"] = "image/svg+xml"
+
+    def with_asset_version(asset_url, file_path):
+        if not file_path.exists():
+            return asset_url
+        version = int(file_path.stat().st_mtime)
+        separator = "&" if "?" in asset_url else "?"
+        return f"{asset_url}{separator}v={version}"
+
     logo_path = (settings.get("logo_path") or "").strip()
     if logo_path.startswith("static/"):
         static_filename = logo_path[len("static/") :].lstrip("/")
-        settings["logo_url"] = url_for("static", filename=static_filename)
+        settings["logo_url"] = with_asset_version(url_for("static", filename=static_filename), BASE_DIR / static_filename)
     elif logo_path.startswith("uploads/branding/"):
-        settings["logo_url"] = url_for("public_branding_file", filename=logo_path.replace("uploads/branding/", ""))
+        fallback_name = logo_path.replace("uploads/branding/", "")
+        settings["logo_url"] = with_asset_version(url_for("public_branding_file", filename=fallback_name), BRANDING_UPLOAD_FOLDER / fallback_name)
     else:
         fallback_logo = STATIC_UPLOAD_FOLDER / "branding" / "Logo.png"
         if fallback_logo.exists():
-            settings["logo_url"] = url_for("static", filename="uploads/branding/Logo.png")
+            settings["logo_url"] = with_asset_version(url_for("static", filename="uploads/branding/Logo.png"), fallback_logo)
 
     if settings["logo_url"]:
         settings["favicon_url"] = settings["logo_url"]
