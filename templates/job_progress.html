@@ -64,9 +64,9 @@
 <section class="before-after" aria-label="Before and after slider">
     <h3>Before / After View</h3>
     <div class="before-after-stage" id="before-after-stage">
-        <img src="{{ url_for('uploaded_file', filename=media.before.replace('uploads/', '')) }}" alt="Before progress image">
+        <img src="{{ url_for('uploaded_file', filename=media.before.replace('uploads/', '')) }}" alt="Before progress image" loading="lazy" decoding="async">
         <div class="after-layer" id="after-layer">
-            <img src="{{ url_for('uploaded_file', filename=media.after.replace('uploads/', '')) }}" alt="After progress image">
+            <img src="{{ url_for('uploaded_file', filename=media.after.replace('uploads/', '')) }}" alt="After progress image" loading="lazy" decoding="async">
         </div>
     </div>
     <label for="before-after-slider">Slide to compare</label>
@@ -100,7 +100,7 @@
                         <div class="photo-grid">
                             {% for photo in update.photos %}
                                 <a href="{{ url_for('uploaded_file', filename=photo.replace('uploads/', '')) }}" target="_blank" rel="noopener">
-                                    <img src="{{ url_for('uploaded_file', filename=photo.replace('uploads/', '')) }}" alt="Job progress photo">
+                                    <img src="{{ url_for('uploaded_file', filename=photo.replace('uploads/', '')) }}" alt="Job progress photo" loading="lazy" decoding="async">
                                 </a>
                             {% endfor %}
                         </div>

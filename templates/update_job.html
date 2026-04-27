@@ -216,7 +216,7 @@
                     <div class="photo-grid">
                         {% for photo in update.photos %}
                             <a href="{{ url_for('uploaded_file', filename=photo.replace('uploads/', '')) }}" target="_blank" rel="noopener">
-                                <img src="{{ url_for('uploaded_file', filename=photo.replace('uploads/', '')) }}" alt="Job update photo">
+                                <img src="{{ url_for('uploaded_file', filename=photo.replace('uploads/', '')) }}" alt="Job update photo" loading="lazy" decoding="async">
                             </a>
                         {% endfor %}
                     </div>

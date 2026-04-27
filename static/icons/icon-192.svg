@@ -3,12 +3,11 @@
   <desc id="desc">KAS Waterproofing and Building Services app icon.</desc>
   <defs>
     <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#1aa36f"/>
+      <stop offset="0" stop-color="#21b07a"/>
       <stop offset="1" stop-color="#0f6a47"/>
     </linearGradient>
   </defs>
-  <rect x="24" y="24" width="464" height="464" rx="120" fill="#0f1714"/>
-  <rect x="56" y="56" width="400" height="400" rx="96" fill="url(#g)"/>
-  <path d="M110 384V128h56v108l96-108h68l-96 108 104 148h-68l-74-104-30 33v71z" fill="#ffffff"/>
-  <rect x="338" y="128" width="64" height="256" rx="32" fill="#ffffff"/>
+  <rect x="24" y="24" width="464" height="464" rx="126" fill="#0f1714"/>
+  <rect x="56" y="56" width="400" height="400" rx="104" fill="url(#g)"/>
+  <text x="256" y="308" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="112" font-weight="800" fill="#ffffff" letter-spacing="6">KAS</text>
 </svg>

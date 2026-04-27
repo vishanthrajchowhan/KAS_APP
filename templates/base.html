@@ -13,8 +13,10 @@
     <title>{% block title %}KAS{% endblock %}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="manifest" href="{{ url_for('pwa_manifest') }}">
+    <link rel="icon" href="{{ url_for('static', filename='icons/favicon.svg') }}" type="image/svg+xml">
+    <link rel="icon" href="{{ url_for('static', filename='icons/icon-192.png') }}" sizes="192x192" type="image/png">
     <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/icon-192.png') }}">
     <link rel="apple-touch-startup-image" href="{{ url_for('static', filename='icons/apple-splash.svg') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
@@ -27,9 +29,15 @@
             <aside class="sidebar" id="sidebar" aria-label="Primary navigation">
                 <div class="sidebar-brand-row">
                     <a class="brand" href="{{ url_for('index') }}">
-                        <span class="brand-mark">KAS</span>
+                        <span class="brand-mark{% if workspace_settings.logo_url %} has-logo{% endif %}">
+                            {% if workspace_settings.logo_url %}
+                                <img class="brand-logo" src="{{ workspace_settings.logo_url }}" alt="KAS logo">
+                            {% else %}
+                                KAS
+                            {% endif %}
+                        </span>
                         <span class="brand-meta">
-                            <strong>Waterproofing</strong>
+                            <strong>KAS</strong>
                             <small>Fort Lauderdale, FL</small>
                         </span>
                     </a>
@@ -75,7 +83,38 @@
 
                     <div class="topbar-right">
                         <button class="icon-button" type="button" id="theme-toggle" aria-label="Toggle dark mode">◐</button>
-                        <button class="icon-button notification-dot" type="button" aria-label="Notifications">🔔</button>
+
+                        <div class="notification-menu" id="notification-menu">
+                            <button class="icon-button notification-dot{% if notification_count %} has-unread{% endif %}" type="button" id="notification-trigger" aria-expanded="false" aria-label="Open notifications">
+                                🔔
+                                {% if notification_count %}
+                                    <span class="notification-badge">{{ notification_count }}</span>
+                                {% endif %}
+                            </button>
+                            <div class="notification-dropdown" id="notification-dropdown">
+                                <div class="notification-dropdown-header">
+                                    <strong>Notifications</strong>
+                                    <small>{{ notification_count }} new</small>
+                                </div>
+                                <div class="notification-list">
+                                    {% if notifications %}
+                                        {% for item in notifications %}
+                                            <a class="notification-item" href="{{ item.href }}">
+                                                <strong>{{ item.title }}</strong>
+                                                <p>{{ item.message }}</p>
+                                                <small>{{ item.timestamp|replace('T', ' ') }}</small>
+                                            </a>
+                                        {% endfor %}
+                                    {% else %}
+                                        <div class="notification-item empty">
+                                            <strong>No notifications</strong>
+                                            <p>New leads, estimates, and field activity will appear here.</p>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="profile-menu" id="profile-menu">
                             <button class="profile-trigger" type="button" id="profile-trigger" aria-expanded="false">
                                 <span class="avatar">{{ g.user.name[:1]|upper }}</span>
@@ -86,9 +125,7 @@
                             </button>
                             <div class="profile-dropdown" id="profile-dropdown">
                                 <a href="{{ url_for('index') }}">My Dashboard</a>
-                                {% if g.user.role == 'admin' %}
-                                    <a href="{{ url_for('settings') }}">Company Settings</a>
-                                {% endif %}
+                                <a href="{{ url_for('settings') }}">Settings</a>
                                 <form method="post" action="{{ url_for('logout') }}">
                                     <button class="button button-danger button-full" type="submit">Sign Out</button>
                                 </form>
@@ -163,11 +200,12 @@
     (function () {
         const body = document.body;
         const shell = document.getElementById("app-shell");
-        const sidebar = document.getElementById("sidebar");
         const openBtn = document.getElementById("sidebar-toggle");
         const closeBtn = document.getElementById("sidebar-close");
         const profileTrigger = document.getElementById("profile-trigger");
         const profileMenu = document.getElementById("profile-menu");
+        const notificationTrigger = document.getElementById("notification-trigger");
+        const notificationMenu = document.getElementById("notification-menu");
         const themeToggle = document.getElementById("theme-toggle");
         const loadingOverlay = document.getElementById("loading-overlay");
         const installCta = document.getElementById("install-cta");
@@ -180,6 +218,7 @@
         const supportsStandalone = standaloneMatch || window.navigator.standalone || launchedFromAndroidApp;
         const isIos = /iphone|ipad|ipod/i.test(window.navigator.userAgent);
         const installDismissed = localStorage.getItem("kas-install-dismissed") === "true";
+        const defaultTheme = "{{ workspace_settings.theme if workspace_settings is defined else 'light' }}";
         let deferredInstallPrompt = null;
 
         function hideInstallPrompts() {
@@ -222,7 +261,7 @@
         }
 
         const savedTheme = localStorage.getItem("kas-theme");
-        if (savedTheme === "dark") {
+        if (savedTheme === "dark" || (!savedTheme && defaultTheme === "dark")) {
             body.classList.add("theme-dark");
         }
 
@@ -245,18 +284,43 @@
         }
 
         if (profileTrigger && profileMenu) {
-            profileTrigger.addEventListener("click", function () {
+            profileTrigger.addEventListener("click", function (event) {
+                event.stopPropagation();
                 const expanded = profileTrigger.getAttribute("aria-expanded") === "true";
                 profileTrigger.setAttribute("aria-expanded", expanded ? "false" : "true");
                 profileMenu.classList.toggle("open");
-            });
-            document.addEventListener("click", function (event) {
-                if (!profileMenu.contains(event.target)) {
-                    profileMenu.classList.remove("open");
-                    profileTrigger.setAttribute("aria-expanded", "false");
+                if (notificationMenu) {
+                    notificationMenu.classList.remove("open");
                 }
             });
         }
+
+        if (notificationTrigger && notificationMenu) {
+            notificationTrigger.addEventListener("click", function (event) {
+                event.stopPropagation();
+                const expanded = notificationTrigger.getAttribute("aria-expanded") === "true";
+                notificationTrigger.setAttribute("aria-expanded", expanded ? "false" : "true");
+                notificationMenu.classList.toggle("open");
+                if (profileMenu) {
+                    profileMenu.classList.remove("open");
+                }
+            });
+        }
+
+        document.addEventListener("click", function (event) {
+            if (profileMenu && !profileMenu.contains(event.target)) {
+                profileMenu.classList.remove("open");
+                if (profileTrigger) {
+                    profileTrigger.setAttribute("aria-expanded", "false");
+                }
+            }
+            if (notificationMenu && !notificationMenu.contains(event.target)) {
+                notificationMenu.classList.remove("open");
+                if (notificationTrigger) {
+                    notificationTrigger.setAttribute("aria-expanded", "false");
+                }
+            }
+        });
 
         const actionLinks = document.querySelectorAll("a.button, .sidebar-nav a, .mobile-bottom-nav a");
         actionLinks.forEach(function (link) {
@@ -318,8 +382,7 @@
                 return null;
             }
             try {
-                const registration = await navigator.serviceWorker.register("{{ url_for('pwa_service_worker') }}");
-                return registration;
+                return await navigator.serviceWorker.register("{{ url_for('pwa_service_worker') }}");
             } catch (error) {
                 console.warn("Service worker registration failed", error);
                 return null;
@@ -417,12 +480,7 @@
         });
 
         showInstallPrompt();
-
-        registerServiceWorker().then(function (registration) {
-            if (registration) {
-                subscribeToPushIfConfigured(registration);
-            }
-        });
+        registerServiceWorker().then(subscribeToPushIfConfigured);
     })();
     </script>
 </body>

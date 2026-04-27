@@ -28,6 +28,7 @@ BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
 
 UPLOAD_FOLDER = BASE_DIR / "uploads"
+BRANDING_UPLOAD_FOLDER = UPLOAD_FOLDER / "branding"
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
 ALLOWED_RECEIPT_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp", "pdf", "doc", "docx", "xls", "xlsx"}
 PRE_CONSTRUCTION_STATUSES = (
@@ -96,6 +97,20 @@ JOB_SERVICE_TYPES = (
     "Tiles",
     "Other Related Services",
 )
+
+DEFAULT_WORKSPACE_SETTINGS = {
+    "company_name": "KAS Waterproofing & Building Services",
+    "company_city": "Fort Lauderdale, Florida",
+    "company_phone": "",
+    "company_email": "",
+    "theme": "light",
+    "logo_path": "",
+    "dark_mode_default": False,
+    "notify_new_lead": True,
+    "notify_estimate_approved": True,
+    "notify_payment_received": True,
+    "notify_photo_upload": True,
+}
 
 # Service templates - common line items by service type
 SERVICE_TEMPLATES = {
@@ -267,6 +282,7 @@ def get_db_connection():
 
 def init_db():
     UPLOAD_FOLDER.mkdir(exist_ok=True)
+    BRANDING_UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
     with get_db_connection() as conn:
         conn.execute(
             """
@@ -375,6 +391,7 @@ def init_db():
             )
             """
         )
+        migrate_workspace_settings_table(conn)
         seed_default_users(conn)
 
 
@@ -447,6 +464,216 @@ def migrate_updates_table(conn):
     conn.execute("ALTER TABLE updates ADD COLUMN IF NOT EXISTS receipt_path TEXT")
     conn.execute("ALTER TABLE updates ADD COLUMN IF NOT EXISTS user_id BIGINT")
     conn.execute("ALTER TABLE updates ADD COLUMN IF NOT EXISTS author_role TEXT")
+
+
+def migrate_workspace_settings_table(conn):
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS workspace_settings (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            company_name TEXT NOT NULL,
+            company_city TEXT NOT NULL,
+            company_phone TEXT,
+            company_email TEXT,
+            theme TEXT NOT NULL DEFAULT 'light',
+            logo_path TEXT,
+            dark_mode_default BOOLEAN NOT NULL DEFAULT FALSE,
+            notify_new_lead BOOLEAN NOT NULL DEFAULT TRUE,
+            notify_estimate_approved BOOLEAN NOT NULL DEFAULT TRUE,
+            notify_payment_received BOOLEAN NOT NULL DEFAULT TRUE,
+            notify_photo_upload BOOLEAN NOT NULL DEFAULT TRUE,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+        """
+    )
+    conn.execute("ALTER TABLE workspace_settings ADD COLUMN IF NOT EXISTS company_name TEXT")
+    conn.execute("ALTER TABLE workspace_settings ADD COLUMN IF NOT EXISTS company_city TEXT")
+    conn.execute("ALTER TABLE workspace_settings ADD COLUMN IF NOT EXISTS company_phone TEXT")
+    conn.execute("ALTER TABLE workspace_settings ADD COLUMN IF NOT EXISTS company_email TEXT")
+    conn.execute("ALTER TABLE workspace_settings ADD COLUMN IF NOT EXISTS theme TEXT")
+    conn.execute("ALTER TABLE workspace_settings ADD COLUMN IF NOT EXISTS logo_path TEXT")
+    conn.execute("ALTER TABLE workspace_settings ADD COLUMN IF NOT EXISTS dark_mode_default BOOLEAN")
+    conn.execute("ALTER TABLE workspace_settings ADD COLUMN IF NOT EXISTS notify_new_lead BOOLEAN")
+    conn.execute("ALTER TABLE workspace_settings ADD COLUMN IF NOT EXISTS notify_estimate_approved BOOLEAN")
+    conn.execute("ALTER TABLE workspace_settings ADD COLUMN IF NOT EXISTS notify_payment_received BOOLEAN")
+    conn.execute("ALTER TABLE workspace_settings ADD COLUMN IF NOT EXISTS notify_photo_upload BOOLEAN")
+    conn.execute("ALTER TABLE workspace_settings ADD COLUMN IF NOT EXISTS created_at TEXT")
+    conn.execute("ALTER TABLE workspace_settings ADD COLUMN IF NOT EXISTS updated_at TEXT")
+
+    existing_settings = conn.execute("SELECT id FROM workspace_settings WHERE id = 1").fetchone()
+    if existing_settings is None:
+        now = datetime.now().isoformat(timespec="seconds")
+        conn.execute(
+            """
+            INSERT INTO workspace_settings (
+                id, company_name, company_city, company_phone, company_email,
+                theme, logo_path, dark_mode_default, notify_new_lead,
+                notify_estimate_approved, notify_payment_received, notify_photo_upload,
+                created_at, updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                1,
+                DEFAULT_WORKSPACE_SETTINGS["company_name"],
+                DEFAULT_WORKSPACE_SETTINGS["company_city"],
+                DEFAULT_WORKSPACE_SETTINGS["company_phone"],
+                DEFAULT_WORKSPACE_SETTINGS["company_email"],
+                DEFAULT_WORKSPACE_SETTINGS["theme"],
+                DEFAULT_WORKSPACE_SETTINGS["logo_path"],
+                int(DEFAULT_WORKSPACE_SETTINGS["dark_mode_default"]),
+                int(DEFAULT_WORKSPACE_SETTINGS["notify_new_lead"]),
+                int(DEFAULT_WORKSPACE_SETTINGS["notify_estimate_approved"]),
+                int(DEFAULT_WORKSPACE_SETTINGS["notify_payment_received"]),
+                int(DEFAULT_WORKSPACE_SETTINGS["notify_photo_upload"]),
+                now,
+                now,
+            ),
+        )
+
+
+def load_workspace_settings(conn):
+    settings = dict(DEFAULT_WORKSPACE_SETTINGS)
+    row = conn.execute("SELECT * FROM workspace_settings WHERE id = 1").fetchone()
+    if row is None:
+        migrate_workspace_settings_table(conn)
+        row = conn.execute("SELECT * FROM workspace_settings WHERE id = 1").fetchone()
+
+    if row is not None:
+        settings.update({key: row[key] for key in row.keys() if key in settings or key == "logo_path"})
+
+    settings["dark_mode_default"] = bool(settings.get("dark_mode_default"))
+    settings["notify_new_lead"] = bool(settings.get("notify_new_lead"))
+    settings["notify_estimate_approved"] = bool(settings.get("notify_estimate_approved"))
+    settings["notify_payment_received"] = bool(settings.get("notify_payment_received"))
+    settings["notify_photo_upload"] = bool(settings.get("notify_photo_upload"))
+    settings["theme"] = settings.get("theme") or "light"
+    settings["logo_url"] = ""
+    if settings.get("logo_path"):
+        logo_filename = settings["logo_path"].replace("uploads/", "")
+        settings["logo_url"] = url_for("uploaded_file", filename=logo_filename)
+    return settings
+
+
+def save_workspace_settings(conn, data):
+    now = datetime.now().isoformat(timespec="seconds")
+    conn.execute(
+        """
+        UPDATE workspace_settings
+        SET company_name = ?, company_city = ?, company_phone = ?, company_email = ?,
+            theme = ?, logo_path = ?, dark_mode_default = ?, notify_new_lead = ?,
+            notify_estimate_approved = ?, notify_payment_received = ?, notify_photo_upload = ?,
+            updated_at = ?
+        WHERE id = 1
+        """,
+        (
+            data["company_name"],
+            data["company_city"],
+            data["company_phone"],
+            data["company_email"],
+            data["theme"],
+            data["logo_path"],
+            int(data["dark_mode_default"]),
+            int(data["notify_new_lead"]),
+            int(data["notify_estimate_approved"]),
+            int(data["notify_payment_received"]),
+            int(data["notify_photo_upload"]),
+            now,
+        ),
+    )
+
+
+def build_notifications_for_user(user, settings):
+    if user is None:
+        return []
+
+    items = []
+    now = datetime.now()
+
+    def append_item(title, message, timestamp, href, kind):
+        items.append(
+            {
+                "title": title,
+                "message": message,
+                "timestamp": timestamp,
+                "href": href,
+                "kind": kind,
+            }
+        )
+
+    with get_db_connection() as conn:
+        if user["role"] == "admin":
+            if settings["notify_new_lead"]:
+                rows = conn.execute(
+                    """
+                    SELECT id, name, created_at
+                    FROM jobs
+                    WHERE status = 'Lead'
+                    ORDER BY created_at DESC, id DESC
+                    LIMIT 3
+                    """
+                ).fetchall()
+                for row in rows:
+                    append_item("New lead submitted", row["name"], row["created_at"], url_for("update_job", job_id=row["id"]), "lead")
+
+            if settings["notify_estimate_approved"]:
+                rows = conn.execute(
+                    """
+                    SELECT id, estimate_number, client_name, approved_at
+                    FROM estimates
+                    WHERE status = 'Approved'
+                    ORDER BY approved_at DESC NULLS LAST, created_at DESC
+                    LIMIT 3
+                    """
+                ).fetchall()
+                for row in rows:
+                    append_item("Estimate approved", f"{row['estimate_number']} · {row['client_name']}", row["approved_at"] or now.isoformat(timespec="seconds"), url_for("view_estimate", estimate_id=row["id"]), "estimate")
+
+            if settings["notify_payment_received"]:
+                rows = conn.execute(
+                    """
+                    SELECT id, name, invoice_amount, created_at
+                    FROM jobs
+                    WHERE payment_status = 'Paid'
+                    ORDER BY created_at DESC, id DESC
+                    LIMIT 3
+                    """
+                ).fetchall()
+                for row in rows:
+                    append_item("Payment received", f"{row['name']} · {money(row['invoice_amount'])}", row["created_at"], url_for("update_job", job_id=row["id"]), "payment")
+
+            if settings["notify_photo_upload"]:
+                rows = conn.execute(
+                    """
+                    SELECT jobs.id, jobs.name, updates.timestamp
+                    FROM updates
+                    JOIN jobs ON jobs.id = updates.job_id
+                    WHERE updates.image_path IS NOT NULL
+                    ORDER BY updates.timestamp DESC, updates.id DESC
+                    LIMIT 3
+                    """
+                ).fetchall()
+                for row in rows:
+                    append_item("Crew photo uploaded", row["name"], row["timestamp"], url_for("job_progress", job_id=row["id"]), "upload")
+        else:
+            visible_clause, visible_params = visible_jobs_where()
+            rows = conn.execute(
+                f"""
+                SELECT updates.timestamp, updates.notes, jobs.id, jobs.name
+                FROM updates
+                JOIN jobs ON jobs.id = updates.job_id
+                WHERE {visible_clause}
+                ORDER BY updates.timestamp DESC, updates.id DESC
+                LIMIT 6
+                """,
+                visible_params,
+            ).fetchall()
+            for row in rows:
+                append_item("Recent activity", row["name"], row["timestamp"], url_for("job_progress", job_id=row["id"]), "activity")
+
+    items.sort(key=lambda item: item["timestamp"] or "", reverse=True)
+    return items[:6]
 
 
 def allowed_file(filename):
@@ -667,6 +894,19 @@ def ensure_database():
                 "SELECT id, name, email, role FROM users WHERE id = ?",
                 (user_id,),
             ).fetchone()
+
+
+@app.context_processor
+def inject_workspace_context():
+    with get_db_connection() as conn:
+        workspace_settings = load_workspace_settings(conn)
+
+    notifications = build_notifications_for_user(g.user, workspace_settings) if g.user is not None else []
+    return {
+        "workspace_settings": workspace_settings,
+        "notifications": notifications,
+        "notification_count": len(notifications),
+    }
 
 
 @app.route("/manifest.json")
@@ -1000,11 +1240,111 @@ def analytics():
 @role_required("admin")
 def settings():
     """Company and workspace settings panel."""
+    with get_db_connection() as conn:
+        workspace_settings = load_workspace_settings(conn)
+        users_summary = conn.execute(
+            """
+            SELECT
+                COUNT(*) AS total_users,
+                SUM(CASE WHEN role = 'admin' THEN 1 ELSE 0 END) AS admin_count,
+                SUM(CASE WHEN role = 'employee' THEN 1 ELSE 0 END) AS employee_count,
+                SUM(CASE WHEN role = 'client' THEN 1 ELSE 0 END) AS client_count
+            FROM users
+            """
+        ).fetchone()
+        recent_users = conn.execute(
+            "SELECT name, email, role, created_at FROM users ORDER BY created_at DESC, id DESC LIMIT 5"
+        ).fetchall()
+
     if request.method == "POST":
+        company_name = request.form.get("company_name", "").strip() or DEFAULT_WORKSPACE_SETTINGS["company_name"]
+        company_city = request.form.get("company_city", "").strip() or DEFAULT_WORKSPACE_SETTINGS["company_city"]
+        company_phone = request.form.get("company_phone", "").strip()
+        company_email = request.form.get("company_email", "").strip()
+        theme = request.form.get("theme", "light").strip().lower()
+        if theme not in {"light", "dark"}:
+            theme = "light"
+
+        dark_mode_default = request.form.get("dark_mode_default") == "on"
+        notify_new_lead = request.form.get("notify_new_lead") == "on"
+        notify_estimate_approved = request.form.get("notify_estimate_approved") == "on"
+        notify_payment_received = request.form.get("notify_payment_received") == "on"
+        notify_photo_upload = request.form.get("notify_photo_upload") == "on"
+
+        logo_path = workspace_settings.get("logo_path", "")
+        logo_file = request.files.get("logo")
+        if logo_file and logo_file.filename:
+            logo_extension = logo_file.filename.rsplit(".", 1)[-1].lower() if "." in logo_file.filename else ""
+            if logo_extension not in {"png", "jpg", "jpeg", "webp", "gif"}:
+                flash("Logo must be a PNG, JPG, JPEG, GIF, or WEBP image.", "error")
+                return render_template(
+                    "settings.html",
+                    workspace_settings={
+                        **workspace_settings,
+                        "company_name": company_name,
+                        "company_city": company_city,
+                        "company_phone": company_phone,
+                        "company_email": company_email,
+                        "theme": theme,
+                        "dark_mode_default": dark_mode_default,
+                        "notify_new_lead": notify_new_lead,
+                        "notify_estimate_approved": notify_estimate_approved,
+                        "notify_payment_received": notify_payment_received,
+                        "notify_photo_upload": notify_photo_upload,
+                    },
+                    users_summary=users_summary,
+                    recent_users=recent_users,
+                )
+
+            BRANDING_UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
+            logo_name = secure_filename(logo_file.filename)
+            logo_suffix = logo_name.rsplit(".", 1)[-1].lower()
+            logo_file_name = f"kas-logo-{uuid.uuid4().hex}.{logo_suffix}"
+            logo_file_path = BRANDING_UPLOAD_FOLDER / logo_file_name
+            logo_file.save(logo_file_path)
+            logo_path = f"uploads/branding/{logo_file_name}"
+
+        with get_db_connection() as conn:
+            save_workspace_settings(
+                conn,
+                {
+                    "company_name": company_name,
+                    "company_city": company_city,
+                    "company_phone": company_phone,
+                    "company_email": company_email,
+                    "theme": theme,
+                    "logo_path": logo_path,
+                    "dark_mode_default": dark_mode_default,
+                    "notify_new_lead": notify_new_lead,
+                    "notify_estimate_approved": notify_estimate_approved,
+                    "notify_payment_received": notify_payment_received,
+                    "notify_photo_upload": notify_photo_upload,
+                },
+            )
+            workspace_settings = load_workspace_settings(conn)
+            users_summary = conn.execute(
+                """
+                SELECT
+                    COUNT(*) AS total_users,
+                    SUM(CASE WHEN role = 'admin' THEN 1 ELSE 0 END) AS admin_count,
+                    SUM(CASE WHEN role = 'employee' THEN 1 ELSE 0 END) AS employee_count,
+                    SUM(CASE WHEN role = 'client' THEN 1 ELSE 0 END) AS client_count
+                FROM users
+                """
+            ).fetchone()
+            recent_users = conn.execute(
+                "SELECT name, email, role, created_at FROM users ORDER BY created_at DESC, id DESC LIMIT 5"
+            ).fetchall()
+
         flash("Settings saved. Company preferences updated.", "success")
         return redirect(url_for("settings"))
 
-    return render_template("settings.html")
+    return render_template(
+        "settings.html",
+        workspace_settings=workspace_settings,
+        users_summary=users_summary,
+        recent_users=recent_users,
+    )
 
 
 @app.route("/add", methods=("GET", "POST"))
