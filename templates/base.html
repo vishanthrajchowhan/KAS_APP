@@ -10,7 +10,8 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="KAS App">
     <meta name="description" content="KAS App - Waterproofing &amp; Building Services">
-    {% set dynamic_favicon = (workspace_settings.favicon_url if workspace_settings is defined and workspace_settings.favicon_url else url_for('static', filename='icons/favicon.svg')) %}
+    {% set uploaded_logo_url = (workspace_settings.uploaded_logo_url if workspace_settings is defined and workspace_settings.uploaded_logo_url else '') %}
+    {% set dynamic_favicon = (uploaded_logo_url if uploaded_logo_url else url_for('static', filename='icons/favicon.svg')) %}
     <title>{% block title %}KAS{% endblock %}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -30,9 +31,9 @@
             <aside class="sidebar" id="sidebar" aria-label="Primary navigation">
                 <div class="sidebar-brand-row">
                     <a class="brand" href="{{ url_for('index') }}">
-                        <span class="brand-mark{% if workspace_settings.logo_url %} has-logo{% endif %}">
-                            {% if workspace_settings.logo_url %}
-                                <img class="brand-logo" src="{{ workspace_settings.logo_url }}" alt="{{ workspace_settings.company_name or 'KAS' }} logo" loading="lazy" decoding="async">
+                        <span class="brand-mark{% if uploaded_logo_url %} has-logo{% endif %}">
+                            {% if uploaded_logo_url %}
+                                <img class="brand-logo" src="{{ uploaded_logo_url }}" alt="{{ workspace_settings.company_name or 'KAS' }} logo" loading="lazy" decoding="async">
                             {% else %}
                                 KAS
                             {% endif %}
@@ -74,6 +75,16 @@
                 <header class="topbar">
                     <div class="topbar-left">
                         <button class="icon-button sidebar-toggle" type="button" id="sidebar-toggle" aria-label="Open menu">☰</button>
+                        <a class="topbar-brand" href="{{ url_for('index') }}">
+                            <span class="topbar-brand-mark{% if uploaded_logo_url %} has-logo{% endif %}">
+                                {% if uploaded_logo_url %}
+                                    <img class="topbar-brand-logo" src="{{ uploaded_logo_url }}" alt="{{ workspace_settings.company_name or 'KAS' }} logo" loading="lazy" decoding="async">
+                                {% else %}
+                                    KAS
+                                {% endif %}
+                            </span>
+                            <span class="topbar-brand-text">{{ workspace_settings.company_name or 'KAS' }}</span>
+                        </a>
                         <form class="global-search" method="get" action="{{ url_for('index') }}">
                             {% if request.args.get('view_as') %}
                                 <input type="hidden" name="view_as" value="{{ request.args.get('view_as') }}">
@@ -165,9 +176,9 @@
     {% else %}
         <main class="page auth-page fade-in">
             <div class="auth-brand">
-                <span class="brand-mark{% if workspace_settings.logo_url %} has-logo{% endif %}">
-                    {% if workspace_settings.logo_url %}
-                        <img class="brand-logo" src="{{ workspace_settings.logo_url }}" alt="{{ workspace_settings.company_name or 'KAS' }} logo" loading="lazy" decoding="async">
+                <span class="brand-mark{% if uploaded_logo_url %} has-logo{% endif %}">
+                    {% if uploaded_logo_url %}
+                        <img class="brand-logo" src="{{ uploaded_logo_url }}" alt="{{ workspace_settings.company_name or 'KAS' }} logo" loading="lazy" decoding="async">
                     {% else %}
                         KAS
                     {% endif %}

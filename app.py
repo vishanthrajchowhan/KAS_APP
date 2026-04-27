@@ -30,6 +30,7 @@ load_dotenv(BASE_DIR / ".env")
 UPLOAD_FOLDER = BASE_DIR / "uploads"
 STATIC_UPLOAD_FOLDER = BASE_DIR / "static" / "uploads"
 BRANDING_UPLOAD_FOLDER = STATIC_UPLOAD_FOLDER / "branding"
+PUBLIC_LOGO_FILE = STATIC_UPLOAD_FOLDER / "company-logo.png"
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
 ALLOWED_LOGO_EXTENSIONS = {"png", "jpg", "jpeg", "webp"}
 ALLOWED_RECEIPT_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp", "pdf", "doc", "docx", "xls", "xlsx"}
@@ -577,6 +578,7 @@ def load_workspace_settings(conn):
     settings["theme"] = settings.get("theme") or "light"
     settings["company_state"] = (settings.get("company_state") or "FL").strip()[:20]
     settings["logo_url"] = ""
+    settings["uploaded_logo_url"] = ""
     settings["favicon_url"] = url_for("static", filename="icons/favicon.svg")
     settings["favicon_mimetype"] = "image/svg+xml"
 
@@ -588,18 +590,23 @@ def load_workspace_settings(conn):
         return f"{asset_url}{separator}v={version}"
 
     logo_path = (settings.get("logo_path") or "").strip()
-    if logo_path.startswith("static/"):
+    if PUBLIC_LOGO_FILE.exists():
+        settings["logo_url"] = with_asset_version(url_for("static", filename="uploads/company-logo.png"), PUBLIC_LOGO_FILE)
+    elif logo_path.startswith("static/"):
         static_filename = logo_path[len("static/") :].lstrip("/")
-        settings["logo_url"] = with_asset_version(url_for("static", filename=static_filename), BASE_DIR / static_filename)
+        logo_file_path = BASE_DIR / static_filename
+        settings["logo_url"] = with_asset_version(url_for("static", filename=static_filename), logo_file_path)
     elif logo_path.startswith("uploads/branding/"):
         fallback_name = logo_path.replace("uploads/branding/", "")
-        settings["logo_url"] = with_asset_version(url_for("public_branding_file", filename=fallback_name), BRANDING_UPLOAD_FOLDER / fallback_name)
+        logo_file_path = BRANDING_UPLOAD_FOLDER / fallback_name
+        settings["logo_url"] = with_asset_version(url_for("public_branding_file", filename=fallback_name), logo_file_path)
     else:
-        fallback_logo = STATIC_UPLOAD_FOLDER / "branding" / "Logo.png"
-        if fallback_logo.exists():
-            settings["logo_url"] = with_asset_version(url_for("static", filename="uploads/branding/Logo.png"), fallback_logo)
+        legacy_logo = STATIC_UPLOAD_FOLDER / "branding" / "Logo.png"
+        if legacy_logo.exists():
+            settings["logo_url"] = with_asset_version(url_for("static", filename="uploads/branding/Logo.png"), legacy_logo)
 
     if settings["logo_url"]:
+        settings["uploaded_logo_url"] = settings["logo_url"]
         settings["favicon_url"] = settings["logo_url"]
         settings["favicon_mimetype"] = "image/png" if settings["logo_url"].lower().endswith(".png") else "image/svg+xml"
     return settings
@@ -844,14 +851,14 @@ def process_logo_upload(uploaded_file):
             max_size = (640, 640)
             image.thumbnail(max_size, Image.Resampling.LANCZOS)
 
-            BRANDING_UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
-            logo_file_name = f"kas-logo-{uuid.uuid4().hex}.webp"
-            logo_file_path = BRANDING_UPLOAD_FOLDER / logo_file_name
-            image.save(logo_file_path, format="WEBP", quality=86, method=6)
+            STATIC_UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
+            if PUBLIC_LOGO_FILE.exists():
+                PUBLIC_LOGO_FILE.unlink()
+            image.save(PUBLIC_LOGO_FILE, format="PNG", optimize=True)
     except Exception as exc:
         raise ValueError("Unable to process logo image. Please upload a valid PNG, JPG, JPEG, or WEBP file.") from exc
 
-    return f"static/uploads/branding/{logo_file_name}"
+    return "static/uploads/company-logo.png"
 
 
 def money(value):
