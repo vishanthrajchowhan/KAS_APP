@@ -522,11 +522,11 @@ def migrate_workspace_settings_table(conn):
                 DEFAULT_WORKSPACE_SETTINGS["company_email"],
                 DEFAULT_WORKSPACE_SETTINGS["theme"],
                 DEFAULT_WORKSPACE_SETTINGS["logo_path"],
-                int(DEFAULT_WORKSPACE_SETTINGS["dark_mode_default"]),
-                int(DEFAULT_WORKSPACE_SETTINGS["notify_new_lead"]),
-                int(DEFAULT_WORKSPACE_SETTINGS["notify_estimate_approved"]),
-                int(DEFAULT_WORKSPACE_SETTINGS["notify_payment_received"]),
-                int(DEFAULT_WORKSPACE_SETTINGS["notify_photo_upload"]),
+                DEFAULT_WORKSPACE_SETTINGS["dark_mode_default"],
+                DEFAULT_WORKSPACE_SETTINGS["notify_new_lead"],
+                DEFAULT_WORKSPACE_SETTINGS["notify_estimate_approved"],
+                DEFAULT_WORKSPACE_SETTINGS["notify_payment_received"],
+                DEFAULT_WORKSPACE_SETTINGS["notify_photo_upload"],
                 now,
                 now,
             ),
@@ -543,11 +543,11 @@ def load_workspace_settings(conn):
     if row is not None:
         settings.update({key: row[key] for key in row.keys() if key in settings or key == "logo_path"})
 
-    settings["dark_mode_default"] = bool(settings.get("dark_mode_default"))
-    settings["notify_new_lead"] = bool(settings.get("notify_new_lead"))
-    settings["notify_estimate_approved"] = bool(settings.get("notify_estimate_approved"))
-    settings["notify_payment_received"] = bool(settings.get("notify_payment_received"))
-    settings["notify_photo_upload"] = bool(settings.get("notify_photo_upload"))
+    settings["dark_mode_default"] = normalize_bool(settings.get("dark_mode_default"))
+    settings["notify_new_lead"] = normalize_bool(settings.get("notify_new_lead"))
+    settings["notify_estimate_approved"] = normalize_bool(settings.get("notify_estimate_approved"))
+    settings["notify_payment_received"] = normalize_bool(settings.get("notify_payment_received"))
+    settings["notify_photo_upload"] = normalize_bool(settings.get("notify_photo_upload"))
     settings["theme"] = settings.get("theme") or "light"
     settings["logo_url"] = ""
     if settings.get("logo_path"):
@@ -574,11 +574,11 @@ def save_workspace_settings(conn, data):
             data["company_email"],
             data["theme"],
             data["logo_path"],
-            int(data["dark_mode_default"]),
-            int(data["notify_new_lead"]),
-            int(data["notify_estimate_approved"]),
-            int(data["notify_payment_received"]),
-            int(data["notify_photo_upload"]),
+            bool(data["dark_mode_default"]),
+            bool(data["notify_new_lead"]),
+            bool(data["notify_estimate_approved"]),
+            bool(data["notify_payment_received"]),
+            bool(data["notify_photo_upload"]),
             now,
         ),
     )
@@ -698,6 +698,26 @@ def parse_money(value):
 def parse_date(value):
     value = (value or "").strip()
     return value or None
+
+
+def parse_checkbox(value):
+    return value == "on"
+
+
+def normalize_bool(value, default=False):
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value != 0
+    if isinstance(value, str):
+        cleaned = value.strip().lower()
+        if cleaned in {"1", "true", "t", "yes", "y", "on"}:
+            return True
+        if cleaned in {"0", "false", "f", "no", "n", "off", ""}:
+            return False
+    return bool(value)
 
 
 def money(value):
@@ -1265,11 +1285,11 @@ def settings():
         if theme not in {"light", "dark"}:
             theme = "light"
 
-        dark_mode_default = request.form.get("dark_mode_default") == "on"
-        notify_new_lead = request.form.get("notify_new_lead") == "on"
-        notify_estimate_approved = request.form.get("notify_estimate_approved") == "on"
-        notify_payment_received = request.form.get("notify_payment_received") == "on"
-        notify_photo_upload = request.form.get("notify_photo_upload") == "on"
+        dark_mode_default = parse_checkbox(request.form.get("dark_mode_default"))
+        notify_new_lead = parse_checkbox(request.form.get("notify_new_lead"))
+        notify_estimate_approved = parse_checkbox(request.form.get("notify_estimate_approved"))
+        notify_payment_received = parse_checkbox(request.form.get("notify_payment_received"))
+        notify_photo_upload = parse_checkbox(request.form.get("notify_photo_upload"))
 
         logo_path = workspace_settings.get("logo_path", "")
         logo_file = request.files.get("logo")
