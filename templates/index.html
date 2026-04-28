@@ -30,8 +30,8 @@
         <div class="dashboard-hero-actions" aria-label="Quick actions">
             <a class="button button-primary" href="{{ url_for('add_job') }}">+ Add Lead</a>
             <a class="button" href="{{ url_for('create_estimate') }}">Create Estimate</a>
-            <a class="button" href="{{ url_for('users', role='client') }}">Add Client</a>
-            <a class="button" href="{{ url_for('users', role='employee') }}">Assign Employee</a>
+            <a class="button" href="{{ url_for('clients') }}">Clients</a>
+            <a class="button" href="{{ url_for('employees') }}">Employees</a>
             {% if latest_job_id %}
                 <a class="button" href="{{ url_for('update_job', job_id=latest_job_id) }}">Add Update</a>
             {% else %}

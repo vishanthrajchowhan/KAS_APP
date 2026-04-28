@@ -300,6 +300,7 @@ def init_db():
                 id BIGSERIAL PRIMARY KEY,
                 name TEXT NOT NULL,
                 email TEXT NOT NULL UNIQUE,
+                phone TEXT,
                 password TEXT NOT NULL,
                 role TEXT NOT NULL CHECK (role IN ('admin', 'employee', 'client')),
                 created_at TEXT NOT NULL
@@ -322,6 +323,7 @@ def init_db():
                 id BIGSERIAL PRIMARY KEY,
                 name TEXT NOT NULL,
                 location TEXT NOT NULL,
+                due_date TEXT,
                 service_type TEXT,
                 other_service_details TEXT,
                 description TEXT NOT NULL,
@@ -339,6 +341,7 @@ def init_db():
             )
             """
         )
+        conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS phone TEXT")
         migrate_jobs_table(conn)
         conn.execute(
             """
@@ -1548,6 +1551,7 @@ def add_job():
         name = request.form.get("name", "").strip()
         client_name = request.form.get("client_name", "").strip()
         location = request.form.get("location", "").strip()
+        due_date = request.form.get("due_date", "").strip() or None
         selected_service_types = sanitize_selected_services(request.form.getlist("service_type"), JOB_SERVICE_TYPES)
         service_type = compose_service_text(selected_service_types)
         other_service_details = request.form.get("other_service_details", "").strip()
@@ -1589,6 +1593,7 @@ def add_job():
                 name=name,
                 client_name=client_name,
                 location=location,
+                due_date=due_date,
                 selected_service_types=selected_service_types,
                 other_service_details=other_service_details,
                 description=description,
@@ -1608,16 +1613,17 @@ def add_job():
             conn.execute(
                 """
                 INSERT INTO jobs (
-                    name, client_name, location, service_type, other_service_details, description, status,
+                    name, client_name, location, due_date, service_type, other_service_details, description, status,
                     proposal_amount, proposal_sent_date, payment_status,
                     assigned_to, client_id, created_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     name,
                     client_name,
                     location,
+                    due_date,
                     service_type,
                     other_service_details,
                     description,
@@ -1645,6 +1651,7 @@ def add_job():
         statuses=STATUSES,
         service_types=JOB_SERVICE_TYPES,
         selected_service_types=[],
+        due_date="",
         employees=employees,
         clients=clients,
     )
@@ -1658,6 +1665,7 @@ def users():
     if request.method == "POST":
         name = request.form.get("name", "").strip()
         email = request.form.get("email", "").strip().lower()
+        phone = request.form.get("phone", "").strip()
         password = request.form.get("password", "")
         role = request.form.get("role", "").strip().lower()
 
@@ -1669,12 +1677,13 @@ def users():
             with get_db_connection() as conn:
                 conn.execute(
                     """
-                    INSERT INTO users (name, email, password, role, created_at)
-                    VALUES (?, ?, ?, ?, ?)
+                    INSERT INTO users (name, email, phone, password, role, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?)
                     """,
                     (
                         name,
                         email,
+                        phone or None,
                         generate_password_hash(password),
                         role,
                         datetime.now().isoformat(timespec="seconds"),
@@ -1689,9 +1698,208 @@ def users():
 
     with get_db_connection() as conn:
         users_list = conn.execute(
-            "SELECT id, name, email, role, created_at FROM users ORDER BY role, name"
+            "SELECT id, name, email, phone, role, created_at FROM users ORDER BY role, name"
         ).fetchall()
     return render_template("users.html", users=users_list, roles=ROLES, default_role=default_role)
+
+
+@app.route("/jobs")
+@login_required
+@role_required("admin")
+def jobs():
+    search = request.args.get("q", "").strip()
+    status_filter = request.args.get("status", "").strip()
+    employee_filter = request.args.get("employee", "").strip()
+    sort = request.args.get("sort", "priority").strip()
+    where_clauses = []
+    params = []
+
+    if status_filter in STATUSES:
+        where_clauses.append("jobs.status = ?")
+        params.append(status_filter)
+
+    if employee_filter.isdigit():
+        where_clauses.append("jobs.assigned_to = ?")
+        params.append(int(employee_filter))
+
+    if search:
+        where_clauses.append(
+            "(jobs.name LIKE ? OR jobs.client_name LIKE ? OR jobs.location LIKE ? OR jobs.service_type LIKE ? OR employee.name LIKE ? OR client.name LIKE ? OR client.email LIKE ? OR employee.email LIKE ?)"
+        )
+        like_search = f"%{search}%"
+        params.extend([like_search] * 8)
+
+    where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+    order_by = {
+        "oldest": "jobs.created_at ASC",
+        "status": "jobs.status ASC, jobs.created_at DESC",
+        "employee": "COALESCE(employee.name, jobs.client_name, jobs.name) ASC, jobs.created_at DESC",
+        "due": "COALESCE(jobs.due_date, jobs.decision_date, jobs.proposal_sent_date) ASC NULLS LAST, jobs.created_at DESC",
+    }.get(
+        sort,
+        "CASE jobs.status WHEN 'Lead' THEN 1 WHEN 'Estimating' THEN 2 WHEN 'Proposal Sent' THEN 3 WHEN 'Negotiation' THEN 4 WHEN 'Approved' THEN 5 WHEN 'Scheduled' THEN 6 WHEN 'Started' THEN 7 WHEN 'In Progress' THEN 8 WHEN 'Completed' THEN 9 WHEN 'Invoiced' THEN 10 WHEN 'Paid' THEN 11 ELSE 99 END, jobs.created_at DESC",
+    )
+
+    today = datetime.now().date().isoformat()
+    with get_db_connection() as conn:
+        jobs_list = conn.execute(
+            f"""
+            SELECT
+                jobs.*,
+                employee.name AS assigned_employee_name,
+                employee.email AS assigned_employee_email,
+                client.name AS client_user_name,
+                client.email AS client_user_email,
+                COALESCE(jobs.due_date, jobs.decision_date, jobs.proposal_sent_date) AS effective_due_date,
+                CASE
+                    WHEN COALESCE(jobs.due_date, jobs.decision_date, jobs.proposal_sent_date) IS NOT NULL
+                         AND COALESCE(jobs.due_date, jobs.decision_date, jobs.proposal_sent_date) < ?
+                         AND jobs.status NOT IN ('Completed', 'Paid')
+                    THEN 1 ELSE 0
+                END AS is_overdue,
+                CASE jobs.status
+                    WHEN 'Lead' THEN 12
+                    WHEN 'Estimating' THEN 22
+                    WHEN 'Proposal Sent' THEN 34
+                    WHEN 'Negotiation' THEN 42
+                    WHEN 'Approved' THEN 54
+                    WHEN 'Scheduled' THEN 68
+                    WHEN 'Started' THEN 74
+                    WHEN 'In Progress' THEN 84
+                    WHEN 'Completed' THEN 94
+                    WHEN 'Invoiced' THEN 98
+                    WHEN 'Paid' THEN 100
+                    ELSE 40
+                END AS progress_percent
+            FROM jobs
+            LEFT JOIN users employee ON employee.id = jobs.assigned_to
+            LEFT JOIN users client ON client.id = jobs.client_id
+            {where_sql}
+            ORDER BY {order_by}
+            """,
+            [today] + params,
+        ).fetchall()
+        employees = conn.execute(
+            "SELECT id, name, email FROM users WHERE role = 'employee' ORDER BY name"
+        ).fetchall()
+
+    active_jobs = sum(1 for row in jobs_list if row["status"] in {"Scheduled", "Started", "In Progress"})
+    scheduled_jobs = sum(1 for row in jobs_list if row["status"] == "Scheduled")
+    in_progress_jobs = sum(1 for row in jobs_list if row["status"] == "In Progress")
+    completed_jobs = sum(1 for row in jobs_list if row["status"] in {"Completed", "Paid"})
+    overdue_jobs = sum(1 for row in jobs_list if row["is_overdue"])
+
+    return render_template(
+        "jobs.html",
+        jobs=jobs_list,
+        employees=employees,
+        filters={"q": search, "status": status_filter, "employee": employee_filter, "sort": sort},
+        status_options=STATUSES,
+        active_jobs=active_jobs,
+        scheduled_jobs=scheduled_jobs,
+        in_progress_jobs=in_progress_jobs,
+        completed_jobs=completed_jobs,
+        overdue_jobs=overdue_jobs,
+        can_manage_jobs=can_manage_jobs(),
+        money=money,
+    )
+
+
+@app.route("/clients")
+@login_required
+@role_required("admin")
+def clients():
+    with get_db_connection() as conn:
+        client_rows = conn.execute(
+            """
+            SELECT
+                users.id,
+                users.name,
+                users.email,
+                users.phone,
+                COUNT(DISTINCT jobs.id) AS total_projects,
+                COUNT(DISTINCT CASE WHEN jobs.status IN ('Completed', 'Paid') THEN jobs.id END) AS completed_projects,
+                COUNT(DISTINCT CASE WHEN jobs.status IN ('Scheduled', 'Started', 'In Progress') THEN jobs.id END) AS active_projects,
+                MAX(jobs.created_at) AS last_job_date,
+                COALESCE(SUM(CASE WHEN jobs.payment_status = 'Paid' THEN COALESCE(jobs.invoice_amount, 0) ELSE 0 END), 0) AS total_spent,
+                COALESCE(SUM(CASE WHEN jobs.payment_status != 'Paid' AND COALESCE(jobs.invoice_amount, 0) > 0 THEN COALESCE(jobs.invoice_amount, 0) ELSE 0 END), 0) AS outstanding_balance
+            FROM users
+            LEFT JOIN jobs ON jobs.client_id = users.id
+            WHERE users.role = 'client'
+            GROUP BY users.id
+            ORDER BY users.name
+            """
+        ).fetchall()
+
+    total_clients = len(client_rows)
+    active_clients = sum(1 for row in client_rows if row["total_projects"])
+    repeat_clients = sum(1 for row in client_rows if (row["total_projects"] or 0) > 1)
+    outstanding_balance = sum(row["outstanding_balance"] or 0 for row in client_rows)
+    total_spent = sum(row["total_spent"] or 0 for row in client_rows)
+
+    return render_template(
+        "clients.html",
+        clients=client_rows,
+        total_clients=total_clients,
+        active_clients=active_clients,
+        repeat_clients=repeat_clients,
+        outstanding_balance=outstanding_balance,
+        total_spent=total_spent,
+        money=money,
+    )
+
+
+@app.route("/employees")
+@login_required
+@role_required("admin")
+def employees():
+    today_prefix = datetime.now().date().isoformat() + "%"
+    with get_db_connection() as conn:
+        employee_rows = conn.execute(
+            """
+            SELECT
+                users.id,
+                users.name,
+                users.email,
+                users.phone,
+                COUNT(DISTINCT jobs.id) AS assigned_jobs,
+                COUNT(DISTINCT CASE WHEN jobs.status IN ('Scheduled', 'Started', 'In Progress') THEN jobs.id END) AS active_jobs,
+                COUNT(DISTINCT CASE WHEN jobs.created_at LIKE ? THEN jobs.id END) AS active_today_jobs,
+                MAX(jobs.created_at) AS last_assigned_job
+            FROM users
+            LEFT JOIN jobs ON jobs.assigned_to = users.id
+            WHERE users.role = 'employee'
+            GROUP BY users.id
+            ORDER BY users.name
+            """,
+            (today_prefix,),
+        ).fetchall()
+
+    total_employees = len(employee_rows)
+    active_today = sum(1 for row in employee_rows if row["active_today_jobs"])
+    field_crew = sum(1 for row in employee_rows if row["assigned_jobs"])
+    office_staff = max(total_employees - field_crew, 0)
+
+    employee_cards = []
+    for row in employee_rows:
+        active_jobs = row["active_jobs"] or 0
+        assigned_jobs = row["assigned_jobs"] or 0
+        if active_jobs:
+            status = "Busy"
+        elif assigned_jobs:
+            status = "Available"
+        else:
+            status = "Off Duty"
+        employee_cards.append({**row, "status": status})
+
+    return render_template(
+        "employees.html",
+        employees=employee_cards,
+        total_employees=total_employees,
+        active_today=active_today,
+        field_crew=field_crew,
+        office_staff=office_staff,
+    )
 
 
 @app.route("/update/<int:job_id>")
@@ -1805,6 +2013,7 @@ def submit_update():
     selected_service_types = sanitize_selected_services(request.form.getlist("service_type"), JOB_SERVICE_TYPES)
     service_type = compose_service_text(selected_service_types)
     other_service_details = request.form.get("other_service_details", "").strip()
+    due_date = request.form.get("due_date", "").strip() or None
 
     if not job_id:
         flash("Please choose a valid job.", "error")
@@ -1841,6 +2050,7 @@ def submit_update():
         client_id = job["client_id"]
         service_type = job["service_type"] or ""
         other_service_details = job["other_service_details"] or ""
+        due_date = job["due_date"] or None
     else:
         if not client_name:
             flash("Please enter a client name.", "error")
@@ -1891,6 +2101,7 @@ def submit_update():
             client_id != job["client_id"],
             service_type != (job["service_type"] or ""),
             other_service_details != (job["other_service_details"] or ""),
+            due_date != (job["due_date"] or None),
         ]
     )
     if not notes and not valid_files and not valid_receipt_files and not job_fields_changed:
@@ -1937,6 +2148,7 @@ def submit_update():
                 UPDATE jobs
                 SET status = ?,
                     client_name = ?,
+                    due_date = ?,
                     service_type = ?,
                     other_service_details = ?,
                     proposal_amount = ?,
@@ -1952,6 +2164,7 @@ def submit_update():
                 (
                     status,
                     client_name,
+                    due_date,
                     service_type,
                     other_service_details,
                     proposal_amount,

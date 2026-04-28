@@ -11,17 +11,19 @@
     <meta name="apple-mobile-web-app-title" content="KAS App">
     <meta name="description" content="KAS App - Waterproofing &amp; Building Services">
     {% set uploaded_logo_url = (workspace_settings.uploaded_logo_url if workspace_settings is defined and workspace_settings.uploaded_logo_url else '') %}
-    {% set dynamic_favicon = (uploaded_logo_url if uploaded_logo_url else url_for('static', filename='icons/favicon.svg')) %}
+    {% set company_logo_url = uploaded_logo_url %}
+    {% set dynamic_favicon = (company_logo_url if company_logo_url else url_for('static', filename='icons/favicon.svg')) %}
     <title>{% block title %}KAS{% endblock %}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="manifest" href="{{ url_for('pwa_manifest') }}">
+    <link rel="icon" type="image/png" href="{{ company_logo_url if company_logo_url else url_for('static', filename='icons/icon-192.png') }}">
     <link rel="icon" href="{{ dynamic_favicon }}" type="{{ workspace_settings.favicon_mimetype if workspace_settings is defined and workspace_settings.favicon_mimetype else 'image/svg+xml' }}">
-    <link rel="icon" href="{{ url_for('static', filename='icons/icon-192.png') }}" sizes="192x192" type="image/png">
-    <link rel="apple-touch-icon" href="{{ dynamic_favicon }}">
+    <link rel="apple-touch-icon" href="{{ company_logo_url if company_logo_url else dynamic_favicon }}">
     <link rel="apple-touch-startup-image" href="{{ url_for('static', filename='icons/apple-splash.svg') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
     {% set rendered_content %}{% block content %}{% endblock %}{% endset %}
@@ -47,15 +49,15 @@
                 </div>
 
                 <nav class="sidebar-nav">
-                    <a class="nav-link {% if request.endpoint == 'index' %}active{% endif %}" href="{{ url_for('index') }}">Dashboard</a>
-                    <a class="nav-link {% if request.endpoint in ['add_job', 'update_job', 'job_progress', 'submit_update'] %}active{% endif %}" href="{{ url_for('index') }}">Jobs</a>
+                    <a class="nav-link {% if request.endpoint == 'index' %}active{% endif %}" href="{{ url_for('index') }}"><span class="nav-icon" data-lucide="layout-grid"></span><span>Dashboard</span></a>
+                    <a class="nav-link {% if request.endpoint == 'jobs' or request.endpoint in ['add_job', 'update_job', 'job_progress', 'submit_update'] %}active{% endif %}" href="{{ url_for('jobs') }}"><span class="nav-icon" data-lucide="briefcase-business"></span><span>Jobs</span></a>
                     {% if g.user.role == 'admin' %}
-                        <a class="nav-link {% if request.endpoint == 'users' %}active{% endif %}" href="{{ url_for('users') }}">Clients</a>
-                        <a class="nav-link {% if request.endpoint == 'users' %}active{% endif %}" href="{{ url_for('users') }}">Employees</a>
-                        <a class="nav-link {% if request.endpoint in ['estimates', 'create_estimate', 'view_estimate', 'edit_estimate'] %}active{% endif %}" href="{{ url_for('estimates') }}">Estimates</a>
-                        <a class="nav-link {% if request.endpoint in ['update_job', 'job_progress'] %}active{% endif %}" href="{{ url_for('index', sort='updated') }}">Updates</a>
-                        <a class="nav-link {% if request.endpoint == 'analytics' %}active{% endif %}" href="{{ url_for('analytics') }}">Analytics</a>
-                        <a class="nav-link {% if request.endpoint == 'settings' %}active{% endif %}" href="{{ url_for('settings') }}">Settings</a>
+                        <a class="nav-link {% if request.endpoint == 'clients' %}active{% endif %}" href="{{ url_for('clients') }}"><span class="nav-icon" data-lucide="users"></span><span>Clients</span></a>
+                        <a class="nav-link {% if request.endpoint == 'employees' %}active{% endif %}" href="{{ url_for('employees') }}"><span class="nav-icon" data-lucide="user-check"></span><span>Employees</span></a>
+                        <a class="nav-link {% if request.endpoint in ['estimates', 'create_estimate', 'view_estimate', 'edit_estimate'] %}active{% endif %}" href="{{ url_for('estimates') }}"><span class="nav-icon" data-lucide="file-text"></span><span>Estimates</span></a>
+                        <a class="nav-link {% if request.endpoint in ['update_job', 'job_progress', 'submit_update'] %}active{% endif %}" href="{{ url_for('index', sort='updated') }}"><span class="nav-icon" data-lucide="bell"></span><span>Updates</span></a>
+                        <a class="nav-link {% if request.endpoint == 'analytics' %}active{% endif %}" href="{{ url_for('analytics') }}"><span class="nav-icon" data-lucide="bar-chart-3"></span><span>Analytics</span></a>
+                        <a class="nav-link {% if request.endpoint == 'settings' %}active{% endif %}" href="{{ url_for('settings') }}"><span class="nav-icon" data-lucide="settings-2"></span><span>Settings</span></a>
                     {% endif %}
                 </nav>
 
@@ -138,6 +140,7 @@
                             <div class="profile-dropdown" id="profile-dropdown">
                                 <a href="{{ url_for('index') }}">My Dashboard</a>
                                 {% if g.user.role == 'admin' %}
+                                    <a href="{{ url_for('users') }}">Access Management</a>
                                     <a href="{{ url_for('settings') }}">Settings</a>
                                 {% endif %}
                                 <form method="post" action="{{ url_for('logout') }}">
@@ -164,13 +167,14 @@
             </div>
 
             <nav class="mobile-bottom-nav" aria-label="Mobile navigation">
-                <a href="{{ url_for('index') }}" class="{% if request.endpoint == 'index' %}active{% endif %}">Dashboard</a>
-                <a href="{{ url_for('index') }}" class="{% if request.endpoint in ['add_job', 'update_job', 'job_progress', 'submit_update'] %}active{% endif %}">Jobs</a>
+                <a href="{{ url_for('index') }}" class="{% if request.endpoint == 'index' %}active{% endif %}"><span data-lucide="layout-grid"></span><span>Dashboard</span></a>
+                <a href="{{ url_for('jobs') }}" class="{% if request.endpoint == 'jobs' or request.endpoint in ['add_job', 'update_job', 'job_progress', 'submit_update'] %}active{% endif %}"><span data-lucide="briefcase-business"></span><span>Jobs</span></a>
                 {% if g.user.role == 'admin' %}
-                    <a href="{{ url_for('estimates') }}" class="{% if request.endpoint in ['estimates', 'create_estimate', 'view_estimate', 'edit_estimate'] %}active{% endif %}">Estimates</a>
-                    <a href="{{ url_for('settings') }}" class="{% if request.endpoint == 'settings' %}active{% endif %}">Settings</a>
+                    <a href="{{ url_for('clients') }}" class="{% if request.endpoint == 'clients' %}active{% endif %}"><span data-lucide="users"></span><span>Clients</span></a>
+                    <a href="{{ url_for('employees') }}" class="{% if request.endpoint == 'employees' %}active{% endif %}"><span data-lucide="user-check"></span><span>Employees</span></a>
+                    <a href="{{ url_for('settings') }}" class="{% if request.endpoint == 'settings' %}active{% endif %}"><span data-lucide="settings-2"></span><span>Settings</span></a>
                 {% else %}
-                    <a href="{{ url_for('index', sort='updated') }}">Updates</a>
+                    <a href="{{ url_for('index', sort='updated') }}"><span data-lucide="bell"></span><span>Updates</span></a>
                     <form method="post" action="{{ url_for('logout') }}"><button type="submit">Sign Out</button></form>
                 {% endif %}
             </nav>
@@ -510,5 +514,6 @@
         registerServiceWorker().then(subscribeToPushIfConfigured);
     })();
     </script>
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
 </body>
 </html>

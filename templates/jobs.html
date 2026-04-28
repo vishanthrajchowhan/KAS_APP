@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+
+{% block title %}Jobs | KAS{% endblock %}
+
+{% block content %}
+<section class="jobs-page management-page">
+    <section class="page-hero glass-panel reveal">
+        <div class="hero-copy shell-copy">
+            <p class="eyebrow">Operations Board</p>
+            <h1>Jobs Management</h1>
+            <p>Track every active project, filter by employee or status, and keep the field team moving with a clean command center.</p>
+            <div class="dashboard-tags">
+                <span class="dashboard-tag">Active jobs: {{ active_jobs }}</span>
+                <span class="dashboard-tag">Overdue: {{ overdue_jobs }}</span>
+                <span class="dashboard-tag">In progress: {{ in_progress_jobs }}</span>
+            </div>
+        </div>
+        <div class="hero-actions">
+            <a class="button" href="{{ url_for('jobs') }}">Reset Filters</a>
+            {% if can_manage_jobs %}
+                <a class="button button-primary" href="{{ url_for('add_job') }}">Quick Add Job</a>
+            {% endif %}
+        </div>
+    </section>
+
+    <section class="management-stats stagger-grid" aria-label="Job summary">
+        <div class="stat-card glass-panel reveal">
+            <span class="kpi-value" data-count="{{ active_jobs }}">{{ active_jobs }}</span>
+            <p>Active Jobs</p>
+            <small>Scheduled, started, and in progress</small>
+        </div>
+        <div class="stat-card glass-panel reveal">
+            <span class="kpi-value" data-count="{{ scheduled_jobs }}">{{ scheduled_jobs }}</span>
+            <p>Scheduled</p>
+            <small>Ready for the field crew</small>
+        </div>
+        <div class="stat-card glass-panel reveal">
+            <span class="kpi-value" data-count="{{ in_progress_jobs }}">{{ in_progress_jobs }}</span>
+            <p>In Progress</p>
+            <small>Work actively underway</small>
+        </div>
+        <div class="stat-card glass-panel reveal">
+            <span class="kpi-value" data-count="{{ completed_jobs }}">{{ completed_jobs }}</span>
+            <p>Completed</p>
+            <small>Finished or paid projects</small>
+        </div>
+        <div class="stat-card glass-panel reveal">
+            <span class="kpi-value" data-count="{{ overdue_jobs }}">{{ overdue_jobs }}</span>
+            <p>Overdue</p>
+            <small>Past their due date</small>
+        </div>
+    </section>
+
+    <form class="jobs-toolbar glass-panel reveal" method="get" action="{{ url_for('jobs') }}">
+        <div>
+            <label for="q">Search jobs</label>
+            <input id="q" name="q" type="search" placeholder="Client, address, service, employee" value="{{ filters.q }}">
+        </div>
+        <div>
+            <label for="status">Status</label>
+            <select id="status" name="status">
+                <option value="">All statuses</option>
+                {% for status in status_options %}
+                    <option value="{{ status }}" {% if filters.status == status %}selected{% endif %}>{{ status }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label for="employee">Employee</label>
+            <select id="employee" name="employee">
+                <option value="">All employees</option>
+                {% for employee in employees %}
+                    <option value="{{ employee.id }}" {% if filters.employee|int == employee.id %}selected{% endif %}>{{ employee.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label for="sort">Sort</label>
+            <select id="sort" name="sort">
+                <option value="priority" {% if filters.sort == 'priority' %}selected{% endif %}>Priority</option>
+                <option value="due" {% if filters.sort == 'due' %}selected{% endif %}>Due Date</option>
+                <option value="status" {% if filters.sort == 'status' %}selected{% endif %}>Status</option>
+                <option value="employee" {% if filters.sort == 'employee' %}selected{% endif %}>Employee</option>
+                <option value="oldest" {% if filters.sort == 'oldest' %}selected{% endif %}>Oldest</option>
+            </select>
+        </div>
+        <button class="button button-primary" type="submit">Filter</button>
+    </form>
+
+    <section class="jobs-board stagger-grid" aria-label="Jobs board">
+        {% for job in jobs %}
+            <article id="job-{{ job.id }}" class="job-board-card glass-panel reveal">
+                <div class="job-card-top">
+                    <div>
+                        <p class="eyebrow">{{ job.status }}</p>
+                        <h3>{{ job.name }}</h3>
+                        <p class="muted">{{ job.client_name or job.client_user_name or 'Client not set' }}</p>
+                    </div>
+                    <span class="chip-pill {% if job.is_overdue %}busy{% endif %}">{{ 'Overdue' if job.is_overdue else job.status }}</span>
+                </div>
+
+                <div class="job-meta">
+                    <small><strong>Service:</strong> {{ job.service_type or 'General' }}</small>
+                    <small><strong>Address:</strong> {{ job.location }}</small>
+                    <small><strong>Assigned:</strong> {{ job.assigned_employee_name or 'Unassigned' }}</small>
+                    <small><strong>Due:</strong> {{ job.effective_due_date or 'TBD' }}</small>
+                </div>
+
+                <div class="progress-bar" aria-label="Job progress">
+                    <span style="--progress: {{ job.progress_percent }}%;"></span>
+                </div>
+
+                <div class="card-actions">
+                    <a class="button" href="{{ url_for('job_progress', job_id=job.id) }}">View</a>
+                    <a class="button" href="{{ url_for('update_job', job_id=job.id) }}">Edit</a>
+                    <form method="post" action="{{ url_for('delete_job', job_id=job.id) }}" onsubmit="return confirm('Delete this job?');">
+                        <button class="button button-danger" type="submit">Delete</button>
+                    </form>
+                </div>
+            </article>
+        {% else %}
+            <section class="empty-state reveal">
+                <h2>No jobs found</h2>
+                <p>Try a different filter or create a new job record.</p>
+                {% if can_manage_jobs %}
+                    <a class="button button-primary" href="{{ url_for('add_job') }}">Quick Add Job</a>
+                {% endif %}
+            </section>
+        {% endfor %}
+    </section>
+</section>
+{% endblock %}

@@ -22,6 +22,9 @@
         <label for="location">Location</label>
         <input id="location" name="location" type="text" value="{{ location or '' }}" required maxlength="180" autocomplete="street-address">
 
+        <label for="due_date">Due Date</label>
+        <input id="due_date" name="due_date" type="date" value="{{ due_date or '' }}">
+
         <div class="form-section service-type-section">
             <label for="service_type">Service Types</label>
             <select id="service_type" name="service_type" multiple size="6" required data-other-option="Other">

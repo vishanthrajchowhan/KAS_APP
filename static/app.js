@@ -78,10 +78,17 @@
         });
     }
 
+    function setupIcons() {
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+            window.lucide.createIcons();
+        }
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
         revealElements();
         setupCounters();
         setupStaggerGroups();
         setupButtons();
+        setupIcons();
     });
 })();

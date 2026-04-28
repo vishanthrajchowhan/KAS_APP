@@ -2378,6 +2378,10 @@ body {
     background: color-mix(in srgb, var(--surface) 88%, transparent);
 }
 
+.sidebar-toggle {
+    display: none;
+}
+
 @keyframes pulse-ring {
     0% { box-shadow: 0 0 0 0 rgba(255, 98, 88, 0.32); }
     70% { box-shadow: 0 0 0 10px rgba(255, 98, 88, 0); }
@@ -2395,6 +2399,411 @@ body {
     .dashboard-hero,
     .dashboard-workspace {
         grid-template-columns: 1fr;
+    }
+}
+
+.sidebar .brand {
+    gap: 14px;
+}
+
+.sidebar .brand-mark {
+    width: 56px;
+    height: 56px;
+    min-width: 56px;
+    min-height: 56px;
+    border-radius: 18px;
+    box-shadow: 0 18px 30px rgba(15, 106, 71, 0.24);
+}
+
+.sidebar .brand-logo {
+    padding: 6px;
+}
+
+.sidebar-nav .nav-link {
+    position: relative;
+    gap: 12px;
+    padding-inline: 16px;
+}
+
+.nav-icon {
+    width: 18px;
+    height: 18px;
+    flex: 0 0 18px;
+}
+
+.nav-link.active {
+    color: #ffffff;
+    background: linear-gradient(135deg, rgba(15, 106, 71, 0.95), rgba(18, 95, 67, 0.88));
+    box-shadow: 0 14px 28px rgba(15, 106, 71, 0.28);
+    transform: translateX(4px);
+}
+
+.nav-link.active::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 11px;
+    bottom: 11px;
+    width: 3px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.7);
+}
+
+.sidebar-nav .nav-link:hover {
+    transform: translateX(5px);
+}
+
+.topbar-brand-mark {
+    width: 34px;
+    height: 34px;
+    min-width: 34px;
+    min-height: 34px;
+    border-radius: 11px;
+}
+
+.topbar-brand-logo {
+    padding: 4px;
+}
+
+.auth-page {
+    max-width: 1080px;
+    margin: 0 auto;
+}
+
+.auth-page .auth-brand {
+    justify-content: center;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 10px;
+    padding: 22px 0 28px;
+}
+
+.auth-page .brand-mark {
+    width: 96px;
+    height: 96px;
+    min-width: 96px;
+    min-height: 96px;
+    border-radius: 28px;
+    font-size: 1.1rem;
+    box-shadow: 0 24px 40px rgba(15, 106, 71, 0.24);
+}
+
+.auth-page .brand-logo {
+    padding: 10px;
+}
+
+.glass-panel {
+    background: color-mix(in srgb, var(--surface) 84%, transparent);
+    border: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
+    box-shadow: 0 18px 42px rgba(18, 35, 28, 0.09);
+    backdrop-filter: blur(18px);
+}
+
+.page-hero,
+.management-toolbar,
+.jobs-board,
+.person-grid,
+.summary-grid {
+    display: grid;
+    gap: 16px;
+}
+
+.page-hero {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    padding: 24px;
+    border-radius: 28px;
+}
+
+.page-hero .hero-copy {
+    max-width: 760px;
+}
+
+.page-hero .hero-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.management-stats {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.management-stats .stat-card,
+.stats-card,
+.person-card,
+.job-board-card,
+.dashboard-card {
+    position: relative;
+    padding: 18px;
+    border-radius: 24px;
+    background: color-mix(in srgb, var(--surface) 88%, transparent);
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+}
+
+.management-stats .stat-card::after,
+.person-card::after,
+.job-board-card::after {
+    content: "";
+    position: absolute;
+    inset: auto -12px -28px auto;
+    width: 120px;
+    height: 120px;
+    border-radius: 999px;
+    background: radial-gradient(circle, rgba(15, 106, 71, 0.14), transparent 70%);
+    pointer-events: none;
+}
+
+.jobs-toolbar,
+.people-toolbar {
+    display: grid;
+    grid-template-columns: minmax(240px, 1fr) repeat(3, minmax(150px, 210px)) auto;
+    gap: 12px;
+    align-items: end;
+    padding: 18px;
+    border-radius: 24px;
+    background: color-mix(in srgb, var(--surface) 90%, transparent);
+    border: 1px solid var(--line);
+}
+
+.jobs-board {
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
+
+.job-board-card {
+    display: grid;
+    gap: 14px;
+}
+
+.job-card-top,
+.person-header,
+.summary-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.job-card-top h3,
+.person-card h3 {
+    margin-bottom: 4px;
+}
+
+.job-meta,
+.person-meta,
+.client-meta {
+    display: grid;
+    gap: 6px;
+    color: var(--muted);
+}
+
+.job-meta small,
+.person-meta small,
+.client-meta small {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 10px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--surface-2) 82%, transparent);
+    overflow: hidden;
+}
+
+.progress-bar > span {
+    display: block;
+    width: var(--progress, 0%);
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(135deg, var(--primary), var(--primary-2));
+}
+
+.card-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.card-actions form {
+    display: contents;
+}
+
+.card-actions .button {
+    width: 100%;
+}
+
+.person-grid {
+    grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+}
+
+.person-avatar {
+    width: 56px;
+    height: 56px;
+    display: grid;
+    place-items: center;
+    flex: 0 0 56px;
+    border-radius: 18px;
+    background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 84%, white), color-mix(in srgb, var(--primary-2) 86%, black));
+    color: #ffffff;
+    font-size: 1rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+}
+
+.person-card.client .person-avatar {
+    background: linear-gradient(135deg, #0f6a47, #5f8b7a);
+}
+
+.person-card.employee .person-avatar {
+    background: linear-gradient(135deg, #173b68, #0f6a47);
+}
+
+.person-status,
+.chip-pill,
+.metric-pill {
+    display: inline-flex;
+    align-items: center;
+    min-height: 28px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+
+.person-status.busy,
+.chip-pill.busy,
+.metric-pill.busy {
+    color: var(--warning-text);
+    background: var(--warning-bg);
+    border-color: color-mix(in srgb, var(--warning-text) 18%, transparent);
+}
+
+.person-status.available,
+.chip-pill.available,
+.metric-pill.available {
+    color: var(--success-text);
+    background: var(--success-bg);
+    border-color: color-mix(in srgb, var(--success-text) 18%, transparent);
+}
+
+.person-status.off-duty,
+.chip-pill.off-duty,
+.metric-pill.off-duty {
+    color: var(--muted);
+    background: var(--surface-2);
+}
+
+.people-toolbar .button,
+.jobs-toolbar .button {
+    width: 100%;
+}
+
+.management-page,
+.clients-page,
+.employees-page,
+.jobs-page {
+    display: grid;
+    gap: 18px;
+}
+
+.shell-copy {
+    max-width: 780px;
+}
+
+.management-footer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+@media (max-width: 1080px) {
+    .management-stats {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .jobs-toolbar,
+    .people-toolbar,
+    .page-hero {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 960px) {
+    .app-shell {
+        grid-template-columns: 1fr;
+    }
+
+    .sidebar {
+        position: fixed;
+        inset: 0 auto 0 0;
+        width: min(86vw, 330px);
+        transform: translateX(-110%);
+        transition: transform 0.28s ease;
+        z-index: 40;
+    }
+
+    .app-shell.sidebar-open .sidebar {
+        transform: translateX(0);
+    }
+
+    .workspace {
+        min-height: 100vh;
+    }
+
+    .sidebar-toggle {
+        display: inline-flex;
+    }
+
+    .sidebar .brand-mark {
+        width: 48px;
+        height: 48px;
+        min-width: 48px;
+        min-height: 48px;
+    }
+
+    .auth-page .brand-mark {
+        width: 88px;
+        height: 88px;
+        min-width: 88px;
+        min-height: 88px;
+    }
+}
+
+@media (min-width: 961px) {
+    .sidebar-close {
+        display: none;
+    }
+}
+
+@media (max-width: 760px) {
+    .management-stats,
+    .person-grid,
+    .jobs-board {
+        grid-template-columns: 1fr;
+    }
+
+    .card-actions {
+        grid-template-columns: 1fr;
+    }
+
+    .topbar-brand-text {
+        display: none;
+    }
+
+    .auth-page .auth-brand {
+        padding: 12px 0 18px;
     }
 }
 

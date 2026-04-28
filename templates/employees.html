@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block title %}Employees | KAS{% endblock %}
+
+{% block content %}
+<section class="employees-page management-page">
+    <section class="page-hero glass-panel reveal">
+        <div class="hero-copy shell-copy">
+            <p class="eyebrow">Workforce Management</p>
+            <h1>Employees</h1>
+            <p>See who is available, who is busy, and how your field crew is distributed across current work.</p>
+            <div class="dashboard-tags">
+                <span class="dashboard-tag">Total employees: {{ total_employees }}</span>
+                <span class="dashboard-tag">Active today: {{ active_today }}</span>
+                <span class="dashboard-tag">Field crew: {{ field_crew }}</span>
+                <span class="dashboard-tag">Office staff: {{ office_staff }}</span>
+            </div>
+        </div>
+        <div class="hero-actions">
+            <a class="button" href="{{ url_for('users') }}">Access Management</a>
+            <a class="button button-primary" href="{{ url_for('add_job') }}">Assign Job</a>
+        </div>
+    </section>
+
+    <section class="management-stats stagger-grid" aria-label="Employee summary">
+        <div class="stat-card glass-panel reveal">
+            <span class="kpi-value" data-count="{{ total_employees }}">{{ total_employees }}</span>
+            <p>Total Employees</p>
+            <small>All team members in the workspace</small>
+        </div>
+        <div class="stat-card glass-panel reveal">
+            <span class="kpi-value" data-count="{{ active_today }}">{{ active_today }}</span>
+            <p>Active Today</p>
+            <small>Employees with jobs this morning</small>
+        </div>
+        <div class="stat-card glass-panel reveal">
+            <span class="kpi-value" data-count="{{ field_crew }}">{{ field_crew }}</span>
+            <p>Field Crew</p>
+            <small>Team members assigned to jobs</small>
+        </div>
+        <div class="stat-card glass-panel reveal">
+            <span class="kpi-value" data-count="{{ office_staff }}">{{ office_staff }}</span>
+            <p>Office Staff</p>
+            <small>Team members without active field jobs</small>
+        </div>
+        <div class="stat-card glass-panel reveal">
+            <span class="kpi-value" data-count="{{ employees|selectattr('status', 'equalto', 'Busy')|list|length }}">{{ employees|selectattr('status', 'equalto', 'Busy')|list|length }}</span>
+            <p>Busy Now</p>
+            <small>Currently on an active job</small>
+        </div>
+    </section>
+
+    <section class="person-grid stagger-grid" aria-label="Employee cards">
+        {% for employee in employees %}
+            <article id="employee-{{ employee.id }}" class="person-card employee glass-panel reveal">
+                <div class="person-header">
+                    <div class="person-avatar" aria-hidden="true">{{ employee.name[:1]|upper }}</div>
+                    <div>
+                        <p class="eyebrow">Team Member</p>
+                        <h3>{{ employee.name }}</h3>
+                        <div class="person-meta">
+                            <small>{{ employee.email }}</small>
+                            <small>{{ employee.phone or 'Phone not on file' }}</small>
+                        </div>
+                    </div>
+                    <span class="person-status {{ employee.status|lower|replace(' ', '-') }}">{{ employee.status }}</span>
+                </div>
+
+                <div class="summary-grid">
+                    <div class="metric-pill">Assigned Jobs: {{ employee.assigned_jobs or 0 }}</div>
+                    <div class="metric-pill">Active Jobs: {{ employee.active_jobs or 0 }}</div>
+                    <div class="metric-pill">Clock Status: Ready</div>
+                    <div class="metric-pill">Last Job: {{ employee.last_assigned_job[:10] if employee.last_assigned_job else 'No jobs yet' }}</div>
+                </div>
+
+                <div class="card-actions">
+                    <a class="button" href="#employee-{{ employee.id }}">View</a>
+                    <a class="button" href="{{ url_for('users') }}">Edit</a>
+                    <a class="button button-primary" href="{{ url_for('add_job') }}">Assign Job</a>
+                </div>
+            </article>
+        {% else %}
+            <section class="empty-state reveal">
+                <h2>No employees yet</h2>
+                <p>Create employee accounts in access management to see the workforce board.</p>
+            </section>
+        {% endfor %}
+    </section>
+</section>
+{% endblock %}

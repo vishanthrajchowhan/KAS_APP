@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Users | KAS{% endblock %}
+{% block title %}Access Management | KAS{% endblock %}
 
 {% block content %}
 <section class="page-title">
@@ -46,8 +46,8 @@
             </div>
             <div class="form-grid two">
                 <div>
-                    <label for="password">Temporary Password</label>
-                    <input id="password" name="password" type="password" required minlength="6">
+                    <label for="phone">Phone</label>
+                    <input id="phone" name="phone" type="tel" maxlength="30" placeholder="(954) 555-0123">
                 </div>
                 <div>
                     <label for="role">Role</label>
@@ -57,6 +57,13 @@
                         {% endfor %}
                     </select>
                 </div>
+            </div>
+            <div class="form-grid two">
+                <div>
+                    <label for="password">Temporary Password</label>
+                    <input id="password" name="password" type="password" required minlength="6">
+                </div>
+                <div></div>
             </div>
         </section>
         <button class="button button-primary button-full" type="submit">Create User</button>
@@ -76,6 +83,7 @@
                     <tr>
                         <th>Name</th>
                         <th>Email</th>
+                        <th>Phone</th>
                         <th>Role</th>
                     </tr>
                 </thead>
@@ -84,6 +92,7 @@
                         <tr>
                             <td>{{ user.name }}</td>
                             <td>{{ user.email }}</td>
+                            <td>{{ user.phone or '—' }}</td>
                             <td>{{ user.role|title }}</td>
                         </tr>
                     {% endfor %}
