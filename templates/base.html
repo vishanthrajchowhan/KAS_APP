@@ -137,7 +137,9 @@
                             </button>
                             <div class="profile-dropdown" id="profile-dropdown">
                                 <a href="{{ url_for('index') }}">My Dashboard</a>
-                                <a href="{{ url_for('settings') }}">Settings</a>
+                                {% if g.user.role == 'admin' %}
+                                    <a href="{{ url_for('settings') }}">Settings</a>
+                                {% endif %}
                                 <form method="post" action="{{ url_for('logout') }}">
                                     <button class="button button-danger button-full" type="submit">Sign Out</button>
                                 </form>
