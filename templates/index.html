@@ -7,12 +7,12 @@
 {% set completed_jobs = status_counts.get('Completed', 0) + status_counts.get('Paid', 0) %}
 {% set revenue_this_month = (monthly_revenue[-1].value if monthly_revenue else 0) or 0 %}
 
-<section class="dashboard-hero">
+<section class="dashboard-hero glass-panel reveal">
     <div class="dashboard-hero-copy">
         <p class="eyebrow">Operations Workspace</p>
-        <h1>Pipeline Dashboard</h1>
+        <h1>Manage Jobs. Close Faster. Build Smarter.</h1>
         {% if dashboard_role == "admin" %}
-            <p>Manage leads, execution, and revenue for KAS Waterproofing &amp; Building Services from one premium command center.</p>
+            <p>Operations dashboard for KAS Waterproofing &amp; Building Services.</p>
         {% elif dashboard_role == "employee" %}
             <p>Your assigned field jobs, updates, and timeline visibility in a mobile-ready workspace.</p>
         {% else %}
@@ -33,158 +33,158 @@
             <a class="button" href="{{ url_for('users', role='client') }}">Add Client</a>
             <a class="button" href="{{ url_for('users', role='employee') }}">Assign Employee</a>
             {% if latest_job_id %}
-                <a class="button" href="{{ url_for('update_job', job_id=latest_job_id) }}">Upload Update</a>
+                <a class="button" href="{{ url_for('update_job', job_id=latest_job_id) }}">Add Update</a>
             {% else %}
-                <span class="button button-disabled" aria-disabled="true">Upload Update</span>
+                <span class="button button-disabled" aria-disabled="true">Add Update</span>
             {% endif %}
         </div>
     {% endif %}
 </section>
 
-<section class="dashboard-kpis" aria-label="Business summary">
+<section class="dashboard-kpis stagger-grid" aria-label="Business summary">
     {% if dashboard_role == "admin" %}
-        <article class="kpi-card kpi-primary">
+        <article class="kpi-card kpi-primary glass-panel reveal">
             <div class="kpi-icon">◫</div>
             <div class="kpi-copy">
-                <span class="kpi-value">{{ jobs|length }}</span>
+                <span class="kpi-value" data-count="{{ jobs|length }}">{{ jobs|length }}</span>
                 <p>Total Projects</p>
                 <small>All visible jobs in the current workspace</small>
             </div>
         </article>
-        <article class="kpi-card">
+        <article class="kpi-card glass-panel reveal">
             <div class="kpi-icon">⚡</div>
             <div class="kpi-copy">
-                <span class="kpi-value">{{ active_jobs }}</span>
+                <span class="kpi-value" data-count="{{ active_jobs }}">{{ active_jobs }}</span>
                 <p>Active Jobs</p>
                 <small>Scheduled, started, and in progress</small>
             </div>
         </article>
-        <article class="kpi-card">
+        <article class="kpi-card glass-panel reveal">
             <div class="kpi-icon">✓</div>
             <div class="kpi-copy">
-                <span class="kpi-value">{{ completed_jobs }}</span>
+                <span class="kpi-value" data-count="{{ completed_jobs }}">{{ completed_jobs }}</span>
                 <p>Completed Jobs</p>
                 <small>Finished or paid projects</small>
             </div>
         </article>
-        <article class="kpi-card">
+        <article class="kpi-card glass-panel reveal">
             <div class="kpi-icon">⌁</div>
             <div class="kpi-copy">
-                <span class="kpi-value">{{ pending_estimates }}</span>
+                <span class="kpi-value" data-count="{{ pending_estimates }}">{{ pending_estimates }}</span>
                 <p>Pending Estimates</p>
                 <small>Draft, sent, and viewed quotes</small>
             </div>
         </article>
-        <article class="kpi-card">
+        <article class="kpi-card glass-panel reveal">
             <div class="kpi-icon">$</div>
             <div class="kpi-copy">
-                <span class="kpi-value">{{ money(revenue_this_month) }}</span>
+                <span class="kpi-value" data-count="{{ revenue_this_month|int }}">{{ money(revenue_this_month) }}</span>
                 <p>Revenue This Month</p>
                 <small>Collected payments for the month</small>
             </div>
         </article>
-        <article class="kpi-card">
+        <article class="kpi-card glass-panel reveal">
             <div class="kpi-icon">＋</div>
             <div class="kpi-copy">
-                <span class="kpi-value">{{ new_leads }}</span>
+                <span class="kpi-value" data-count="{{ new_leads }}">{{ new_leads }}</span>
                 <p>New Leads</p>
                 <small>Lead stage entries created this month</small>
             </div>
         </article>
     {% elif dashboard_role == "employee" %}
-        <article class="kpi-card kpi-primary">
+        <article class="kpi-card kpi-primary glass-panel reveal">
             <div class="kpi-icon">◫</div>
             <div class="kpi-copy">
-                <span class="kpi-value">{{ jobs|length }}</span>
+                <span class="kpi-value" data-count="{{ jobs|length }}">{{ jobs|length }}</span>
                 <p>Assigned Projects</p>
                 <small>Your visible field workload</small>
             </div>
         </article>
-        <article class="kpi-card">
+        <article class="kpi-card glass-panel reveal">
             <div class="kpi-icon">⚡</div>
             <div class="kpi-copy">
-                <span class="kpi-value">{{ status_counts.get('In Progress', 0) }}</span>
+                <span class="kpi-value" data-count="{{ status_counts.get('In Progress', 0) }}">{{ status_counts.get('In Progress', 0) }}</span>
                 <p>In Progress</p>
                 <small>Active jobs in motion</small>
             </div>
         </article>
-        <article class="kpi-card">
+        <article class="kpi-card glass-panel reveal">
             <div class="kpi-icon">✓</div>
             <div class="kpi-copy">
-                <span class="kpi-value">{{ completed_jobs }}</span>
+                <span class="kpi-value" data-count="{{ completed_jobs }}">{{ completed_jobs }}</span>
                 <p>Completed</p>
                 <small>Closed field work</small>
             </div>
         </article>
-        <article class="kpi-card">
+        <article class="kpi-card glass-panel reveal">
             <div class="kpi-icon">📝</div>
             <div class="kpi-copy">
-                <span class="kpi-value">{{ jobs|sum(attribute='update_count') }}</span>
+                <span class="kpi-value" data-count="{{ jobs|sum(attribute='update_count') }}">{{ jobs|sum(attribute='update_count') }}</span>
                 <p>Updates Logged</p>
                 <small>Notes and media uploaded to jobs</small>
             </div>
         </article>
-        <article class="kpi-card">
+        <article class="kpi-card glass-panel reveal">
             <div class="kpi-icon">↗</div>
             <div class="kpi-copy">
-                <span class="kpi-value">{{ status_counts.get('Scheduled', 0) + status_counts.get('Started', 0) }}</span>
+                <span class="kpi-value" data-count="{{ status_counts.get('Scheduled', 0) + status_counts.get('Started', 0) }}">{{ status_counts.get('Scheduled', 0) + status_counts.get('Started', 0) }}</span>
                 <p>Ready to Work</p>
                 <small>Jobs queued for the crew</small>
             </div>
         </article>
-        <article class="kpi-card">
+        <article class="kpi-card glass-panel reveal">
             <div class="kpi-icon">⌛</div>
             <div class="kpi-copy">
-                <span class="kpi-value">{{ status_counts.get('Proposal Sent', 0) + status_counts.get('Negotiation', 0) }}</span>
+                <span class="kpi-value" data-count="{{ status_counts.get('Proposal Sent', 0) + status_counts.get('Negotiation', 0) }}">{{ status_counts.get('Proposal Sent', 0) + status_counts.get('Negotiation', 0) }}</span>
                 <p>Awaiting Decision</p>
                 <small>Leads still moving through sales</small>
             </div>
         </article>
     {% else %}
-        <article class="kpi-card kpi-primary">
+        <article class="kpi-card kpi-primary glass-panel reveal">
             <div class="kpi-icon">◫</div>
             <div class="kpi-copy">
-                <span class="kpi-value">{{ jobs|length }}</span>
+                <span class="kpi-value" data-count="{{ jobs|length }}">{{ jobs|length }}</span>
                 <p>My Projects</p>
                 <small>Projects visible to your portal</small>
             </div>
         </article>
-        <article class="kpi-card">
+        <article class="kpi-card glass-panel reveal">
             <div class="kpi-icon">⚡</div>
             <div class="kpi-copy">
-                <span class="kpi-value">{{ status_counts.get('In Progress', 0) }}</span>
+                <span class="kpi-value" data-count="{{ status_counts.get('In Progress', 0) }}">{{ status_counts.get('In Progress', 0) }}</span>
                 <p>In Progress</p>
                 <small>Work currently underway</small>
             </div>
         </article>
-        <article class="kpi-card">
+        <article class="kpi-card glass-panel reveal">
             <div class="kpi-icon">✓</div>
             <div class="kpi-copy">
-                <span class="kpi-value">{{ completed_jobs }}</span>
+                <span class="kpi-value" data-count="{{ completed_jobs }}">{{ completed_jobs }}</span>
                 <p>Completed</p>
                 <small>Finished milestones</small>
             </div>
         </article>
-        <article class="kpi-card">
+        <article class="kpi-card glass-panel reveal">
             <div class="kpi-icon">📝</div>
             <div class="kpi-copy">
-                <span class="kpi-value">{{ jobs|sum(attribute='update_count') }}</span>
+                <span class="kpi-value" data-count="{{ jobs|sum(attribute='update_count') }}">{{ jobs|sum(attribute='update_count') }}</span>
                 <p>Updates Logged</p>
                 <small>Latest status and photos</small>
             </div>
         </article>
-        <article class="kpi-card">
+        <article class="kpi-card glass-panel reveal">
             <div class="kpi-icon">↗</div>
             <div class="kpi-copy">
-                <span class="kpi-value">{{ status_counts.get('Scheduled', 0) + status_counts.get('Started', 0) }}</span>
+                <span class="kpi-value" data-count="{{ status_counts.get('Scheduled', 0) + status_counts.get('Started', 0) }}">{{ status_counts.get('Scheduled', 0) + status_counts.get('Started', 0) }}</span>
                 <p>Ready to Work</p>
                 <small>Upcoming activity</small>
             </div>
         </article>
-        <article class="kpi-card">
+        <article class="kpi-card glass-panel reveal">
             <div class="kpi-icon">⌛</div>
             <div class="kpi-copy">
-                <span class="kpi-value">{{ status_counts.get('Proposal Sent', 0) + status_counts.get('Negotiation', 0) }}</span>
+                <span class="kpi-value" data-count="{{ status_counts.get('Proposal Sent', 0) + status_counts.get('Negotiation', 0) }}">{{ status_counts.get('Proposal Sent', 0) + status_counts.get('Negotiation', 0) }}</span>
                 <p>Awaiting Decision</p>
                 <small>Quotes in review</small>
             </div>
@@ -194,7 +194,7 @@
 
 <section class="dashboard-workspace">
     <div class="dashboard-panels">
-        <section class="panel panel-status premium-panel" aria-label="Jobs by status">
+        <section class="panel panel-status premium-panel glass-panel reveal">
             <div class="panel-header">
                 <div>
                     <p class="eyebrow">Pipeline Health</p>
@@ -220,7 +220,7 @@
         </section>
 
         {% if monthly_revenue and dashboard_role == "admin" %}
-        <section class="panel panel-revenue premium-panel" aria-label="Monthly revenue trend">
+        <section class="panel panel-revenue premium-panel glass-panel reveal">
             <div class="panel-header">
                 <div>
                     <p class="eyebrow">Revenue Pulse</p>
@@ -246,7 +246,7 @@
         {% endif %}
     </div>
 
-    <section class="panel panel-activity premium-panel" aria-label="Recent activity">
+    <section class="panel panel-activity premium-panel glass-panel reveal">
         <div class="panel-header">
             <div>
                 <p class="eyebrow">Field Activity</p>
@@ -254,7 +254,7 @@
             </div>
             <span class="panel-chip">{{ recent_activity|length }} updates</span>
         </div>
-        <div class="activity-feed">
+        <div class="activity-feed timeline-feed">
             {% if recent_activity %}
                 {% for event in recent_activity[:6] %}
                     <div class="activity-item premium-activity-item">

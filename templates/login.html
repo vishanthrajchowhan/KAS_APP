@@ -3,14 +3,19 @@
 {% block title %}Login | KAS{% endblock %}
 
 {% block content %}
-<section class="auth-shell">
-    <div class="auth-copy">
+<section class="auth-shell glass-shell reveal">
+    <div class="auth-copy glass-panel">
         <p class="eyebrow">Secure Access</p>
         <h1>KAS Operations Cloud</h1>
         <p>Sign in to manage waterproofing, painting, and construction operations with a premium field-to-office workflow.</p>
+        <div class="dashboard-tags">
+            <span class="dashboard-tag">Fast login</span>
+            <span class="dashboard-tag">Live updates</span>
+            <span class="dashboard-tag">Team visibility</span>
+        </div>
     </div>
 
-    <form class="form-card auth-card" method="post" action="{{ url_for('login', next=request.args.get('next')) }}">
+    <form class="form-card auth-card glass-panel" method="post" action="{{ url_for('login', next=request.args.get('next')) }}">
         <label for="email">Email</label>
         <input id="email" name="email" type="email" value="{{ email or '' }}" required autocomplete="username">
 

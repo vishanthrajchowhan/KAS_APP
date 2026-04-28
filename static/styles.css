@@ -540,6 +540,19 @@ h3 {
     font-size: 1.04rem;
 }
 
+.auth-copy {
+    max-width: 620px;
+}
+
+.auth-copy h1 {
+    font-size: clamp(2rem, 4vw, 3rem);
+}
+
+.auth-copy p {
+    color: var(--muted);
+    font-size: 1.04rem;
+}
+
 .form-section {
     display: grid;
     gap: 10px;
@@ -2396,5 +2409,242 @@ body {
 
     .auth-brand {
         align-items: flex-start;
+    }
+}
+
+.auth-card {
+    padding: 28px;
+    border-radius: 24px;
+}
+
+.glass-panel,
+.panel,
+.estimate-card,
+.settings-section,
+.form-card,
+.auth-card,
+.job-summary,
+.empty-state,
+.progress-hero,
+.filters,
+.table-card,
+.update-card {
+    background: color-mix(in srgb, var(--surface) 88%, transparent);
+    backdrop-filter: blur(18px);
+}
+
+.reveal {
+    opacity: 0;
+    transform: translateY(16px);
+    transition: opacity 0.6s ease, transform 0.6s ease;
+    transition-delay: var(--reveal-delay, 0ms);
+}
+
+.reveal.is-ready {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.stagger-grid > * {
+    transition-delay: var(--item-delay, 0ms);
+}
+
+.premium-panel,
+.job-card,
+.estimate-card,
+.settings-section,
+.auth-card,
+.panel,
+.filter,
+.modal-card,
+.profile-dropdown,
+.notification-dropdown {
+    border-color: color-mix(in srgb, var(--line) 82%, transparent);
+    box-shadow: 0 12px 30px rgba(18, 35, 28, 0.08);
+}
+
+.premium-panel::before,
+.glass-panel::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.02));
+    pointer-events: none;
+}
+
+.premium-panel > *,
+.glass-panel > * {
+    position: relative;
+}
+
+.topbar-brand {
+    transition: transform 0.22s ease, box-shadow 0.22s ease;
+}
+
+.topbar-brand:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 14px 26px rgba(18, 35, 28, 0.11);
+}
+
+.dashboard-hero,
+.dashboard-kpis,
+.dashboard-workspace,
+.premium-job-list,
+.settings-shell,
+.auth-shell {
+    position: relative;
+}
+
+.dashboard-hero {
+    border-radius: 28px;
+}
+
+.dashboard-hero-actions .button,
+.job-actions .button,
+.estimate-actions .button,
+.settings-links .button,
+.settings-actions-row .button {
+    border-radius: 14px;
+}
+
+.job-card {
+    border-radius: 24px;
+}
+
+.job-card:hover,
+.estimate-card:hover,
+.update-card:hover,
+.settings-section:hover,
+.form-card:hover,
+.auth-card:hover {
+    transform: translateY(-4px);
+}
+
+.job-actions {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.job-actions .button,
+.estimate-actions .button,
+.dashboard-hero-actions .button {
+    white-space: nowrap;
+}
+
+.estimate-card {
+    border-radius: 24px;
+}
+
+.estimate-actions {
+    flex-wrap: wrap;
+}
+
+.settings-grid-fields {
+    gap: 14px;
+}
+
+.settings-section {
+    border-radius: 24px;
+}
+
+.settings-footer-actions {
+    padding: 18px;
+}
+
+.topbar-brand-text,
+.brand-meta strong,
+.page-title h1,
+.dashboard-hero-copy h1,
+.estimate-client,
+.company-name {
+    letter-spacing: -0.02em;
+}
+
+.dashboard-stats > div,
+.kpi-card,
+.panel,
+.estimate-card,
+.job-card,
+.settings-section,
+.auth-card,
+.empty-state,
+.progress-hero,
+.filters,
+.table-card,
+.update-card {
+    transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease, background 0.25s ease;
+}
+
+.dashboard-stats > div:hover,
+.kpi-card:hover,
+.panel:hover,
+.estimate-card:hover,
+.job-card:hover,
+.settings-section:hover,
+.auth-card:hover,
+.empty-state:hover,
+.progress-hero:hover,
+.filters:hover,
+.table-card:hover,
+.update-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-md);
+}
+
+.button:focus-visible,
+.icon-button:focus-visible,
+.profile-trigger:focus-visible,
+.nav-link:focus-visible,
+.quick-filter:focus-visible,
+.topbar-brand:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--primary) 36%, white);
+    outline-offset: 2px;
+}
+
+.timeline-feed .activity-item {
+    border-radius: 16px;
+}
+
+.brand-logo,
+.topbar-brand-logo,
+.logo-preview img,
+.estimate-logo {
+    image-rendering: auto;
+}
+
+@media (max-width: 1180px) {
+    .dashboard-kpis {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 900px) {
+    .dashboard-kpis {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .dashboard-hero,
+    .dashboard-workspace {
+        grid-template-columns: 1fr;
+    }
+
+    .topbar-brand-text {
+        max-width: 120px;
+    }
+}
+
+@media (max-width: 560px) {
+    .dashboard-kpis,
+    .settings-grid-fields,
+    .estimate-info,
+    .form-grid.two {
+        grid-template-columns: 1fr;
+    }
+
+    .topbar-brand-text {
+        display: none;
+    }
+
+    .modal-actions {
+        grid-template-columns: 1fr;
     }
 }

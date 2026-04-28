@@ -4,7 +4,7 @@
 
 {% block content %}
 <section class="form-shell">
-    <div class="page-title">
+    <div class="page-title reveal">
         <div>
             <p class="eyebrow">Sales Quotes</p>
             <h1>Estimates</h1>
@@ -14,27 +14,27 @@
     </div>
 
     {% if metrics %}
-    <div class="dashboard-stats">
-        <div>
-            <span>{{ metrics.total_estimates or 0 }}</span>
+    <div class="dashboard-stats stagger-grid">
+        <div class="glass-panel reveal">
+            <span data-count="{{ metrics.total_estimates or 0 }}">{{ metrics.total_estimates or 0 }}</span>
             <p>Total Estimates</p>
         </div>
-        <div>
-            <span>{{ metrics.draft_count or 0 }}</span>
+        <div class="glass-panel reveal">
+            <span data-count="{{ metrics.draft_count or 0 }}">{{ metrics.draft_count or 0 }}</span>
             <p>Drafts</p>
         </div>
-        <div>
-            <span>{{ metrics.pending_count or 0 }}</span>
+        <div class="glass-panel reveal">
+            <span data-count="{{ metrics.pending_count or 0 }}">{{ metrics.pending_count or 0 }}</span>
             <p>Pending</p>
         </div>
-        <div>
-            <span>{{ money(metrics.approved_value or 0) }}</span>
+        <div class="glass-panel reveal">
+            <span data-count="{{ metrics.approved_value or 0 }}">{{ money(metrics.approved_value or 0) }}</span>
             <p>Approved Value</p>
         </div>
     </div>
     {% endif %}
 
-    <div class="filters">
+    <div class="filters premium-filters-bar reveal">
         <form method="get" action="{{ url_for('estimates') }}" style="display: contents;">
             <input type="text" name="q" placeholder="Search client, company, estimate #..." value="{{ filters.q or '' }}">
             <select name="status">
@@ -49,15 +49,18 @@
                 <option value="name" {% if filters.sort == 'name' %}selected{% endif %}>Client Name</option>
                 <option value="value" {% if filters.sort == 'value' %}selected{% endif %}>Highest Value</option>
             </select>
+            <input type="date" id="estimate-date-filter" placeholder="Date">
+            <input type="number" id="estimate-min-amount" min="0" step="0.01" placeholder="Min amount">
+            <input type="number" id="estimate-max-amount" min="0" step="0.01" placeholder="Max amount">
             <button type="submit" class="button">Filter</button>
             <a href="{{ url_for('estimates') }}" class="button">Clear</a>
         </form>
     </div>
 
     {% if estimates %}
-        <div class="job-list">
+        <div class="job-list premium-job-list" id="estimate-list">
             {% for est in estimates %}
-            <div class="estimate-card">
+            <div class="estimate-card glass-panel reveal" data-created-at="{{ est.created_at[:10] if est.created_at else '' }}" data-amount="{{ est.total or 0 }}">
                 <div class="estimate-header">
                     <div class="estimate-number">{{ est.estimate_number }}</div>
                     <div class="estimate-client">{{ est.client_name }}</div>
@@ -85,6 +88,11 @@
                             <a href="{{ url_for('edit_estimate', estimate_id=est.id) }}" class="button button-small">Edit</a>
                         {% endif %}
                         <button type="button" class="button button-small button-danger" data-delete-id="{{ est.id }}" data-delete-number="{{ est.estimate_number }}">Delete</button>
+                        {% if est.status == 'Approved' %}
+                            <form method="post" action="{{ url_for('convert_estimate_to_job', estimate_id=est.id) }}" style="display: contents;">
+                                <button type="submit" class="button button-small button-primary">Convert to Job</button>
+                            </form>
+                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -148,6 +156,30 @@
         if (event.key === 'Escape' && !modal.hidden) {
             hideModal();
         }
+    });
+
+    const list = document.getElementById('estimate-list');
+    const dateFilter = document.getElementById('estimate-date-filter');
+    const minAmount = document.getElementById('estimate-min-amount');
+    const maxAmount = document.getElementById('estimate-max-amount');
+
+    function applyFilters() {
+        if (!list) return;
+        const dateValue = (dateFilter && dateFilter.value) || '';
+        const minValue = parseFloat((minAmount && minAmount.value) || '');
+        const maxValue = parseFloat((maxAmount && maxAmount.value) || '');
+        Array.from(list.querySelectorAll('.estimate-card')).forEach((card) => {
+            const createdAt = card.getAttribute('data-created-at') || '';
+            const amount = parseFloat(card.getAttribute('data-amount') || '0');
+            const matchesDate = !dateValue || createdAt === dateValue;
+            const matchesMin = Number.isNaN(minValue) ? true : amount >= minValue;
+            const matchesMax = Number.isNaN(maxValue) ? true : amount <= maxValue;
+            card.hidden = !(matchesDate && matchesMin && matchesMax);
+        });
+    }
+
+    [dateFilter, minAmount, maxAmount].forEach((input) => {
+        if (input) input.addEventListener('input', applyFilters);
     });
 })();
 </script>

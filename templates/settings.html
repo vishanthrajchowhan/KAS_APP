@@ -3,7 +3,7 @@
 {% block title %}Settings | KAS{% endblock %}
 
 {% block content %}
-<section class="page-title">
+<section class="page-title reveal">
     <div>
         <p class="eyebrow">Workspace Preferences</p>
         <h1>Settings</h1>
@@ -12,7 +12,7 @@
 </section>
 
 <form method="post" enctype="multipart/form-data" class="settings-shell">
-    <section class="settings-section">
+    <section class="settings-section glass-panel reveal">
         <div class="settings-section-header">
             <div>
                 <p class="eyebrow">Company Profile</p>
@@ -51,7 +51,7 @@
         </div>
     </section>
 
-    <section class="settings-section">
+    <section class="settings-section glass-panel reveal">
         <div class="settings-section-header">
             <div>
                 <p class="eyebrow">Branding</p>
@@ -81,7 +81,7 @@
         </div>
     </section>
 
-    <section class="settings-section">
+    <section class="settings-section glass-panel reveal">
         <div class="settings-section-header">
             <div>
                 <p class="eyebrow">Notifications</p>
@@ -96,7 +96,7 @@
         </div>
     </section>
 
-    <section class="settings-section">
+    <section class="settings-section glass-panel reveal">
         <div class="settings-section-header">
             <div>
                 <p class="eyebrow">Users</p>
@@ -165,7 +165,7 @@
         </div>
     </section>
 
-    <section class="settings-actions settings-section settings-footer-actions">
+    <section class="settings-actions settings-section settings-footer-actions glass-panel reveal">
         <button class="button button-primary" type="submit">Save Settings</button>
         <a class="button" href="{{ url_for('index') }}">Cancel</a>
     </section>
