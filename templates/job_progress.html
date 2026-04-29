@@ -95,9 +95,9 @@
 <section class="before-after" aria-label="Before and after slider">
     <h3>Before / After View</h3>
     <div class="before-after-stage" id="before-after-stage">
-        <img src="{{ url_for('uploaded_file', filename=media.before['path'].replace('uploads/', '')) }}" alt="Before progress image" loading="lazy" decoding="async">
+        <img src="{{ media.before.url }}" alt="Before progress image" loading="lazy" decoding="async">
         <div class="after-layer" id="after-layer">
-            <img src="{{ url_for('uploaded_file', filename=media.after['path'].replace('uploads/', '')) }}" alt="After progress image" loading="lazy" decoding="async">
+            <img src="{{ media.after.url }}" alt="After progress image" loading="lazy" decoding="async">
         </div>
     </div>
     <label for="before-after-slider">Slide to compare</label>
@@ -131,8 +131,8 @@
                         <div class="photo-grid">
                             {% for photo in update.photos %}
                                 <div class="photo-visibility-card">
-                                    <a href="{{ url_for('uploaded_file', filename=photo['path'].replace('uploads/', '')) }}" target="_blank" rel="noopener">
-                                        <img src="{{ url_for('uploaded_file', filename=photo['path'].replace('uploads/', '')) }}" alt="Job progress photo" loading="lazy" decoding="async">
+                                    <a href="{{ photo.url }}" target="_blank" rel="noopener">
+                                        <img src="{{ photo.url }}" alt="Job progress photo" loading="lazy" decoding="async">
                                     </a>
                                     {% if can_manage_jobs %}
                                         <form method="post" action="{{ url_for('update_photo_visibility', update_id=photo.id) }}">
@@ -151,8 +151,8 @@
                         <div class="receipt-list">
                             <h3>Receipts / Bills</h3>
                             {% for receipt in update.receipts %}
-                                <a href="{{ url_for('uploaded_file', filename=receipt.replace('uploads/', '')) }}" target="_blank" rel="noopener">
-                                    {{ receipt.replace('uploads/', '') }}
+                                <a href="{{ receipt.url }}" target="_blank" rel="noopener">
+                                    {{ receipt.name }}
                                 </a>
                             {% endfor %}
                         </div>

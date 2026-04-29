@@ -139,12 +139,31 @@
         }
     }
 
+    function setupUploadForms() {
+        document.querySelectorAll('form[enctype="multipart/form-data"]').forEach((form) => {
+            form.addEventListener('submit', () => {
+                const submitButton = form.querySelector('button[type="submit"]');
+                if (submitButton) {
+                    submitButton.disabled = true;
+                    submitButton.dataset.originalText = submitButton.textContent || '';
+                    submitButton.textContent = 'Uploading...';
+                }
+                const overlay = document.getElementById('loading-overlay');
+                if (overlay) {
+                    overlay.setAttribute('aria-hidden', 'false');
+                    overlay.classList.add('visible');
+                }
+            });
+        });
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
         revealElements();
         setupCounters();
         setupStaggerGroups();
         setupButtons();
         setupServiceChipSelectors();
+        setupUploadForms();
         setupIcons();
     });
 })();

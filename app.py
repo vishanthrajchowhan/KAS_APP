@@ -1,5 +1,6 @@
 import os
 import uuid
+from io import BytesIO
 from datetime import datetime, timedelta
 from functools import wraps
 from pathlib import Path
@@ -20,6 +21,7 @@ from flask import (
 from psycopg import errors
 from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
+from supabase import create_client
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 
@@ -34,6 +36,26 @@ PUBLIC_LOGO_FILE = STATIC_UPLOAD_FOLDER / "company-logo.png"
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
 ALLOWED_LOGO_EXTENSIONS = {"png", "jpg", "jpeg", "webp"}
 ALLOWED_RECEIPT_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp", "pdf", "doc", "docx", "xls", "xlsx"}
+SUPABASE_STORAGE_BUCKETS = {
+    "job_photos": "job-photos",
+    "receipts": "receipts",
+    "logos": "logos",
+    "documents": "documents",
+}
+IMAGE_MIME_TYPES = {
+    "gif": "image/gif",
+    "jpg": "image/jpeg",
+    "jpeg": "image/jpeg",
+    "png": "image/png",
+    "webp": "image/webp",
+}
+DOCUMENT_MIME_TYPES = {
+    "pdf": "application/pdf",
+    "doc": "application/msword",
+    "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "xls": "application/vnd.ms-excel",
+    "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+}
 PRE_CONSTRUCTION_STATUSES = (
     "Lead",
     "Estimating",
@@ -248,6 +270,8 @@ def build_postgres_conninfo():
 
 POSTGRES_CONNINFO = build_postgres_conninfo()
 POSTGRES_POOL = None
+SUPABASE_CLIENT = None
+STORAGE_BUCKETS_READY = False
 if POSTGRES_CONNINFO:
     POSTGRES_POOL = ConnectionPool(
         conninfo=POSTGRES_CONNINFO,
@@ -260,6 +284,42 @@ if POSTGRES_CONNINFO:
             "prepare_threshold": None,
         },
     )
+
+
+def get_supabase_client():
+    global SUPABASE_CLIENT
+    supabase_url = os.environ.get("SUPABASE_URL", "").strip()
+    supabase_key = os.environ.get("SUPABASE_KEY", "").strip()
+    if not supabase_url or not supabase_key:
+        raise RuntimeError("SUPABASE_URL and SUPABASE_KEY are required for Supabase Storage uploads.")
+    if SUPABASE_CLIENT is None:
+        SUPABASE_CLIENT = create_client(supabase_url, supabase_key)
+    return SUPABASE_CLIENT
+
+
+def supabase_storage_configured():
+    return bool(os.environ.get("SUPABASE_URL", "").strip() and os.environ.get("SUPABASE_KEY", "").strip())
+
+
+def ensure_storage_buckets():
+    global STORAGE_BUCKETS_READY
+    if STORAGE_BUCKETS_READY:
+        return
+    if not supabase_storage_configured():
+        return
+
+    client = get_supabase_client()
+    for bucket_name in SUPABASE_STORAGE_BUCKETS.values():
+        try:
+            try:
+                client.storage.create_bucket(bucket_name, options={"public": True})
+            except TypeError:
+                client.storage.create_bucket(bucket_name, {"public": True})
+        except Exception as exc:
+            message = str(exc).lower()
+            if "already" not in message and "exist" not in message and "duplicate" not in message:
+                app.logger.warning("Could not create Supabase bucket %s: %s", bucket_name, exc)
+    STORAGE_BUCKETS_READY = True
 
 
 def get_postgres_pool():
@@ -326,6 +386,7 @@ def init_db():
     UPLOAD_FOLDER.mkdir(exist_ok=True)
     STATIC_UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
     BRANDING_UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
+    ensure_storage_buckets()
     with get_db_connection() as conn:
         conn.execute(
             """
@@ -383,7 +444,9 @@ def init_db():
                 job_id BIGINT NOT NULL,
                 notes TEXT,
                 image_path TEXT,
+                photo_url TEXT,
                 receipt_path TEXT,
+                receipt_url TEXT,
                 client_visible BOOLEAN NOT NULL DEFAULT FALSE,
                 update_group TEXT,
                 user_id BIGINT,
@@ -527,6 +590,8 @@ def migrate_jobs_table(conn):
 def migrate_updates_table(conn):
     conn.execute("ALTER TABLE updates ADD COLUMN IF NOT EXISTS update_group TEXT")
     conn.execute("ALTER TABLE updates ADD COLUMN IF NOT EXISTS receipt_path TEXT")
+    conn.execute("ALTER TABLE updates ADD COLUMN IF NOT EXISTS photo_url TEXT")
+    conn.execute("ALTER TABLE updates ADD COLUMN IF NOT EXISTS receipt_url TEXT")
     conn.execute("ALTER TABLE updates ADD COLUMN IF NOT EXISTS client_visible BOOLEAN DEFAULT FALSE")
     conn.execute("ALTER TABLE updates ADD COLUMN IF NOT EXISTS user_id BIGINT")
     conn.execute("ALTER TABLE updates ADD COLUMN IF NOT EXISTS author_role TEXT")
@@ -571,6 +636,7 @@ def migrate_workspace_settings_table(conn):
     conn.execute("ALTER TABLE workspace_settings ADD COLUMN IF NOT EXISTS company_email TEXT")
     conn.execute("ALTER TABLE workspace_settings ADD COLUMN IF NOT EXISTS theme TEXT")
     conn.execute("ALTER TABLE workspace_settings ADD COLUMN IF NOT EXISTS logo_path TEXT")
+    conn.execute("ALTER TABLE workspace_settings ADD COLUMN IF NOT EXISTS logo_url TEXT")
     conn.execute("ALTER TABLE workspace_settings ADD COLUMN IF NOT EXISTS dark_mode_default BOOLEAN")
     conn.execute("ALTER TABLE workspace_settings ADD COLUMN IF NOT EXISTS notify_new_lead BOOLEAN")
     conn.execute("ALTER TABLE workspace_settings ADD COLUMN IF NOT EXISTS notify_estimate_approved BOOLEAN")
@@ -622,7 +688,7 @@ def load_workspace_settings(conn):
         row = conn.execute("SELECT * FROM workspace_settings WHERE id = 1").fetchone()
 
     if row is not None:
-        settings.update({key: row[key] for key in row.keys() if key in settings or key == "logo_path"})
+        settings.update({key: row[key] for key in row.keys() if key in settings or key in {"logo_path", "logo_url"}})
 
     settings["dark_mode_default"] = normalize_bool(settings.get("dark_mode_default"))
     settings["notify_new_lead"] = normalize_bool(settings.get("notify_new_lead"))
@@ -643,8 +709,11 @@ def load_workspace_settings(conn):
         separator = "&" if "?" in asset_url else "?"
         return f"{asset_url}{separator}v={version}"
 
+    stored_logo_url = (settings.get("logo_url") or "").strip()
     logo_path = (settings.get("logo_path") or "").strip()
-    if PUBLIC_LOGO_FILE.exists():
+    if stored_logo_url:
+        settings["logo_url"] = stored_logo_url
+    elif PUBLIC_LOGO_FILE.exists():
         settings["logo_url"] = with_asset_version(url_for("static", filename="uploads/company-logo.png"), PUBLIC_LOGO_FILE)
     elif logo_path.startswith("static/"):
         static_filename = logo_path[len("static/") :].lstrip("/")
@@ -672,7 +741,7 @@ def save_workspace_settings(conn, data):
         """
         UPDATE workspace_settings
         SET company_name = ?, company_city = ?, company_address = ?, company_state = ?, company_zip = ?, company_phone = ?, company_email = ?,
-            theme = ?, logo_path = ?, dark_mode_default = ?, notify_new_lead = ?,
+            theme = ?, logo_path = ?, logo_url = ?, dark_mode_default = ?, notify_new_lead = ?,
             notify_estimate_approved = ?, notify_payment_received = ?, notify_photo_upload = ?,
             updated_at = ?
         WHERE id = 1
@@ -687,6 +756,7 @@ def save_workspace_settings(conn, data):
             data["company_email"],
             data["theme"],
             data["logo_path"],
+            data.get("logo_url", ""),
             bool(data["dark_mode_default"]),
             bool(data["notify_new_lead"]),
             bool(data["notify_estimate_approved"]),
@@ -801,6 +871,152 @@ def allowed_receipt_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_RECEIPT_EXTENSIONS
 
 
+def extension_for_file(filename, default_extension="bin"):
+    if "." not in (filename or ""):
+        return default_extension
+    return filename.rsplit(".", 1)[1].lower()
+
+
+def content_type_for_extension(extension):
+    return IMAGE_MIME_TYPES.get(extension) or DOCUMENT_MIME_TYPES.get(extension) or "application/octet-stream"
+
+
+def clean_storage_stem(filename):
+    original_name = secure_filename(filename or "")
+    if not original_name:
+        return "upload"
+    stem = original_name.rsplit(".", 1)[0]
+    cleaned = "-".join(part for part in stem.lower().replace("_", "-").split("-") if part)
+    return cleaned[:70] or "upload"
+
+
+def compress_image_upload(uploaded_file, max_size=(1800, 1800), quality=82):
+    try:
+        from PIL import Image, ImageOps
+    except ModuleNotFoundError as exc:
+        raise ValueError("Image processing dependency is missing. Install Pillow in the active environment.") from exc
+
+    extension = extension_for_file(uploaded_file.filename, "jpg")
+    uploaded_file.stream.seek(0)
+    with Image.open(uploaded_file.stream) as raw_image:
+        image = ImageOps.exif_transpose(raw_image)
+        image.thumbnail(max_size, Image.Resampling.LANCZOS)
+        output = BytesIO()
+
+        if extension == "png":
+            if image.mode not in ("RGB", "RGBA"):
+                image = image.convert("RGBA")
+            image.save(output, format="PNG", optimize=True)
+            stored_extension = "png"
+            content_type = "image/png"
+        elif extension == "webp":
+            if image.mode not in ("RGB", "RGBA"):
+                image = image.convert("RGB")
+            image.save(output, format="WEBP", quality=quality, method=6)
+            stored_extension = "webp"
+            content_type = "image/webp"
+        else:
+            if image.mode != "RGB":
+                image = image.convert("RGB")
+            image.save(output, format="JPEG", quality=quality, optimize=True, progressive=True)
+            stored_extension = "jpg"
+            content_type = "image/jpeg"
+
+    output.seek(0)
+    return output.getvalue(), stored_extension, content_type
+
+
+def raw_upload_bytes(uploaded_file):
+    extension = extension_for_file(uploaded_file.filename)
+    uploaded_file.stream.seek(0)
+    return uploaded_file.read(), extension, content_type_for_extension(extension)
+
+
+def storage_path_for_upload(kind, source_filename, job_id=None, extension=None):
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    unique = uuid.uuid4().hex[:8]
+    extension = extension or extension_for_file(source_filename)
+    clean_stem = clean_storage_stem(source_filename)
+    if kind == "job_photo":
+        return f"job-{job_id}-photo-{timestamp}-{unique}-{clean_stem}.{extension}"
+    if kind == "receipt":
+        return f"receipt-job{job_id}-{timestamp}-{unique}-{clean_stem}.{extension}"
+    if kind == "logo":
+        return f"logo-company-{timestamp}-{unique}.{extension}"
+    return f"document-{timestamp}-{unique}-{clean_stem}.{extension}"
+
+
+def upload_to_supabase_storage(bucket_name, storage_path, content, content_type):
+    client = get_supabase_client()
+    file_options = {"content-type": content_type, "upsert": "true"}
+    client.storage.from_(bucket_name).upload(storage_path, content, file_options=file_options)
+    public_url = client.storage.from_(bucket_name).get_public_url(storage_path)
+    if isinstance(public_url, dict):
+        return public_url.get("publicUrl") or public_url.get("public_url") or public_url.get("data", {}).get("publicUrl")
+    return str(public_url)
+
+
+def save_upload_to_storage(uploaded_file, bucket_key, kind, job_id=None, compress_images=True):
+    if not supabase_storage_configured():
+        raise RuntimeError("Supabase Storage is not configured. Add SUPABASE_URL and SUPABASE_KEY.")
+
+    source_extension = extension_for_file(uploaded_file.filename)
+    if compress_images and source_extension in IMAGE_MIME_TYPES:
+        content, extension, content_type = compress_image_upload(uploaded_file)
+    else:
+        content, extension, content_type = raw_upload_bytes(uploaded_file)
+
+    storage_path = storage_path_for_upload(kind, uploaded_file.filename, job_id=job_id, extension=extension)
+    public_url = upload_to_supabase_storage(SUPABASE_STORAGE_BUCKETS[bucket_key], storage_path, content, content_type)
+    return {"path": storage_path, "url": public_url}
+
+
+def upload_local_file_to_storage(local_path, bucket_key, kind, job_id=None):
+    extension = extension_for_file(local_path.name)
+    content = local_path.read_bytes()
+    storage_path = storage_path_for_upload(kind, local_path.name, job_id=job_id, extension=extension)
+    public_url = upload_to_supabase_storage(
+        SUPABASE_STORAGE_BUCKETS[bucket_key],
+        storage_path,
+        content,
+        content_type_for_extension(extension),
+    )
+    return {"path": storage_path, "url": public_url}
+
+
+def is_public_url(value):
+    return str(value or "").startswith(("http://", "https://"))
+
+
+def storage_public_url(bucket_key, storage_path):
+    if not storage_path or not bucket_key or not supabase_storage_configured():
+        return ""
+    public_url = get_supabase_client().storage.from_(SUPABASE_STORAGE_BUCKETS[bucket_key]).get_public_url(storage_path)
+    if isinstance(public_url, dict):
+        return public_url.get("publicUrl") or public_url.get("public_url") or public_url.get("data", {}).get("publicUrl") or ""
+    return str(public_url)
+
+
+def media_url(stored_value, bucket_key=None):
+    stored_value = stored_value or ""
+    if not stored_value:
+        return ""
+    if is_public_url(stored_value):
+        return stored_value
+    if stored_value.startswith("uploads/"):
+        return url_for("uploaded_file", filename=stored_value.replace("uploads/", "", 1))
+    if bucket_key:
+        return storage_public_url(bucket_key, stored_value)
+    return stored_value
+
+
+def display_file_name(stored_value):
+    stored_value = stored_value or ""
+    if "/" in stored_value:
+        return stored_value.rsplit("/", 1)[-1]
+    return stored_value
+
+
 def parse_money(value):
     value = (value or "").strip()
     if not value:
@@ -818,7 +1034,7 @@ def parse_date(value):
 
 
 def parse_checkbox(value):
-    return value == "on"
+    return str(value or "").strip().lower() in {"1", "on", "true", "yes"}
 
 
 def normalize_bool(value, default=False):
@@ -934,33 +1150,21 @@ def task_progress_summary(tasks):
 
 
 def process_logo_upload(uploaded_file):
-    try:
-        from PIL import Image, ImageOps
-    except ModuleNotFoundError as exc:
-        raise ValueError("Logo processing dependency is missing. Install Pillow in the active environment.") from exc
-
     original_name = secure_filename(uploaded_file.filename)
     if not original_name or not allowed_logo_file(original_name):
         raise ValueError("Logo must be PNG, JPG, JPEG, or WEBP.")
 
     try:
-        uploaded_file.stream.seek(0)
-        with Image.open(uploaded_file.stream) as raw_image:
-            image = ImageOps.exif_transpose(raw_image)
-            if image.mode not in ("RGB", "RGBA"):
-                image = image.convert("RGBA" if "A" in image.getbands() else "RGB")
-
-            max_size = (640, 640)
-            image.thumbnail(max_size, Image.Resampling.LANCZOS)
-
-            STATIC_UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
-            if PUBLIC_LOGO_FILE.exists():
-                PUBLIC_LOGO_FILE.unlink()
-            image.save(PUBLIC_LOGO_FILE, format="PNG", optimize=True)
+        stored_logo = save_upload_to_storage(
+            uploaded_file,
+            "logos",
+            "logo",
+            compress_images=True,
+        )
     except Exception as exc:
-        raise ValueError("Unable to process logo image. Please upload a valid PNG, JPG, JPEG, or WEBP file.") from exc
+        raise ValueError("Unable to upload logo to Supabase Storage. Please try again.") from exc
 
-    return "static/uploads/company-logo.png"
+    return stored_logo["path"], stored_logo["url"]
 
 
 def money(value):
@@ -1035,11 +1239,18 @@ def group_updates(update_rows):
                     {
                         "id": row["id"],
                         "path": row["image_path"],
+                        "url": row.get("photo_url") or media_url(row["image_path"], "job_photos"),
                         "client_visible": normalize_bool(row.get("client_visible")),
                     }
                 )
         if row["receipt_path"]:
-            group_lookup[group_key]["receipts"].append(row["receipt_path"])
+            group_lookup[group_key]["receipts"].append(
+                {
+                    "path": row["receipt_path"],
+                    "url": row.get("receipt_url") or media_url(row["receipt_path"], "receipts"),
+                    "name": display_file_name(row["receipt_path"]),
+                }
+            )
 
     if is_client():
         grouped = [entry for entry in grouped if entry["notes"] or entry["photos"]]
@@ -1573,6 +1784,7 @@ def settings():
         notify_photo_upload = parse_checkbox(request.form.get("notify_photo_upload"))
 
         logo_path = workspace_settings.get("logo_path", "")
+        logo_url = workspace_settings.get("logo_url", "")
         logo_file = request.files.get("logo")
         if logo_file and logo_file.filename:
             if not allowed_logo_file(logo_file.filename):
@@ -1599,7 +1811,7 @@ def settings():
                     recent_users=recent_users,
                 )
             try:
-                logo_path = process_logo_upload(logo_file)
+                logo_path, logo_url = process_logo_upload(logo_file)
             except ValueError as exc:
                 flash(str(exc), "error")
                 return render_template(
@@ -1614,6 +1826,8 @@ def settings():
                         "company_phone": company_phone,
                         "company_email": company_email,
                         "theme": theme,
+                        "logo_path": logo_path,
+                        "logo_url": logo_url,
                         "dark_mode_default": dark_mode_default,
                         "notify_new_lead": notify_new_lead,
                         "notify_estimate_approved": notify_estimate_approved,
@@ -1637,6 +1851,7 @@ def settings():
                     "company_email": company_email,
                     "theme": theme,
                     "logo_path": logo_path,
+                    "logo_url": logo_url,
                     "dark_mode_default": dark_mode_default,
                     "notify_new_lead": notify_new_lead,
                     "notify_estimate_approved": notify_estimate_approved,
@@ -2273,8 +2488,8 @@ def submit_update():
 
     now = datetime.now().isoformat(timespec="seconds")
     update_group = uuid.uuid4().hex
-    saved_paths = []
-    saved_receipt_paths = []
+    saved_photos = []
+    saved_receipts = []
 
     try:
         for file in valid_files:
@@ -2282,26 +2497,32 @@ def submit_update():
                 flash(f"Skipped unsupported file: {file.filename}", "error")
                 continue
 
-            original_name = secure_filename(file.filename)
-            timestamp = datetime.now().strftime("%Y%m%d%H%M%S%f")
-            filename = f"job-{job_id}-{timestamp}-{original_name}"
-            file_path = UPLOAD_FOLDER / filename
-            file.save(file_path)
-            saved_paths.append(f"uploads/{filename}")
+            saved_photos.append(
+                save_upload_to_storage(
+                    file,
+                    "job_photos",
+                    "job_photo",
+                    job_id=job_id,
+                    compress_images=True,
+                )
+            )
 
         for file in valid_receipt_files:
             if not allowed_receipt_file(file.filename):
                 flash(f"Skipped unsupported receipt/bill: {file.filename}", "error")
                 continue
 
-            original_name = secure_filename(file.filename)
-            timestamp = datetime.now().strftime("%Y%m%d%H%M%S%f")
-            filename = f"job-{job_id}-{timestamp}-receipt-{original_name}"
-            file_path = UPLOAD_FOLDER / filename
-            file.save(file_path)
-            saved_receipt_paths.append(f"uploads/{filename}")
+            saved_receipts.append(
+                save_upload_to_storage(
+                    file,
+                    "receipts",
+                    "receipt",
+                    job_id=job_id,
+                    compress_images=True,
+                )
+            )
 
-        if not saved_paths and not saved_receipt_paths and not notes and not job_fields_changed and not task_fields_changed:
+        if not saved_photos and not saved_receipts and not notes and not job_fields_changed and not task_fields_changed:
             flash("No update was saved. Please add notes, change status, or upload supported files.", "error")
             return redirect(url_for("update_job", job_id=job_id))
 
@@ -2342,33 +2563,33 @@ def submit_update():
                 ),
             )
 
-            if saved_paths:
-                for image_path in saved_paths:
+            if saved_photos:
+                for photo in saved_photos:
                     conn.execute(
                         """
-                        INSERT INTO updates (job_id, notes, image_path, receipt_path, client_visible, update_group, user_id, author_role, timestamp)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        INSERT INTO updates (job_id, notes, image_path, photo_url, receipt_path, receipt_url, client_visible, update_group, user_id, author_role, timestamp)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """,
-                        (job_id, notes, image_path, None, photos_client_visible, update_group, g.user["id"], g.user["role"], now),
+                        (job_id, notes, photo["path"], photo["url"], None, None, photos_client_visible, update_group, g.user["id"], g.user["role"], now),
                     )
 
-            if saved_receipt_paths:
-                for receipt_path in saved_receipt_paths:
+            if saved_receipts:
+                for receipt in saved_receipts:
                     conn.execute(
                         """
-                        INSERT INTO updates (job_id, notes, image_path, receipt_path, client_visible, update_group, user_id, author_role, timestamp)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        INSERT INTO updates (job_id, notes, image_path, photo_url, receipt_path, receipt_url, client_visible, update_group, user_id, author_role, timestamp)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """,
-                        (job_id, notes, None, receipt_path, False, update_group, g.user["id"], g.user["role"], now),
+                        (job_id, notes, None, None, receipt["path"], receipt["url"], False, update_group, g.user["id"], g.user["role"], now),
                     )
 
-            if not saved_paths and not saved_receipt_paths and (notes or job_fields_changed or task_fields_changed):
+            if not saved_photos and not saved_receipts and (notes or job_fields_changed or task_fields_changed):
                 conn.execute(
                     """
-                    INSERT INTO updates (job_id, notes, image_path, receipt_path, client_visible, update_group, user_id, author_role, timestamp)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO updates (job_id, notes, image_path, photo_url, receipt_path, receipt_url, client_visible, update_group, user_id, author_role, timestamp)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
-                    (job_id, notes, None, None, False, update_group, g.user["id"], g.user["role"], now),
+                    (job_id, notes, None, None, None, None, False, update_group, g.user["id"], g.user["role"], now),
                 )
 
             if is_admin():
@@ -2383,12 +2604,12 @@ def submit_update():
                         (task_status, now, task_id, job_id),
                     )
 
-    except OSError:
+    except (OSError, RuntimeError, ValueError) as exc:
         app.logger.exception("Failed to save job update")
-        flash("Something went wrong while saving the update. Please try again.", "error")
+        flash(f"Upload failed: {exc}", "error")
         return redirect(url_for("update_job", job_id=job_id))
 
-    flash("Job update saved.", "success")
+    flash("Upload complete. Job update saved.", "success")
     return redirect(url_for("update_job", job_id=job_id))
 
 
@@ -2501,6 +2722,75 @@ def uploaded_file(filename):
         return redirect(url_for("index"))
 
     return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
+
+
+@app.cli.command("migrate-local-uploads")
+def migrate_local_uploads_command():
+    """Upload existing local files to Supabase Storage and save public URLs."""
+    if not supabase_storage_configured():
+        raise RuntimeError("Set SUPABASE_URL and SUPABASE_KEY before running this migration.")
+
+    ensure_storage_buckets()
+    migrated = 0
+    skipped = 0
+
+    with get_db_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, job_id, image_path, photo_url, receipt_path, receipt_url
+            FROM updates
+            WHERE (image_path IS NOT NULL AND (photo_url IS NULL OR photo_url = ''))
+               OR (receipt_path IS NOT NULL AND (receipt_url IS NULL OR receipt_url = ''))
+            ORDER BY id ASC
+            """
+        ).fetchall()
+
+        for row in rows:
+            if row["image_path"] and not row["photo_url"] and not is_public_url(row["image_path"]):
+                local_name = row["image_path"].replace("uploads/", "", 1)
+                local_path = UPLOAD_FOLDER / local_name
+                if local_path.exists():
+                    uploaded = upload_local_file_to_storage(local_path, "job_photos", "job_photo", job_id=row["job_id"])
+                    conn.execute(
+                        "UPDATE updates SET image_path = ?, photo_url = ? WHERE id = ?",
+                        (uploaded["path"], uploaded["url"], row["id"]),
+                    )
+                    migrated += 1
+                else:
+                    skipped += 1
+
+            if row["receipt_path"] and not row["receipt_url"] and not is_public_url(row["receipt_path"]):
+                local_name = row["receipt_path"].replace("uploads/", "", 1)
+                local_path = UPLOAD_FOLDER / local_name
+                if local_path.exists():
+                    uploaded = upload_local_file_to_storage(local_path, "receipts", "receipt", job_id=row["job_id"])
+                    conn.execute(
+                        "UPDATE updates SET receipt_path = ?, receipt_url = ? WHERE id = ?",
+                        (uploaded["path"], uploaded["url"], row["id"]),
+                    )
+                    migrated += 1
+                else:
+                    skipped += 1
+
+        settings_row = conn.execute("SELECT logo_path, logo_url FROM workspace_settings WHERE id = 1").fetchone()
+        if settings_row and settings_row["logo_path"] and not settings_row["logo_url"] and not is_public_url(settings_row["logo_path"]):
+            logo_candidates = []
+            if settings_row["logo_path"].startswith("static/"):
+                logo_candidates.append(BASE_DIR / settings_row["logo_path"])
+            if settings_row["logo_path"].startswith("uploads/branding/"):
+                logo_candidates.append(STATIC_UPLOAD_FOLDER / settings_row["logo_path"].replace("uploads/", "", 1))
+            logo_candidates.extend([PUBLIC_LOGO_FILE, STATIC_UPLOAD_FOLDER / "branding" / "Logo.png"])
+            for logo_path in logo_candidates:
+                if logo_path.exists():
+                    uploaded = upload_local_file_to_storage(logo_path, "logos", "logo")
+                    conn.execute(
+                        "UPDATE workspace_settings SET logo_path = ?, logo_url = ? WHERE id = 1",
+                        (uploaded["path"], uploaded["url"]),
+                    )
+                    migrated += 1
+                    break
+
+    print(f"Migration complete. Uploaded {migrated} file(s). Skipped {skipped} missing local file(s).")
 
 
 @app.route("/estimates")
