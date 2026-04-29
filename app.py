@@ -1830,7 +1830,6 @@ def users():
 
 @app.route("/jobs")
 @login_required
-@role_required("admin")
 def jobs():
     search = request.args.get("q", "").strip()
     status_filter = request.args.get("status", "").strip()
@@ -1838,14 +1837,20 @@ def jobs():
     sort = request.args.get("sort", "priority").strip()
     where_clauses = []
     params = []
+    visible_clause, visible_params = visible_jobs_where()
+    if visible_clause:
+        where_clauses.append(visible_clause)
+        params.extend(visible_params)
 
     if status_filter in STATUSES:
         where_clauses.append("jobs.status = ?")
         params.append(status_filter)
 
-    if employee_filter.isdigit():
+    if is_admin() and employee_filter.isdigit():
         where_clauses.append("jobs.assigned_to = ?")
         params.append(int(employee_filter))
+    elif not is_admin():
+        employee_filter = ""
 
     if search:
         where_clauses.append(
@@ -1904,9 +1909,11 @@ def jobs():
             """,
             [today] + params,
         ).fetchall()
-        employees = conn.execute(
-            "SELECT id, name, email FROM users WHERE role = 'employee' ORDER BY name"
-        ).fetchall()
+        employees = []
+        if is_admin():
+            employees = conn.execute(
+                "SELECT id, name, email FROM users WHERE role = 'employee' ORDER BY name"
+            ).fetchall()
 
     active_jobs = sum(1 for row in jobs_list if row["status"] in {"Scheduled", "Started", "In Progress"})
     scheduled_jobs = sum(1 for row in jobs_list if row["status"] == "Scheduled")

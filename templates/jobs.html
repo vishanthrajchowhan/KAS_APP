@@ -65,15 +65,17 @@
                 {% endfor %}
             </select>
         </div>
-        <div>
-            <label for="employee">Employee</label>
-            <select id="employee" name="employee">
-                <option value="">All employees</option>
-                {% for employee in employees %}
-                    <option value="{{ employee.id }}" {% if filters.employee|int == employee.id %}selected{% endif %}>{{ employee.name }}</option>
-                {% endfor %}
-            </select>
-        </div>
+        {% if can_manage_jobs %}
+            <div>
+                <label for="employee">Employee</label>
+                <select id="employee" name="employee">
+                    <option value="">All employees</option>
+                    {% for employee in employees %}
+                        <option value="{{ employee.id }}" {% if filters.employee|int == employee.id %}selected{% endif %}>{{ employee.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        {% endif %}
         <div>
             <label for="sort">Sort</label>
             <select id="sort" name="sort">
