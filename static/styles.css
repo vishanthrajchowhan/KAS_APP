@@ -2920,25 +2920,15 @@ body {
     grid-template-columns: 1.1fr minmax(320px, 460px);
     gap: 22px;
     align-items: stretch;
-    min-height: min(76vh, 760px);
+    min-height: min(68vh, 680px);
     padding: 16px;
     border-radius: 30px;
     overflow: hidden;
-}
-
-.auth-premium-bg {
-    position: absolute;
-    inset: 0;
     background:
         radial-gradient(circle at 8% 12%, rgba(18, 95, 67, 0.36), transparent 34%),
         radial-gradient(circle at 92% 78%, rgba(26, 59, 114, 0.26), transparent 40%),
         linear-gradient(145deg, #0f1715 0%, #132320 55%, #0d1513 100%);
     animation: authFloat 18s ease-in-out infinite alternate;
-}
-
-.auth-premium > * {
-    position: relative;
-    z-index: 1;
 }
 
 .auth-premium-left {
@@ -2989,6 +2979,7 @@ body {
 
 .auth-premium-card {
     align-self: center;
+    justify-self: stretch;
     padding: 30px;
     border-radius: 24px;
     background: color-mix(in srgb, var(--surface) 82%, transparent);

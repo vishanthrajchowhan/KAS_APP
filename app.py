@@ -444,6 +444,7 @@ def seed_default_users(conn):
 
 
 def migrate_jobs_table(conn):
+    conn.execute("ALTER TABLE jobs ADD COLUMN IF NOT EXISTS due_date TEXT")
     conn.execute("ALTER TABLE jobs ADD COLUMN IF NOT EXISTS client_name TEXT")
     conn.execute("ALTER TABLE jobs ADD COLUMN IF NOT EXISTS service_type TEXT")
     conn.execute("ALTER TABLE jobs ADD COLUMN IF NOT EXISTS other_service_details TEXT")

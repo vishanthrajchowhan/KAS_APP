@@ -21,6 +21,7 @@ create table if not exists public.jobs (
     id bigserial primary key,
     name text not null,
     location text not null,
+    due_date text,
     service_type text,
     other_service_details text,
     description text not null,
