@@ -1592,19 +1592,8 @@ def add_job():
                 "SELECT id, name, email FROM users WHERE role = 'client' ORDER BY name"
             ).fetchall()
 
-        is_missing_required = (
-            not name
-            or not client_name
-            or not location
-            or not description
-            or not service_type
-            or (OTHER_SERVICE_LABEL in selected_service_types and not other_service_details)
-        )
-        if is_missing_required:
-            flash(
-                "Please fill out the job, client, location, service type, description, and other service details when Other is selected.",
-                "error",
-            )
+        if not name:
+            flash("Job name is required to create a lead.", "error")
             return render_template(
                 "add_job.html",
                 name=name,
@@ -1624,6 +1613,9 @@ def add_job():
                 assigned_to=assigned_to,
                 client_id=client_id,
             )
+
+        location = location or "TBD"
+        description = description or other_service_details or "No description provided."
 
         now = datetime.now().isoformat(timespec="seconds")
         with get_db_connection() as conn:
