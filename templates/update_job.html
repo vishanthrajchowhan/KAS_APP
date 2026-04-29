@@ -277,8 +277,8 @@
                     <div class="photo-grid">
                         {% for photo in update.photos %}
                             <div class="photo-visibility-card">
-                                <a href="{{ url_for('uploaded_file', filename=photo.path.replace('uploads/', '')) }}" target="_blank" rel="noopener">
-                                    <img src="{{ url_for('uploaded_file', filename=photo.path.replace('uploads/', '')) }}" alt="Job update photo" loading="lazy" decoding="async">
+                                <a href="{{ url_for('uploaded_file', filename=photo['path'].replace('uploads/', '')) }}" target="_blank" rel="noopener">
+                                    <img src="{{ url_for('uploaded_file', filename=photo['path'].replace('uploads/', '')) }}" alt="Job update photo" loading="lazy" decoding="async">
                                 </a>
                                 {% if can_manage_jobs %}
                                     <form method="post" action="{{ url_for('update_photo_visibility', update_id=photo.id) }}">
