@@ -14,13 +14,13 @@
 
     <form class="form-card" method="post" action="{{ url_for('add_job') }}">
         <label for="name">Job Name</label>
-        <input id="name" name="name" type="text" value="{{ name or '' }}" required maxlength="120" autocomplete="off">
+        <input id="name" name="name" type="text" value="{{ name or '' }}" maxlength="120" autocomplete="off">
 
         <label for="client_name">Client Name</label>
-        <input id="client_name" name="client_name" type="text" value="{{ client_name or '' }}" required maxlength="140" autocomplete="name">
+        <input id="client_name" name="client_name" type="text" value="{{ client_name or '' }}" maxlength="140" autocomplete="name">
 
         <label for="location">Location</label>
-        <input id="location" name="location" type="text" value="{{ location or '' }}" required maxlength="180" autocomplete="street-address">
+        <input id="location" name="location" type="text" value="{{ location or '' }}" maxlength="180" autocomplete="street-address">
 
         <label for="due_date">Due Date</label>
         <input id="due_date" name="due_date" type="date" value="{{ due_date or '' }}">
@@ -45,7 +45,7 @@
         </div>
 
         <label for="status">Starting Stage</label>
-        <select id="status" name="status" required>
+        <select id="status" name="status">
             {% for pipeline_status in statuses %}
                 <option value="{{ pipeline_status }}" {% if (status or 'Lead') == pipeline_status %}selected{% endif %}>{{ pipeline_status }}</option>
             {% endfor %}
@@ -84,7 +84,7 @@
         </div>
 
         <label for="description">Description</label>
-        <textarea id="description" name="description" rows="5" required>{{ description or '' }}</textarea>
+        <textarea id="description" name="description" rows="5">{{ description or '' }}</textarea>
 
         <div class="form-grid two">
             <button class="button button-primary button-full" type="submit">Create Lead</button>

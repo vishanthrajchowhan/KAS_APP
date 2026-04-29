@@ -64,12 +64,12 @@
                 <h2>Project Info</h2>
                 {% if can_manage_jobs %}
                     <label for="client_name">Client Name</label>
-                    <input id="client_name" name="client_name" type="text" value="{{ job.client_name or '' }}" required maxlength="140">
+                    <input id="client_name" name="client_name" type="text" value="{{ job.client_name or '' }}" maxlength="140">
                 {% endif %}
 
                 <label for="status">Pipeline Status</label>
                 {% if can_manage_jobs %}
-                    <select id="status" name="status" required>
+                    <select id="status" name="status">
                         <optgroup label="Pre-Construction">
                             {% for pipeline_status in pre_construction_statuses %}
                                 <option value="{{ pipeline_status }}" {% if pipeline_status == job.status %}selected{% endif %}>{{ pipeline_status }}</option>
@@ -92,13 +92,16 @@
                 {% endif %}
 
                 {% if can_manage_jobs %}
-                    <label for="service_type">Service Types</label>
-                    <select id="service_type" name="service_type" multiple size="6" required data-other-option="Other">
+                    <label>Service Types</label>
+                    <div class="service-chip-selector" data-service-chip-selector data-other-value="Other" data-other-wrapper-id="other-service-wrapper" data-other-input-id="other_service_details" data-preview-id="service-chip-preview">
                         {% for option in service_types %}
-                            <option value="{{ option }}" {% if option in (selected_service_types or []) %}selected{% endif %}>{{ option }}</option>
+                            <label class="service-chip-option">
+                                <input type="checkbox" name="service_type" value="{{ option }}" {% if option in (selected_service_types or []) %}checked{% endif %}>
+                                <span>{{ option }}{% if option == 'Other' %} +{% endif %}</span>
+                            </label>
                         {% endfor %}
-                    </select>
-                    <p class="help-text">Use Ctrl/Cmd + click to select multiple services.</p>
+                    </div>
+                    <p class="help-text">Select one or more services for this job.</p>
                     <div id="service-chip-preview" class="service-chip-preview" aria-live="polite"></div>
 
                     <div id="other-service-wrapper" {% if 'Other' not in (selected_service_types or []) %}hidden{% endif %}>
@@ -168,7 +171,7 @@
                         </div>
                         <div>
                             <label for="payment_status">Payment Status</label>
-                            <select id="payment_status" name="payment_status" required>
+                            <select id="payment_status" name="payment_status">
                                 {% for option in payment_statuses %}
                                     <option value="{{ option }}" {% if (job.payment_status or 'Not Paid') == option %}selected{% endif %}>{{ option }}</option>
                                 {% endfor %}
@@ -254,38 +257,4 @@
         <p class="muted">No updates have been submitted for this job yet.</p>
     {% endif %}
 </section>
-<script>
-(() => {
-    const serviceTypeSelect = document.getElementById('service_type');
-    const chipPreview = document.getElementById('service-chip-preview');
-    const otherWrapper = document.getElementById('other-service-wrapper');
-    const otherInput = document.getElementById('other_service_details');
-
-    if (!serviceTypeSelect || !chipPreview || !otherWrapper || !otherInput) {
-        return;
-    }
-
-    const updateServiceUI = () => {
-        const selected = Array.from(serviceTypeSelect.selectedOptions).map((option) => option.value);
-        chipPreview.innerHTML = '';
-        selected.forEach((value) => {
-            const chip = document.createElement('span');
-            chip.className = 'service-chip';
-            chip.textContent = value;
-            chipPreview.appendChild(chip);
-        });
-
-        const otherValue = serviceTypeSelect.dataset.otherOption || 'Other';
-        const hasOther = selected.includes(otherValue);
-        otherWrapper.hidden = !hasOther;
-        otherInput.required = hasOther;
-        if (!hasOther) {
-            otherInput.value = '';
-        }
-    };
-
-    serviceTypeSelect.addEventListener('change', updateServiceUI);
-    updateServiceUI();
-})();
-</script>
 {% endblock %}

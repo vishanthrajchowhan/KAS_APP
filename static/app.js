@@ -97,9 +97,6 @@
                 const selectedInputs = inputs.filter((input) => input.checked);
                 const selectedValues = selectedInputs.map((input) => input.value);
 
-                // Keep one checkbox required so the browser enforces at least one selected service.
-                inputs[0].required = selectedValues.length === 0;
-
                 if (preview) {
                     preview.innerHTML = '';
                     selectedValues.forEach((value) => {
@@ -123,7 +120,6 @@
                     otherWrapper.hidden = !showOther;
                 }
                 if (otherInput) {
-                    otherInput.required = showOther;
                     if (!showOther) {
                         otherInput.value = '';
                     }

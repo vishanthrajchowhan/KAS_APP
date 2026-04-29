@@ -17,7 +17,7 @@
         <div class="form-section">
             <h2>Client Information</h2>
             <label for="client_name">Client Name *</label>
-            <input id="client_name" name="client_name" type="text" value="{{ estimate.client_name or '' }}" required maxlength="200">
+            <input id="client_name" name="client_name" type="text" value="{{ estimate.client_name or '' }}" maxlength="200">
 
             <label for="company_name">Company Name</label>
             <input id="company_name" name="company_name" type="text" value="{{ estimate.company_name or '' }}" maxlength="200">
@@ -123,11 +123,11 @@
                 <div class="form-grid two">
                     <div>
                         <label for="item_name">Item Name *</label>
-                        <input id="item_name" name="item_name" type="text" required placeholder="Labor, Materials, etc." maxlength="200">
+                        <input id="item_name" name="item_name" type="text" placeholder="Labor, Materials, etc." maxlength="200">
                     </div>
                     <div>
                         <label for="unit">Unit *</label>
-                        <select id="unit" name="unit" required>
+                        <select id="unit" name="unit">
                             <option value="">-- Select Unit --</option>
                             <option value="hour">Hour</option>
                             <option value="sqft">Square Foot</option>
@@ -147,11 +147,11 @@
                 <div class="form-grid two">
                     <div>
                         <label for="quantity">Quantity *</label>
-                        <input id="quantity" name="quantity" type="number" step="0.01" min="0" required placeholder="10">
+                        <input id="quantity" name="quantity" type="number" step="0.01" min="0" placeholder="10">
                     </div>
                     <div>
                         <label for="unit_price">Unit Price *</label>
-                        <input id="unit_price" name="unit_price" type="number" step="0.01" min="0" required placeholder="95.00">
+                        <input id="unit_price" name="unit_price" type="number" step="0.01" min="0" placeholder="95.00">
                     </div>
                 </div>
 

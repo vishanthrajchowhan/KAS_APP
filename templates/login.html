@@ -3,27 +3,75 @@
 {% block title %}Login | KAS{% endblock %}
 
 {% block content %}
-<section class="auth-shell glass-shell reveal">
-    <div class="auth-copy glass-panel">
+<section class="auth-premium reveal">
+    <div class="auth-premium-bg" aria-hidden="true"></div>
+
+    <div class="auth-premium-left glass-panel">
+        <div class="auth-premium-brand">
+            <span class="brand-mark{% if workspace_settings.uploaded_logo_url %} has-logo{% endif %}">
+                {% if workspace_settings.uploaded_logo_url %}
+                    <img class="brand-logo" src="{{ workspace_settings.uploaded_logo_url }}" alt="{{ workspace_settings.company_name or 'KAS' }} logo" loading="lazy" decoding="async">
+                {% else %}
+                    KAS
+                {% endif %}
+            </span>
+            <div>
+                <strong>{{ workspace_settings.company_name or 'KAS Waterproofing & Building Services' }}</strong>
+                <small>{{ workspace_settings.company_city or 'Fort Lauderdale, Florida' }}</small>
+            </div>
+        </div>
+
         <p class="eyebrow">Secure Access</p>
         <h1>KAS Operations Cloud</h1>
-        <p>Sign in to manage waterproofing, painting, and construction operations with a premium field-to-office workflow.</p>
-        <div class="dashboard-tags">
-            <span class="dashboard-tag">Fast login</span>
-            <span class="dashboard-tag">Live updates</span>
-            <span class="dashboard-tag">Team visibility</span>
+        <p>Manage jobs, estimates, employees, and field updates in one place.</p>
+
+        <div class="auth-feature-chips">
+            <span class="dashboard-tag">Fast Login</span>
+            <span class="dashboard-tag">Live Updates</span>
+            <span class="dashboard-tag">Team Visibility</span>
         </div>
     </div>
 
-    <form class="form-card auth-card glass-panel" method="post" action="{{ url_for('login', next=request.args.get('next')) }}">
+    <form class="form-card auth-card auth-premium-card glass-panel" method="post" action="{{ url_for('login', next=request.args.get('next')) }}">
+        <h2>Sign In</h2>
+        <p class="help-text">Use your office credentials to continue.</p>
+
         <label for="email">Email</label>
-        <input id="email" name="email" type="email" value="{{ email or '' }}" required autocomplete="username">
+        <input id="email" name="email" type="email" value="{{ email or '' }}" autocomplete="username">
 
         <label for="password">Password</label>
-        <input id="password" name="password" type="password" required autocomplete="current-password">
+        <div class="password-input-wrap">
+            <input id="password" name="password" type="password" autocomplete="current-password">
+            <button class="icon-button password-toggle" id="password-toggle" type="button" aria-label="Show password">
+                <span data-lucide="eye"></span>
+            </button>
+        </div>
+
+        <label class="remember-me-row">
+            <input id="remember_me" name="remember_me" type="checkbox" value="1">
+            <span>Remember me</span>
+        </label>
 
         <button class="button button-primary button-full" type="submit">Sign In</button>
-        <p class="help-text">Use the account assigned by the office.</p>
     </form>
 </section>
+
+<script>
+(() => {
+    const password = document.getElementById('password');
+    const toggle = document.getElementById('password-toggle');
+    if (!password || !toggle) {
+        return;
+    }
+    toggle.addEventListener('click', () => {
+        const showing = password.type === 'text';
+        password.type = showing ? 'password' : 'text';
+        toggle.setAttribute('aria-label', showing ? 'Show password' : 'Hide password');
+        toggle.innerHTML = `<span data-lucide="${showing ? 'eye' : 'eye-off'}"></span>`;
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+            window.lucide.createIcons();
+        }
+    });
+})();
+</script>
 {% endblock %}

@@ -80,10 +80,9 @@ SERVICE_TYPES = (
     "Exterior Painting",
     "Interior Painting",
     "Caulking",
-    "Concrete Repair",
-    "Stucco Repair",
-    "Pressure Cleaning",
-    "Garage Deck Coating",
+    "Drywall",
+    "Roofing",
+    "Tiles",
     "Other",
 )
 
@@ -94,10 +93,9 @@ JOB_SERVICE_TYPES = (
     "Exterior Painting",
     "Interior Painting",
     "Caulking",
-    "Concrete Repair",
-    "Stucco Repair",
-    "Pressure Cleaning",
-    "Garage Deck Coating",
+    "Drywall",
+    "Roofing",
+    "Tiles",
     "Other",
 )
 OTHER_SERVICE_LABEL = "Other"
