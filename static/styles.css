@@ -2521,6 +2521,24 @@ body {
     color: var(--primary);
 }
 
+.photo-visibility-card {
+    display: grid;
+    gap: 8px;
+}
+
+.photo-visibility-card .remember-me-row {
+    width: 100%;
+    margin: 0;
+    padding: 8px 10px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--surface-2) 75%, transparent);
+}
+
+.image-visibility-toggle {
+    margin-top: 8px;
+}
+
 .modal-open {
     overflow: hidden;
 }

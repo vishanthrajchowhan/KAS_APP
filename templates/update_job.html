@@ -225,6 +225,12 @@
                 <label for="images">Update Photos</label>
                 <input id="images" name="images" type="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple>
                 <p class="help-text">Select multiple photos at once. They will appear together under this note.</p>
+                {% if can_manage_jobs %}
+                    <label class="remember-me-row image-visibility-toggle">
+                        <input id="photos_client_visible" name="photos_client_visible" type="checkbox" value="1">
+                        <span>Show these new photos to client</span>
+                    </label>
+                {% endif %}
 
                 {% if can_manage_receipts %}
                     <label for="receipts">Receipts / Bills</label>
@@ -270,9 +276,20 @@
                 {% if update.photos %}
                     <div class="photo-grid">
                         {% for photo in update.photos %}
-                            <a href="{{ url_for('uploaded_file', filename=photo.replace('uploads/', '')) }}" target="_blank" rel="noopener">
-                                <img src="{{ url_for('uploaded_file', filename=photo.replace('uploads/', '')) }}" alt="Job update photo" loading="lazy" decoding="async">
-                            </a>
+                            <div class="photo-visibility-card">
+                                <a href="{{ url_for('uploaded_file', filename=photo.path.replace('uploads/', '')) }}" target="_blank" rel="noopener">
+                                    <img src="{{ url_for('uploaded_file', filename=photo.path.replace('uploads/', '')) }}" alt="Job update photo" loading="lazy" decoding="async">
+                                </a>
+                                {% if can_manage_jobs %}
+                                    <form method="post" action="{{ url_for('update_photo_visibility', update_id=photo.id) }}">
+                                        <input type="hidden" name="next" value="{{ request.path }}">
+                                        <label class="remember-me-row">
+                                            <input name="client_visible" type="checkbox" value="1" {% if photo.client_visible %}checked{% endif %} onchange="this.form.submit()">
+                                            <span>Visible to client</span>
+                                        </label>
+                                    </form>
+                                {% endif %}
+                            </div>
                         {% endfor %}
                     </div>
                 {% endif %}

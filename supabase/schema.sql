@@ -44,6 +44,7 @@ create table if not exists public.updates (
     notes text,
     image_path text,
     receipt_path text,
+    client_visible boolean not null default false,
     update_group text,
     user_id bigint references public.users(id) on delete set null,
     author_role text,

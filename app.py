@@ -384,6 +384,7 @@ def init_db():
                 notes TEXT,
                 image_path TEXT,
                 receipt_path TEXT,
+                client_visible BOOLEAN NOT NULL DEFAULT FALSE,
                 update_group TEXT,
                 user_id BIGINT,
                 author_role TEXT,
@@ -526,8 +527,10 @@ def migrate_jobs_table(conn):
 def migrate_updates_table(conn):
     conn.execute("ALTER TABLE updates ADD COLUMN IF NOT EXISTS update_group TEXT")
     conn.execute("ALTER TABLE updates ADD COLUMN IF NOT EXISTS receipt_path TEXT")
+    conn.execute("ALTER TABLE updates ADD COLUMN IF NOT EXISTS client_visible BOOLEAN DEFAULT FALSE")
     conn.execute("ALTER TABLE updates ADD COLUMN IF NOT EXISTS user_id BIGINT")
     conn.execute("ALTER TABLE updates ADD COLUMN IF NOT EXISTS author_role TEXT")
+    conn.execute("UPDATE updates SET client_visible = FALSE WHERE client_visible IS NULL")
 
 
 def migrate_estimates_table(conn):
@@ -1027,10 +1030,19 @@ def group_updates(update_rows):
             grouped.append(group_lookup[group_key])
 
         if row["image_path"]:
-            group_lookup[group_key]["photos"].append(row["image_path"])
+            if not is_client() or normalize_bool(row.get("client_visible")):
+                group_lookup[group_key]["photos"].append(
+                    {
+                        "id": row["id"],
+                        "path": row["image_path"],
+                        "client_visible": normalize_bool(row.get("client_visible")),
+                    }
+                )
         if row["receipt_path"]:
             group_lookup[group_key]["receipts"].append(row["receipt_path"])
 
+    if is_client():
+        grouped = [entry for entry in grouped if entry["notes"] or entry["photos"]]
     return grouped
 
 
@@ -2089,11 +2101,16 @@ def job_progress(job_id):
             """,
             (job_id,),
         ).fetchall()
+        photo_count_sql = (
+            "SUM(CASE WHEN image_path IS NOT NULL AND client_visible THEN 1 ELSE 0 END) AS photo_count"
+            if is_client()
+            else "SUM(CASE WHEN image_path IS NOT NULL THEN 1 ELSE 0 END) AS photo_count"
+        )
         progress = conn.execute(
-            """
+            f"""
             SELECT
                 COUNT(DISTINCT COALESCE(update_group, timestamp || '|' || COALESCE(notes, ''))) AS update_count,
-                SUM(CASE WHEN image_path IS NOT NULL THEN 1 ELSE 0 END) AS photo_count,
+                {photo_count_sql},
                 MIN(timestamp) AS first_update,
                 MAX(timestamp) AS last_update
             FROM updates
@@ -2114,6 +2131,7 @@ def job_progress(job_id):
         progress=progress,
         can_view_financials=can_view_financials(),
         can_manage_receipts=can_manage_receipts(),
+        can_manage_jobs=can_manage_jobs(),
         tasks=tasks,
         task_summary=task_progress_summary(tasks),
     )
@@ -2134,6 +2152,7 @@ def submit_update():
     payment_status = request.form.get("payment_status", "Not Paid").strip()
     files = request.files.getlist("images")
     receipt_files = request.files.getlist("receipts")
+    photos_client_visible = is_admin() and parse_checkbox(request.form.get("photos_client_visible"))
     assigned_to = request.form.get("assigned_to", type=int)
     client_id = request.form.get("client_id", type=int)
     selected_service_types = sanitize_selected_services(request.form.getlist("service_type"), JOB_SERVICE_TYPES)
@@ -2320,29 +2339,29 @@ def submit_update():
                 for image_path in saved_paths:
                     conn.execute(
                         """
-                        INSERT INTO updates (job_id, notes, image_path, receipt_path, update_group, user_id, author_role, timestamp)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        INSERT INTO updates (job_id, notes, image_path, receipt_path, client_visible, update_group, user_id, author_role, timestamp)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """,
-                        (job_id, notes, image_path, None, update_group, g.user["id"], g.user["role"], now),
+                        (job_id, notes, image_path, None, photos_client_visible, update_group, g.user["id"], g.user["role"], now),
                     )
 
             if saved_receipt_paths:
                 for receipt_path in saved_receipt_paths:
                     conn.execute(
                         """
-                        INSERT INTO updates (job_id, notes, image_path, receipt_path, update_group, user_id, author_role, timestamp)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        INSERT INTO updates (job_id, notes, image_path, receipt_path, client_visible, update_group, user_id, author_role, timestamp)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """,
-                        (job_id, notes, None, receipt_path, update_group, g.user["id"], g.user["role"], now),
+                        (job_id, notes, None, receipt_path, False, update_group, g.user["id"], g.user["role"], now),
                     )
 
             if not saved_paths and not saved_receipt_paths and (notes or job_fields_changed or task_fields_changed):
                 conn.execute(
                     """
-                    INSERT INTO updates (job_id, notes, image_path, receipt_path, update_group, user_id, author_role, timestamp)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO updates (job_id, notes, image_path, receipt_path, client_visible, update_group, user_id, author_role, timestamp)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
-                    (job_id, notes, None, None, update_group, g.user["id"], g.user["role"], now),
+                    (job_id, notes, None, None, False, update_group, g.user["id"], g.user["role"], now),
                 )
 
             if is_admin():
@@ -2386,13 +2405,42 @@ def client_comment(job_id):
     with get_db_connection() as conn:
         conn.execute(
             """
-            INSERT INTO updates (job_id, notes, image_path, receipt_path, update_group, user_id, author_role, timestamp)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO updates (job_id, notes, image_path, receipt_path, client_visible, update_group, user_id, author_role, timestamp)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (job_id, comment, None, None, uuid.uuid4().hex, g.user["id"], g.user["role"], now),
+            (job_id, comment, None, None, False, uuid.uuid4().hex, g.user["id"], g.user["role"], now),
         )
     flash("Comment added.", "success")
     return redirect(url_for("update_job", job_id=job_id))
+
+
+@app.route("/photo/<int:update_id>/visibility", methods=("POST",))
+@login_required
+@role_required("admin")
+def update_photo_visibility(update_id):
+    client_visible = parse_checkbox(request.form.get("client_visible"))
+    next_url = request.form.get("next") or ""
+    with get_db_connection() as conn:
+        photo = conn.execute(
+            "SELECT job_id FROM updates WHERE id = ? AND image_path IS NOT NULL",
+            (update_id,),
+        ).fetchone()
+        if photo is None:
+            flash("Photo not found.", "error")
+            return redirect(url_for("index"))
+        conn.execute(
+            """
+            UPDATE updates
+            SET client_visible = ?
+            WHERE id = ? AND image_path IS NOT NULL
+            """,
+            (client_visible, update_id),
+        )
+
+    flash("Photo visibility updated.", "success")
+    if next_url.startswith("/"):
+        return redirect(next_url)
+    return redirect(url_for("update_job", job_id=photo["job_id"]))
 
 
 @app.route("/delete/<int:job_id>", methods=("POST",))
@@ -2416,7 +2464,7 @@ def uploaded_file(filename):
     with get_db_connection() as conn:
         update = conn.execute(
             """
-            SELECT updates.job_id, updates.image_path, updates.receipt_path, jobs.assigned_to, jobs.client_id
+            SELECT updates.job_id, updates.image_path, updates.receipt_path, updates.client_visible, jobs.assigned_to, jobs.client_id
             FROM updates
             JOIN jobs ON jobs.id = updates.job_id
             WHERE updates.image_path = ? OR updates.receipt_path = ?
@@ -2431,6 +2479,10 @@ def uploaded_file(filename):
 
     if update["receipt_path"] == stored_path and not can_manage_receipts():
         flash("You do not have permission to view financial documents.", "error")
+        return redirect(url_for("index"))
+
+    if is_client() and update["image_path"] == stored_path and not normalize_bool(update["client_visible"]):
+        flash("That photo has not been shared with your client portal.", "error")
         return redirect(url_for("index"))
 
     fake_job = {
