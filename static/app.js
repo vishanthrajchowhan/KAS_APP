@@ -78,6 +78,65 @@
         });
     }
 
+    function setupServiceChipSelectors() {
+        document.querySelectorAll('[data-service-chip-selector]').forEach((container) => {
+            const inputs = Array.from(container.querySelectorAll('input[type="checkbox"][name="service_type"]'));
+            if (!inputs.length) {
+                return;
+            }
+
+            const previewId = container.dataset.previewId;
+            const preview = previewId ? document.getElementById(previewId) : null;
+            const otherValue = container.dataset.otherValue || 'Other';
+            const otherWrapperId = container.dataset.otherWrapperId;
+            const otherInputId = container.dataset.otherInputId;
+            const otherWrapper = otherWrapperId ? document.getElementById(otherWrapperId) : null;
+            const otherInput = otherInputId ? document.getElementById(otherInputId) : null;
+
+            const updateState = () => {
+                const selectedInputs = inputs.filter((input) => input.checked);
+                const selectedValues = selectedInputs.map((input) => input.value);
+
+                // Keep one checkbox required so the browser enforces at least one selected service.
+                inputs[0].required = selectedValues.length === 0;
+
+                if (preview) {
+                    preview.innerHTML = '';
+                    selectedValues.forEach((value) => {
+                        const chip = document.createElement('button');
+                        chip.type = 'button';
+                        chip.className = 'service-chip-selected';
+                        chip.textContent = `${value} ×`;
+                        chip.addEventListener('click', () => {
+                            const matchedInput = inputs.find((input) => input.value === value);
+                            if (matchedInput) {
+                                matchedInput.checked = false;
+                                matchedInput.dispatchEvent(new Event('change', { bubbles: true }));
+                            }
+                        });
+                        preview.appendChild(chip);
+                    });
+                }
+
+                const showOther = selectedValues.includes(otherValue);
+                if (otherWrapper) {
+                    otherWrapper.hidden = !showOther;
+                }
+                if (otherInput) {
+                    otherInput.required = showOther;
+                    if (!showOther) {
+                        otherInput.value = '';
+                    }
+                }
+            };
+
+            inputs.forEach((input) => {
+                input.addEventListener('change', updateState);
+            });
+            updateState();
+        });
+    }
+
     function setupIcons() {
         if (window.lucide && typeof window.lucide.createIcons === 'function') {
             window.lucide.createIcons();
@@ -89,6 +148,7 @@
         setupCounters();
         setupStaggerGroups();
         setupButtons();
+        setupServiceChipSelectors();
         setupIcons();
     });
 })();

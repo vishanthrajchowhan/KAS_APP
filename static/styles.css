@@ -1708,6 +1708,53 @@ tbody tr:last-child td {
     font-size: 0.84rem;
 }
 
+.service-chip-selector {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 8px;
+}
+
+.service-chip-option {
+    position: relative;
+    display: inline-flex;
+}
+
+.service-chip-option input[type="checkbox"] {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.service-chip-option span {
+    min-height: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 14px;
+    border-radius: 999px;
+    border: 1px solid var(--line-strong);
+    background: color-mix(in srgb, var(--surface) 96%, transparent);
+    color: var(--ink);
+    font-size: 0.86rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease, color 0.18s ease;
+}
+
+.service-chip-option span:hover {
+    transform: translateY(-1px);
+    border-color: color-mix(in srgb, var(--primary) 60%, var(--line));
+    box-shadow: 0 10px 18px rgba(18, 35, 28, 0.08);
+}
+
+.service-chip-option input[type="checkbox"]:checked + span {
+    color: #ffffff;
+    border-color: color-mix(in srgb, var(--primary) 94%, #000000);
+    background: linear-gradient(135deg, var(--primary), var(--primary-2));
+    box-shadow: 0 12px 20px rgba(15, 106, 71, 0.28);
+}
+
 #other-service-wrapper {
     margin-top: 6px;
 }
@@ -2310,6 +2357,28 @@ body {
     font-weight: 700;
 }
 
+.service-chip-selected {
+    min-height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 5px 12px;
+    border-radius: 999px;
+    border: 1px solid color-mix(in srgb, var(--primary) 40%, var(--line));
+    background: color-mix(in srgb, var(--surface-2) 90%, transparent);
+    color: var(--primary);
+    font-size: 0.8rem;
+    font-weight: 800;
+    cursor: pointer;
+    transition: transform 0.18s ease, background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+}
+
+.service-chip-selected:hover {
+    transform: translateY(-1px);
+    background: color-mix(in srgb, var(--primary) 14%, var(--surface));
+    border-color: color-mix(in srgb, var(--primary) 65%, var(--line));
+}
+
 .modal-open {
     overflow: hidden;
 }
@@ -2810,6 +2879,18 @@ body {
 @media (max-width: 560px) {
     .settings-grid-fields {
         grid-template-columns: 1fr;
+    }
+
+    .service-chip-selector {
+        gap: 8px;
+    }
+
+    .service-chip-option {
+        flex: 1 1 calc(50% - 8px);
+    }
+
+    .service-chip-option span {
+        width: 100%;
     }
 
     .modal-actions {

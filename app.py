@@ -1,6 +1,6 @@
 import os
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import wraps
 from pathlib import Path
 
@@ -79,26 +79,25 @@ SERVICE_TYPES = (
     "Roof Coating",
     "Exterior Painting",
     "Interior Painting",
-    "Caulking / Sealants",
+    "Caulking",
     "Concrete Repair",
     "Stucco Repair",
-    "Balcony Waterproofing",
-    "Garage / Deck Coating",
     "Pressure Cleaning",
-    "Commercial Building Maintenance",
-    "Custom Construction Services",
+    "Garage Deck Coating",
     "Other",
 )
 
 # Service types for leads/jobs
 JOB_SERVICE_TYPES = (
     "Waterproofing",
+    "Roof Coating",
     "Exterior Painting",
     "Interior Painting",
-    "Drywall",
     "Caulking",
-    "Roofing",
-    "Tiles",
+    "Concrete Repair",
+    "Stucco Repair",
+    "Pressure Cleaning",
+    "Garage Deck Coating",
     "Other",
 )
 OTHER_SERVICE_LABEL = "Other"
@@ -1248,38 +1247,7 @@ def index():
                 params,
             ).fetchall()
         }
-        placeholders = ", ".join(["?"] * len(APPROVED_PIPELINE_STATUSES))
-        proposal_placeholders = ", ".join(["?"] * len(PROPOSAL_PIPELINE_STATUSES))
         metrics_where = f"WHERE {role_clause}" if role_clause else ""
-        metrics = conn.execute(
-            f"""
-            SELECT
-                SUM(CASE WHEN status = 'Lead' THEN 1 ELSE 0 END) AS total_leads,
-                SUM(CASE WHEN status IN ({proposal_placeholders}) OR proposal_sent_date IS NOT NULL THEN 1 ELSE 0 END) AS proposals_sent,
-                SUM(CASE WHEN status IN ({placeholders}) THEN 1 ELSE 0 END) AS approved_jobs,
-                SUM(CASE WHEN status = 'Rejected' THEN 1 ELSE 0 END) AS rejected_jobs,
-                SUM(CASE WHEN status = 'In Progress' THEN 1 ELSE 0 END) AS in_progress_jobs,
-                COALESCE(SUM(CASE WHEN status != 'Rejected' THEN proposal_amount ELSE 0 END), 0) AS revenue_pipeline,
-                COALESCE(SUM(CASE WHEN payment_status = 'Paid' THEN invoice_amount ELSE 0 END), 0) AS collected_revenue
-            FROM jobs
-            {metrics_where}
-            """,
-            list(PROPOSAL_PIPELINE_STATUSES) + list(APPROVED_PIPELINE_STATUSES) + role_params,
-        ).fetchone()
-
-        monthly_revenue_rows = conn.execute(
-            f"""
-            SELECT
-                SUBSTRING(created_at, 1, 7) AS month,
-                COALESCE(SUM(CASE WHEN payment_status = 'Paid' THEN invoice_amount ELSE 0 END), 0) AS value
-            FROM jobs
-            {metrics_where}
-            GROUP BY SUBSTRING(created_at, 1, 7)
-            ORDER BY month DESC
-            LIMIT 6
-            """,
-            role_params,
-        ).fetchall()
 
         recent_activity = conn.execute(
             f"""
@@ -1309,25 +1277,81 @@ def index():
             ).fetchone()
             pending_estimates = pending_estimate_row["count"] if pending_estimate_row else 0
 
-        month_prefix = datetime.now().strftime("%Y-%m")
-        new_leads_row = conn.execute(
+        today = datetime.now().date()
+        today_str = today.isoformat()
+        week_start = today - timedelta(days=today.weekday())
+        week_end = week_start + timedelta(days=6)
+        date_scope_sql = f"WHERE {role_clause} AND " if role_clause else "WHERE "
+
+        scheduled_this_week_row = conn.execute(
             f"""
             SELECT COUNT(*) AS count
             FROM jobs
-            {f'WHERE {role_clause} AND ' if role_clause else 'WHERE '}status = 'Lead' AND SUBSTRING(created_at, 1, 7) = ?
+            {date_scope_sql}jobs.status = 'Scheduled'
+              AND COALESCE(jobs.due_date, SUBSTRING(jobs.created_at, 1, 10)) BETWEEN ? AND ?
             """,
-            role_params + [month_prefix],
+            role_params + [week_start.isoformat(), week_end.isoformat()],
         ).fetchone()
-        new_leads = new_leads_row["count"] if new_leads_row else 0
 
-    proposals_sent = metrics["proposals_sent"] or 0
-    approved_jobs = metrics["approved_jobs"] or 0
-    conversion_rate = round((approved_jobs / proposals_sent) * 100, 1) if proposals_sent else 0
+        jobs_waiting_approval_row = conn.execute(
+            f"""
+            SELECT COUNT(*) AS count
+            FROM jobs
+            {date_scope_sql}jobs.status IN ('Estimating', 'Proposal Sent', 'Negotiation')
+            """,
+            role_params,
+        ).fetchone()
+
+        field_updates_today_row = conn.execute(
+            f"""
+            SELECT COUNT(*) AS count
+            FROM updates
+            JOIN jobs ON jobs.id = updates.job_id
+            {date_scope_sql}SUBSTRING(updates.timestamp, 1, 10) = ?
+            """,
+            role_params + [today_str],
+        ).fetchone()
+
+        overdue_jobs_row = conn.execute(
+            f"""
+            SELECT COUNT(*) AS count
+            FROM jobs
+            {date_scope_sql}COALESCE(jobs.due_date, jobs.proposal_sent_date, jobs.decision_date) IS NOT NULL
+              AND COALESCE(jobs.due_date, jobs.proposal_sent_date, jobs.decision_date) < ?
+              AND jobs.status NOT IN ('Completed', 'Paid', 'Rejected')
+            """,
+            role_params + [today_str],
+        ).fetchone()
+
+        team_assigned_today_row = conn.execute(
+            f"""
+            SELECT COUNT(DISTINCT jobs.assigned_to) AS count
+            FROM jobs
+            {date_scope_sql}jobs.assigned_to IS NOT NULL
+              AND jobs.status IN ('Scheduled', 'Started', 'In Progress')
+              AND COALESCE(jobs.due_date, SUBSTRING(jobs.created_at, 1, 10)) = ?
+            """,
+            role_params + [today_str],
+        ).fetchone()
+
+    open_jobs = sum(
+        1
+        for row in jobs
+        if row["status"] in {"Scheduled", "Started", "In Progress", "Approved", "Estimating", "Proposal Sent", "Negotiation"}
+    )
+    ops_metrics = {
+        "open_jobs": open_jobs,
+        "pending_estimates": pending_estimates,
+        "scheduled_this_week": (scheduled_this_week_row["count"] if scheduled_this_week_row else 0) or 0,
+        "jobs_waiting_approval": (jobs_waiting_approval_row["count"] if jobs_waiting_approval_row else 0) or 0,
+        "field_updates_today": (field_updates_today_row["count"] if field_updates_today_row else 0) or 0,
+        "overdue_jobs": (overdue_jobs_row["count"] if overdue_jobs_row else 0) or 0,
+        "team_assigned_today": (team_assigned_today_row["count"] if team_assigned_today_row else 0) or 0,
+    }
+
     can_view_financials_flag = dashboard_role == "admin"
     can_manage_jobs_flag = dashboard_role == "admin"
 
-    monthly_revenue = list(reversed(monthly_revenue_rows))
-    monthly_peak = max((row["value"] or 0) for row in monthly_revenue) if monthly_revenue else 0
     latest_job_id = jobs[0]["id"] if jobs else None
 
     return render_template(
@@ -1338,19 +1362,13 @@ def index():
         execution_statuses=EXECUTION_STATUSES,
         financial_statuses=FINANCIAL_STATUSES,
         status_counts=status_counts,
-        metrics=metrics,
-        conversion_rate=conversion_rate,
-        money=money,
         can_view_financials=can_view_financials_flag,
         can_manage_jobs=can_manage_jobs_flag,
         dashboard_role=dashboard_role,
         show_view_switcher=is_admin(),
         filters={"q": search, "status": status_filter, "quick": quick_filter, "sort": sort, "view_as": dashboard_role},
         latest_job_id=latest_job_id,
-        pending_estimates=pending_estimates,
-        new_leads=new_leads,
-        monthly_revenue=monthly_revenue,
-        monthly_peak=monthly_peak,
+        ops_metrics=ops_metrics,
         recent_activity=recent_activity,
     )
 

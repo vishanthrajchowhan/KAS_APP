@@ -26,13 +26,16 @@
         <input id="due_date" name="due_date" type="date" value="{{ due_date or '' }}">
 
         <div class="form-section service-type-section">
-            <label for="service_type">Service Types</label>
-            <select id="service_type" name="service_type" multiple size="6" required data-other-option="Other">
+            <label>Service Types</label>
+            <div class="service-chip-selector" data-service-chip-selector data-other-value="Other" data-other-wrapper-id="other-service-wrapper" data-other-input-id="other_service_details" data-preview-id="service-chip-preview">
                 {% for option in service_types %}
-                    <option value="{{ option }}" {% if option in (selected_service_types or []) %}selected{% endif %}>{{ option }}</option>
+                    <label class="service-chip-option">
+                        <input type="checkbox" name="service_type" value="{{ option }}" {% if option in (selected_service_types or []) %}checked{% endif %}>
+                        <span>{{ option }}{% if option == 'Other' %} +{% endif %}</span>
+                    </label>
                 {% endfor %}
-            </select>
-            <p class="help-text">Use Ctrl/Cmd + click to select multiple services.</p>
+            </div>
+            <p class="help-text">Tap one or more services to build the job scope.</p>
             <div id="service-chip-preview" class="service-chip-preview" aria-live="polite"></div>
 
             <div id="other-service-wrapper" {% if 'Other' not in (selected_service_types or []) %}hidden{% endif %}>
@@ -89,40 +92,4 @@
         </div>
     </form>
 </section>
-<script>
-(() => {
-    const serviceTypeSelect = document.getElementById("service_type");
-    const serviceChipPreview = document.getElementById("service-chip-preview");
-    const otherServiceWrapper = document.getElementById("other-service-wrapper");
-    const otherServiceDetailsInput = document.getElementById("other_service_details");
-    const otherServiceOption = serviceTypeSelect ? serviceTypeSelect.dataset.otherOption || "Other" : "Other";
-
-    if (!serviceTypeSelect || !otherServiceWrapper || !otherServiceDetailsInput || !serviceChipPreview) {
-        return;
-    }
-
-    const updateOtherServiceVisibility = () => {
-        const selectedValues = Array.from(serviceTypeSelect.selectedOptions).map((option) => option.value);
-        const isOtherSelected = selectedValues.includes(otherServiceOption);
-
-        serviceChipPreview.innerHTML = "";
-        selectedValues.forEach((value) => {
-            const chip = document.createElement("span");
-            chip.className = "service-chip";
-            chip.textContent = value;
-            serviceChipPreview.appendChild(chip);
-        });
-
-        otherServiceWrapper.hidden = !isOtherSelected;
-        otherServiceDetailsInput.required = isOtherSelected;
-
-        if (!isOtherSelected) {
-            otherServiceDetailsInput.value = "";
-        }
-    };
-
-    serviceTypeSelect.addEventListener("change", updateOtherServiceVisibility);
-    updateOtherServiceVisibility();
-})();
-</script>
 {% endblock %}
