@@ -89,17 +89,53 @@ SERVICE_TYPES = (
 # Service types for leads/jobs
 JOB_SERVICE_TYPES = (
     "Waterproofing",
+    "Exterior Window Waterproofing",
+    "Commercial Windows Waterproofing",
     "Roof Coating",
+    "Wall Coating",
     "Exterior Painting",
     "Interior Painting",
+    "Electrostatic Painting",
+    "Limestone Sealant Joint Replacement",
+    "Exterior Pressure Washing",
+    "Metal Roof & Railing Painting",
     "Caulking",
+    "Sealant Joint Replacement",
     "Drywall",
     "Roofing",
     "Tiles",
+    "Concrete Repair",
+    "Stucco Repair",
+    "Balcony Waterproofing",
+    "Parking Lot Connector Painting",
     "Other",
 )
 OTHER_SERVICE_LABEL = "Other"
 LEGACY_OTHER_SERVICE_LABEL = "Other Related Services"
+TASK_STATUSES = ("Not Started", "In Progress", "Done")
+SERVICE_TASK_TEMPLATES = {
+    "Waterproofing": ("Inspect substrate", "Prepare surface", "Apply waterproofing system", "Final water-tightness review"),
+    "Exterior Window Waterproofing": ("Inspect window perimeters", "Remove failed sealant", "Prime joints", "Install waterproof sealant", "Water test windows"),
+    "Commercial Windows Waterproofing": ("Map commercial window scope", "Clean frames and joints", "Seal window perimeters", "Quality check completed sections"),
+    "Roof Coating": ("Pressure clean roof", "Repair roof penetrations", "Apply primer", "Apply roof coating", "Final roof inspection"),
+    "Wall Coating": ("Clean wall surfaces", "Repair cracks and openings", "Apply primer", "Apply wall coating", "Inspect finish"),
+    "Exterior Painting": ("Pressure wash exterior", "Mask and protect areas", "Prime surfaces", "Apply finish coats", "Touch-up and cleanup"),
+    "Interior Painting": ("Protect interior areas", "Patch drywall", "Prime surfaces", "Apply finish coats", "Final walkthrough"),
+    "Electrostatic Painting": ("Prepare metal surfaces", "Mask surrounding areas", "Apply electrostatic coating", "Inspect adhesion and finish"),
+    "Limestone Sealant Joint Replacement": ("Inspect limestone joints", "Remove existing sealant", "Prepare and prime joints", "Install new sealant", "Tool and inspect joints"),
+    "Exterior Pressure Washing": ("Stage pressure washing area", "Pretreat stains", "Pressure wash surfaces", "Rinse and inspect"),
+    "Metal Roof & Railing Painting": ("Prepare metal roof and railings", "Prime metal surfaces", "Apply finish coating", "Inspect coverage"),
+    "Caulking": ("Remove loose caulking", "Clean joints", "Install sealant", "Tool and inspect sealant"),
+    "Sealant Joint Replacement": ("Cut out failed sealant", "Clean joint cavity", "Install backer rod as needed", "Apply replacement sealant"),
+    "Drywall": ("Protect work area", "Repair drywall", "Sand and prep", "Prime repaired areas"),
+    "Roofing": ("Inspect roofing scope", "Repair roofing areas", "Seal penetrations", "Final roof review"),
+    "Tiles": ("Inspect tile scope", "Remove damaged material", "Install or repair tile", "Clean and inspect"),
+    "Concrete Repair": ("Inspect damaged concrete", "Prepare repair area", "Patch concrete", "Seal repaired surface"),
+    "Stucco Repair": ("Remove loose stucco", "Patch stucco", "Match texture", "Prime repaired area"),
+    "Balcony Waterproofing": ("Inspect balcony substrate", "Prepare balcony surface", "Install waterproofing membrane", "Inspect drainage and finish"),
+    "Parking Lot Connector Painting": ("Prepare connector surfaces", "Mask adjacent areas", "Apply coating", "Inspect completed connector"),
+    "Other": ("Confirm custom scope", "Schedule required materials", "Complete custom work", "Final inspection"),
+}
 
 DEFAULT_WORKSPACE_SETTINGS = {
     "company_name": "KAS Waterproofing & Building Services",
@@ -358,6 +394,20 @@ def init_db():
             """
         )
         migrate_updates_table(conn)
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS job_tasks (
+                id BIGSERIAL PRIMARY KEY,
+                job_id BIGINT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+                service_type TEXT,
+                title TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'Not Started',
+                sort_order INTEGER DEFAULT 0,
+                created_at TEXT NOT NULL,
+                updated_at TEXT
+            )
+            """
+        )
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS estimates (
@@ -830,6 +880,54 @@ def build_service_chips(service_type, other_details=""):
         chips = [chip for chip in chips if chip != OTHER_SERVICE_LABEL]
         chips.append((other_details or "").strip())
     return chips
+
+
+def default_tasks_for_service(service_type):
+    return SERVICE_TASK_TEMPLATES.get(service_type, SERVICE_TASK_TEMPLATES[OTHER_SERVICE_LABEL])
+
+
+def sync_job_tasks(conn, job_id, selected_services):
+    existing = conn.execute(
+        "SELECT service_type, title FROM job_tasks WHERE job_id = ?",
+        (job_id,),
+    ).fetchall()
+    existing_keys = {(row["service_type"] or "", row["title"]) for row in existing}
+    now = datetime.now().isoformat(timespec="seconds")
+    sort_order = len(existing_keys)
+
+    for service in selected_services:
+        for title in default_tasks_for_service(service):
+            key = (service, title)
+            if key in existing_keys:
+                continue
+            sort_order += 1
+            conn.execute(
+                """
+                INSERT INTO job_tasks (job_id, service_type, title, status, sort_order, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (job_id, service, title, "Not Started", sort_order, now),
+            )
+
+
+def fetch_job_tasks(conn, job_id):
+    return conn.execute(
+        """
+        SELECT *
+        FROM job_tasks
+        WHERE job_id = ?
+        ORDER BY sort_order ASC, id ASC
+        """,
+        (job_id,),
+    ).fetchall()
+
+
+def task_progress_summary(tasks):
+    total = len(tasks)
+    done = sum(1 for task in tasks if task["status"] == "Done")
+    in_progress = sum(1 for task in tasks if task["status"] == "In Progress")
+    percent = round((done / total) * 100) if total else 0
+    return {"total": total, "done": done, "in_progress": in_progress, "percent": percent}
 
 
 def process_logo_upload(uploaded_file):
@@ -1645,6 +1743,12 @@ def add_job():
                     now,
                 ),
             )
+            job_row = conn.execute(
+                "SELECT id FROM jobs WHERE created_at = ? AND name = ? ORDER BY id DESC LIMIT 1",
+                (now, name),
+            ).fetchone()
+            if job_row:
+                sync_job_tasks(conn, job_row["id"], selected_service_types)
         flash("CRM job created.", "success")
         return redirect(url_for("index"))
 
@@ -1936,6 +2040,10 @@ def update_job(job_id):
         clients = conn.execute(
             "SELECT id, name, email FROM users WHERE role = 'client' ORDER BY name"
         ).fetchall()
+        tasks = fetch_job_tasks(conn, job_id)
+        if not tasks and job.get("service_type"):
+            sync_job_tasks(conn, job_id, split_services(job.get("service_type")))
+            tasks = fetch_job_tasks(conn, job_id)
     updates = group_updates(update_rows)
 
     return render_template(
@@ -1956,6 +2064,9 @@ def update_job(job_id):
         can_manage_receipts=can_manage_receipts(),
         employees=employees,
         clients=clients,
+        tasks=tasks,
+        task_statuses=TASK_STATUSES,
+        task_summary=task_progress_summary(tasks),
     )
 
 
@@ -1990,6 +2101,10 @@ def job_progress(job_id):
             """,
             (job_id,),
         ).fetchone()
+        tasks = fetch_job_tasks(conn, job_id)
+        if not tasks and job.get("service_type"):
+            sync_job_tasks(conn, job_id, split_services(job.get("service_type")))
+            tasks = fetch_job_tasks(conn, job_id)
     updates = group_updates(update_rows)
 
     return render_template(
@@ -1999,6 +2114,8 @@ def job_progress(job_id):
         progress=progress,
         can_view_financials=can_view_financials(),
         can_manage_receipts=can_manage_receipts(),
+        tasks=tasks,
+        task_summary=task_progress_summary(tasks),
     )
 
 
@@ -2023,6 +2140,14 @@ def submit_update():
     service_type = compose_service_text(selected_service_types)
     other_service_details = request.form.get("other_service_details", "").strip()
     due_date = request.form.get("due_date", "").strip() or None
+    task_status_updates = {}
+    if is_admin():
+        for key, value in request.form.items():
+            if not key.startswith("task_status_"):
+                continue
+            task_id_text = key.removeprefix("task_status_")
+            if task_id_text.isdigit() and value in TASK_STATUSES:
+                task_status_updates[int(task_id_text)] = value
 
     if not job_id:
         flash("Please choose a valid job.", "error")
@@ -2061,15 +2186,6 @@ def submit_update():
         other_service_details = job["other_service_details"] or ""
         due_date = job["due_date"] or None
     else:
-        if not client_name:
-            flash("Please enter a client name.", "error")
-            return redirect(url_for("update_job", job_id=job_id))
-        if not service_type:
-            flash("Please choose at least one service type.", "error")
-            return redirect(url_for("update_job", job_id=job_id))
-        if OTHER_SERVICE_LABEL in selected_service_types and not other_service_details:
-            flash("Please add custom service details when Other is selected.", "error")
-            return redirect(url_for("update_job", job_id=job_id))
         if OTHER_SERVICE_LABEL not in selected_service_types:
             other_service_details = ""
 
@@ -2096,6 +2212,18 @@ def submit_update():
         valid_receipt_files = [file for file in receipt_files if file and file.filename]
     else:
         valid_receipt_files = []
+    task_fields_changed = False
+    if task_status_updates:
+        with get_db_connection() as conn:
+            current_task_rows = conn.execute(
+                "SELECT id, status FROM job_tasks WHERE job_id = ?",
+                (job_id,),
+            ).fetchall()
+        current_task_statuses = {row["id"]: row["status"] for row in current_task_rows}
+        task_fields_changed = any(
+            current_task_statuses.get(task_id) != task_status
+            for task_id, task_status in task_status_updates.items()
+        )
     job_fields_changed = any(
         [
             status != job["status"],
@@ -2113,7 +2241,7 @@ def submit_update():
             due_date != (job["due_date"] or None),
         ]
     )
-    if not notes and not valid_files and not valid_receipt_files and not job_fields_changed:
+    if not notes and not valid_files and not valid_receipt_files and not job_fields_changed and not task_fields_changed:
         flash("Add notes, photos, or change the status before submitting.", "error")
         return redirect(url_for("update_job", job_id=job_id))
 
@@ -2147,7 +2275,7 @@ def submit_update():
             file.save(file_path)
             saved_receipt_paths.append(f"uploads/{filename}")
 
-        if not saved_paths and not saved_receipt_paths and not notes and not job_fields_changed:
+        if not saved_paths and not saved_receipt_paths and not notes and not job_fields_changed and not task_fields_changed:
             flash("No update was saved. Please add notes, change status, or upload supported files.", "error")
             return redirect(url_for("update_job", job_id=job_id))
 
@@ -2208,7 +2336,7 @@ def submit_update():
                         (job_id, notes, None, receipt_path, update_group, g.user["id"], g.user["role"], now),
                     )
 
-            if not saved_paths and not saved_receipt_paths and (notes or job_fields_changed):
+            if not saved_paths and not saved_receipt_paths and (notes or job_fields_changed or task_fields_changed):
                 conn.execute(
                     """
                     INSERT INTO updates (job_id, notes, image_path, receipt_path, update_group, user_id, author_role, timestamp)
@@ -2216,6 +2344,18 @@ def submit_update():
                     """,
                     (job_id, notes, None, None, update_group, g.user["id"], g.user["role"], now),
                 )
+
+            if is_admin():
+                sync_job_tasks(conn, job_id, selected_service_types)
+                for task_id, task_status in task_status_updates.items():
+                    conn.execute(
+                        """
+                        UPDATE job_tasks
+                        SET status = ?, updated_at = ?
+                        WHERE id = ? AND job_id = ?
+                        """,
+                        (task_status, now, task_id, job_id),
+                    )
 
     except OSError:
         app.logger.exception("Failed to save job update")

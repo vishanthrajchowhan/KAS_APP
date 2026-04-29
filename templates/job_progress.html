@@ -31,6 +31,10 @@
 
 <section class="dashboard-stats progress-stats" aria-label="Job progress summary">
     <div>
+        <span>{{ task_summary.percent }}%</span>
+        <p>Tasks Done</p>
+    </div>
+    <div>
         <span>{{ progress.update_count or 0 }}</span>
         <p>Updates</p>
     </div>
@@ -46,6 +50,33 @@
         <span>{% if progress.last_update %}{{ progress.last_update[:10] }}{% else %}-{% endif %}</span>
         <p>Latest Update</p>
     </div>
+</section>
+
+<section class="panel task-progress-panel">
+    <div class="section-heading-row">
+        <div>
+            <p class="eyebrow">Scope Progress</p>
+            <h2>Task Checklist</h2>
+            <p class="help-text">{{ task_summary.done }} of {{ task_summary.total }} tasks complete.</p>
+        </div>
+        <span class="task-percent">{{ task_summary.percent }}%</span>
+    </div>
+    <div class="task-progress-track"><span style="--progress: {{ task_summary.percent }}%;"></span></div>
+    {% if tasks %}
+        <div class="task-list readonly">
+            {% for task in tasks %}
+                <div class="task-row task-row-{{ task.status|lower|replace(' ', '-') }}">
+                    <span>
+                        <strong>{{ task.title }}</strong>
+                        <small>{{ task.service_type or 'General' }}</small>
+                    </span>
+                    <span class="task-status">{{ task.status }}</span>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p class="muted">Tasks will appear once the office organizes the job scope.</p>
+    {% endif %}
 </section>
 
 {% set media = namespace(before=None, after=None) %}

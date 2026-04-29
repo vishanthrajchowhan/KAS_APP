@@ -93,15 +93,18 @@
 
                 {% if can_manage_jobs %}
                     <label>Service Types</label>
-                    <div class="service-chip-selector" data-service-chip-selector data-other-value="Other" data-other-wrapper-id="other-service-wrapper" data-other-input-id="other_service_details" data-preview-id="service-chip-preview">
-                        {% for option in service_types %}
-                            <label class="service-chip-option">
-                                <input type="checkbox" name="service_type" value="{{ option }}" {% if option in (selected_service_types or []) %}checked{% endif %}>
-                                <span>{{ option }}{% if option == 'Other' %} +{% endif %}</span>
-                            </label>
-                        {% endfor %}
-                    </div>
-                    <p class="help-text">Select one or more services for this job.</p>
+                    <details class="service-multi-select">
+                        <summary>Choose one or more services</summary>
+                        <div class="service-chip-selector" data-service-chip-selector data-other-value="Other" data-other-wrapper-id="other-service-wrapper" data-other-input-id="other_service_details" data-preview-id="service-chip-preview">
+                            {% for option in service_types %}
+                                <label class="service-chip-option">
+                                    <input type="checkbox" name="service_type" value="{{ option }}" {% if option in (selected_service_types or []) %}checked{% endif %}>
+                                    <span>{{ option }}{% if option == 'Other' %} +{% endif %}</span>
+                                </label>
+                            {% endfor %}
+                        </div>
+                    </details>
+                    <p class="help-text">Selected services create and organize the task checklist below.</p>
                     <div id="service-chip-preview" class="service-chip-preview" aria-live="polite"></div>
 
                     <div id="other-service-wrapper" {% if 'Other' not in (selected_service_types or []) %}hidden{% endif %}>
@@ -134,6 +137,38 @@
                     <input id="due_date" name="due_date" type="date" value="{{ job.due_date or '' }}">
                 {% endif %}
             </section>
+
+            {% if can_manage_jobs %}
+                <section class="form-section task-planner">
+                    <div class="section-heading-row">
+                        <div>
+                            <h2>Job Tasks</h2>
+                            <p class="help-text">{{ task_summary.done }} of {{ task_summary.total }} tasks complete.</p>
+                        </div>
+                        <span class="task-percent">{{ task_summary.percent }}%</span>
+                    </div>
+                    <div class="task-progress-track"><span style="--progress: {{ task_summary.percent }}%;"></span></div>
+                    {% if tasks %}
+                        <div class="task-list">
+                            {% for task in tasks %}
+                                <label class="task-row">
+                                    <span>
+                                        <strong>{{ task.title }}</strong>
+                                        <small>{{ task.service_type or 'General' }}</small>
+                                    </span>
+                                    <select name="task_status_{{ task.id }}" aria-label="Status for {{ task.title }}">
+                                        {% for option in task_statuses %}
+                                            <option value="{{ option }}" {% if task.status == option %}selected{% endif %}>{{ option }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </label>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="muted">Save services once to create the task checklist.</p>
+                    {% endif %}
+                </section>
+            {% endif %}
 
             {% if can_view_financials %}
                 <section class="form-section">

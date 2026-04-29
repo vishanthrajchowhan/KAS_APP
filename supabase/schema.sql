@@ -50,8 +50,20 @@ create table if not exists public.updates (
     timestamp text not null
 );
 
+create table if not exists public.job_tasks (
+    id bigserial primary key,
+    job_id bigint not null references public.jobs(id) on delete cascade,
+    service_type text,
+    title text not null,
+    status text not null default 'Not Started',
+    sort_order integer default 0,
+    created_at text not null,
+    updated_at text
+);
+
 create index if not exists idx_jobs_assigned_to on public.jobs(assigned_to);
 create index if not exists idx_jobs_client_id on public.jobs(client_id);
 create index if not exists idx_jobs_status on public.jobs(status);
 create index if not exists idx_updates_job_id on public.updates(job_id);
 create index if not exists idx_updates_timestamp on public.updates(timestamp desc);
+create index if not exists idx_job_tasks_job_id on public.job_tasks(job_id);

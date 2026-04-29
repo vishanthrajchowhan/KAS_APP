@@ -1715,11 +1715,45 @@ tbody tr:last-child td {
     font-size: 0.84rem;
 }
 
+.service-multi-select {
+    margin-top: 8px;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: color-mix(in srgb, var(--surface) 94%, transparent);
+    overflow: hidden;
+}
+
+.service-multi-select summary {
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    color: var(--ink);
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.service-multi-select summary::after {
+    content: "Select";
+    color: var(--primary);
+    font-size: 0.78rem;
+    text-transform: uppercase;
+}
+
 .service-chip-selector {
     display: flex;
     flex-wrap: wrap;
     gap: 10px;
     margin-top: 8px;
+}
+
+.service-multi-select .service-chip-selector {
+    max-height: 250px;
+    margin: 0;
+    padding: 14px;
+    overflow-y: auto;
+    border-top: 1px solid var(--line);
 }
 
 .service-chip-option {
@@ -1747,6 +1781,13 @@ tbody tr:last-child td {
     font-weight: 700;
     cursor: pointer;
     transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease, color 0.18s ease;
+}
+
+.service-multi-select .service-chip-option span {
+    justify-content: flex-start;
+    min-width: 220px;
+    max-width: 100%;
+    text-align: left;
 }
 
 .service-chip-option span:hover {
@@ -2386,6 +2427,100 @@ body {
     border-color: color-mix(in srgb, var(--primary) 65%, var(--line));
 }
 
+.section-heading-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.task-planner,
+.task-progress-panel {
+    display: grid;
+    gap: 14px;
+}
+
+.task-percent {
+    min-width: 58px;
+    min-height: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--primary) 12%, var(--surface));
+    color: var(--primary);
+    font-weight: 900;
+}
+
+.task-progress-track {
+    height: 10px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--line) 70%, transparent);
+}
+
+.task-progress-track span {
+    display: block;
+    width: var(--progress, 0%);
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(135deg, var(--primary), var(--primary-2));
+}
+
+.task-list {
+    display: grid;
+    gap: 10px;
+}
+
+.task-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(150px, 190px);
+    gap: 12px;
+    align-items: center;
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--surface-2) 72%, transparent);
+}
+
+.task-row strong,
+.task-row small {
+    display: block;
+}
+
+.task-row small {
+    margin-top: 3px;
+    color: var(--muted);
+    font-weight: 700;
+}
+
+.task-row select {
+    min-height: 40px;
+}
+
+.task-list.readonly .task-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.task-status {
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: var(--surface);
+    color: var(--muted);
+    font-size: 0.8rem;
+    font-weight: 800;
+}
+
+.task-row-done .task-status {
+    background: var(--success-bg);
+    color: var(--success-text);
+}
+
+.task-row-in-progress .task-status {
+    background: color-mix(in srgb, var(--primary) 14%, var(--surface));
+    color: var(--primary);
+}
+
 .modal-open {
     overflow: hidden;
 }
@@ -2897,6 +3032,15 @@ body {
     }
 
     .service-chip-option span {
+        width: 100%;
+    }
+
+    .task-row,
+    .task-list.readonly .task-row {
+        grid-template-columns: 1fr;
+    }
+
+    .task-row select {
         width: 100%;
     }
 
