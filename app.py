@@ -286,12 +286,19 @@ if POSTGRES_CONNINFO:
     )
 
 
+def supabase_key_looks_publishable(supabase_key):
+    normalized_key = str(supabase_key or "").strip().lower()
+    return normalized_key.startswith("sb_publishable_") or "publishable" in normalized_key
+
+
 def get_supabase_client():
     global SUPABASE_CLIENT
     supabase_url = os.environ.get("SUPABASE_URL", "").strip()
     supabase_key = os.environ.get("SUPABASE_KEY", "").strip()
     if not supabase_url or not supabase_key:
         raise RuntimeError("SUPABASE_URL and SUPABASE_KEY are required for Supabase Storage uploads.")
+    if supabase_key_looks_publishable(supabase_key):
+        raise RuntimeError("SUPABASE_KEY must be the secret/service-role key, not the publishable key.")
     if SUPABASE_CLIENT is None:
         SUPABASE_CLIENT = create_client(supabase_url, supabase_key)
     return SUPABASE_CLIENT
@@ -949,7 +956,7 @@ def storage_path_for_upload(kind, source_filename, job_id=None, extension=None):
 def upload_to_supabase_storage(bucket_name, storage_path, content, content_type):
     client = get_supabase_client()
     file_options = {"content-type": content_type, "upsert": "true"}
-    client.storage.from_(bucket_name).upload(storage_path, content, file_options=file_options)
+    client.storage.from_(bucket_name).upload(path=storage_path, file=content, file_options=file_options)
     public_url = client.storage.from_(bucket_name).get_public_url(storage_path)
     if isinstance(public_url, dict):
         return public_url.get("publicUrl") or public_url.get("public_url") or public_url.get("data", {}).get("publicUrl")
@@ -2497,30 +2504,38 @@ def submit_update():
                 flash(f"Skipped unsupported file: {file.filename}", "error")
                 continue
 
-            saved_photos.append(
-                save_upload_to_storage(
-                    file,
-                    "job_photos",
-                    "job_photo",
-                    job_id=job_id,
-                    compress_images=True,
+            try:
+                saved_photos.append(
+                    save_upload_to_storage(
+                        file,
+                        "job_photos",
+                        "job_photo",
+                        job_id=job_id,
+                        compress_images=True,
+                    )
                 )
-            )
+            except Exception as exc:
+                app.logger.exception("Failed to upload job photo for job %s", job_id)
+                flash(f"Could not upload photo {file.filename}: {exc}", "error")
 
         for file in valid_receipt_files:
             if not allowed_receipt_file(file.filename):
                 flash(f"Skipped unsupported receipt/bill: {file.filename}", "error")
                 continue
 
-            saved_receipts.append(
-                save_upload_to_storage(
-                    file,
-                    "receipts",
-                    "receipt",
-                    job_id=job_id,
-                    compress_images=True,
+            try:
+                saved_receipts.append(
+                    save_upload_to_storage(
+                        file,
+                        "receipts",
+                        "receipt",
+                        job_id=job_id,
+                        compress_images=True,
+                    )
                 )
-            )
+            except Exception as exc:
+                app.logger.exception("Failed to upload receipt for job %s", job_id)
+                flash(f"Could not upload receipt {file.filename}: {exc}", "error")
 
         if not saved_photos and not saved_receipts and not notes and not job_fields_changed and not task_fields_changed:
             flash("No update was saved. Please add notes, change status, or upload supported files.", "error")
