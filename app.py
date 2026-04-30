@@ -955,11 +955,19 @@ def storage_path_for_upload(kind, source_filename, job_id=None, extension=None):
 
 def upload_to_supabase_storage(bucket_name, storage_path, content, content_type):
     client = get_supabase_client()
-    file_options = {"content-type": content_type, "upsert": "true"}
-    client.storage.from_(bucket_name).upload(path=storage_path, file=content, file_options=file_options)
+    print("Uploading:", storage_path)
+    res = client.storage.from_(bucket_name).upload(
+        path=storage_path,
+        file=content,
+        file_options={"content-type": content_type},
+    )
+    print("Upload response:", res)
+    if isinstance(res, dict) and res.get("error"):
+        raise Exception(res["error"])
+
     public_url = client.storage.from_(bucket_name).get_public_url(storage_path)
     if isinstance(public_url, dict):
-        return public_url.get("publicUrl") or public_url.get("public_url") or public_url.get("data", {}).get("publicUrl")
+        return public_url.get("publicUrl") or public_url.get("public_url") or public_url.get("data", {}).get("publicUrl") or ""
     return str(public_url)
 
 

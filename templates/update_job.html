@@ -276,10 +276,11 @@
                 {% if update.photos %}
                     <div class="photo-grid">
                         {% for photo in update.photos %}
-                            <div class="photo-visibility-card">
-                                <a href="{{ photo.url }}" target="_blank" rel="noopener">
-                                    <img src="{{ photo.url }}" alt="Job update photo" loading="lazy" decoding="async">
-                                </a>
+                            {% if photo.url %}
+                                <div class="photo-visibility-card">
+                                    <a href="{{ photo.url }}" target="_blank" rel="noopener">
+                                        <img src="{{ photo.url }}" alt="Job update photo" loading="lazy" decoding="async">
+                                    </a>
                                 {% if can_manage_jobs %}
                                     <form method="post" action="{{ url_for('update_photo_visibility', update_id=photo.id) }}">
                                         <input type="hidden" name="next" value="{{ request.path }}">
@@ -289,7 +290,10 @@
                                         </label>
                                     </form>
                                 {% endif %}
-                            </div>
+                                </div>
+                            {% else %}
+                                <div class="photo-visibility-card muted">No image available</div>
+                            {% endif %}
                         {% endfor %}
                     </div>
                 {% endif %}
