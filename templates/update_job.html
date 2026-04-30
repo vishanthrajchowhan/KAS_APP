@@ -281,15 +281,15 @@
                                     <a href="{{ photo.url }}" target="_blank" rel="noopener">
                                         <img src="{{ photo.url }}" alt="Job update photo" loading="lazy" decoding="async">
                                     </a>
-                                {% if can_manage_jobs %}
-                                    <form method="post" action="{{ url_for('update_photo_visibility', update_id=photo.id) }}">
-                                        <input type="hidden" name="next" value="{{ request.path }}">
-                                        <label class="remember-me-row">
-                                            <input name="client_visible" type="checkbox" value="1" {% if photo.client_visible %}checked{% endif %} onchange="this.form.submit()">
-                                            <span>Visible to client</span>
-                                        </label>
-                                    </form>
-                                {% endif %}
+                                    {% if can_manage_jobs %}
+                                        <form method="post" action="{{ url_for('update_photo_visibility', update_id=photo.id) }}">
+                                            <input type="hidden" name="next" value="{{ request.path }}">
+                                            <label class="remember-me-row">
+                                                <input name="client_visible" type="checkbox" value="1" {% if photo.client_visible %}checked{% endif %} onchange="this.form.submit()">
+                                                <span>Visible to client</span>
+                                            </label>
+                                        </form>
+                                    {% endif %}
                                 </div>
                             {% else %}
                                 <div class="photo-visibility-card muted">No image available</div>
