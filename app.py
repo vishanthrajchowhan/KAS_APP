@@ -955,17 +955,18 @@ def storage_path_for_upload(kind, source_filename, job_id=None, extension=None):
 
 def upload_to_supabase_storage(bucket_name, storage_path, content, content_type):
     client = get_supabase_client()
-    print("Uploading:", storage_path)
+    app.logger.debug("Uploading: %s", storage_path)
     res = client.storage.from_(bucket_name).upload(
         path=storage_path,
         file=content,
         file_options={"content-type": content_type},
     )
-    print("Upload response:", res)
+    app.logger.debug("Upload response: %s", res)
     if isinstance(res, dict) and res.get("error"):
         raise Exception(res["error"])
 
     public_url = client.storage.from_(bucket_name).get_public_url(storage_path)
+    app.logger.debug("Public URL response: %s", public_url)
     if isinstance(public_url, dict):
         return public_url.get("publicUrl") or public_url.get("public_url") or public_url.get("data", {}).get("publicUrl") or ""
     return str(public_url)
@@ -2523,8 +2524,8 @@ def submit_update():
                     )
                 )
             except Exception as exc:
-                app.logger.exception("Failed to upload job photo for job %s", job_id)
-                flash(f"Could not upload photo {file.filename}: {exc}", "error")
+                app.logger.error("UPLOAD ERROR: %s", str(exc))
+                flash(f"Upload failed: {str(exc)}", "error")
 
         for file in valid_receipt_files:
             if not allowed_receipt_file(file.filename):
@@ -2542,8 +2543,8 @@ def submit_update():
                     )
                 )
             except Exception as exc:
-                app.logger.exception("Failed to upload receipt for job %s", job_id)
-                flash(f"Could not upload receipt {file.filename}: {exc}", "error")
+                app.logger.error("UPLOAD ERROR: %s", str(exc))
+                flash(f"Upload failed: {str(exc)}", "error")
 
         if not saved_photos and not saved_receipts and not notes and not job_fields_changed and not task_fields_changed:
             flash("No update was saved. Please add notes, change status, or upload supported files.", "error")
