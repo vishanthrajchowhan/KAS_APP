@@ -1020,7 +1020,12 @@ def media_url(stored_value, bucket_key=None):
     if is_public_url(stored_value):
         return stored_value
     if stored_value.startswith("uploads/"):
-        return url_for("uploaded_file", filename=stored_value.replace("uploads/", "", 1))
+        legacy_name = stored_value.replace("uploads/", "", 1)
+        if (UPLOAD_FOLDER / legacy_name).exists():
+            return url_for("uploaded_file", filename=legacy_name)
+        if bucket_key:
+            return storage_public_url(bucket_key, legacy_name)
+        return url_for("uploaded_file", filename=legacy_name)
     local_file = UPLOAD_FOLDER / stored_value
     if local_file.exists():
         return url_for("uploaded_file", filename=stored_value)
@@ -2753,6 +2758,14 @@ def uploaded_file(filename):
     legacy_name = stored_path.replace("uploads/", "", 1)
     if (UPLOAD_FOLDER / legacy_name).exists():
         return send_from_directory(app.config["UPLOAD_FOLDER"], legacy_name)
+    if update["image_path"] == stored_path or update["image_path"] == filename:
+        public_url = storage_public_url("job_photos", legacy_name)
+        if public_url:
+            return redirect(public_url)
+    if update["receipt_path"] == stored_path or update["receipt_path"] == filename:
+        public_url = storage_public_url("receipts", legacy_name)
+        if public_url:
+            return redirect(public_url)
     return "", 404
 
 
