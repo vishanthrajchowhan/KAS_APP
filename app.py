@@ -1021,6 +1021,9 @@ def media_url(stored_value, bucket_key=None):
         return stored_value
     if stored_value.startswith("uploads/"):
         return url_for("uploaded_file", filename=stored_value.replace("uploads/", "", 1))
+    local_file = UPLOAD_FOLDER / stored_value
+    if local_file.exists():
+        return url_for("uploaded_file", filename=stored_value)
     if bucket_key:
         return storage_public_url(bucket_key, stored_value)
     return stored_value
@@ -2719,10 +2722,10 @@ def uploaded_file(filename):
             SELECT updates.job_id, updates.image_path, updates.receipt_path, updates.client_visible, jobs.assigned_to, jobs.client_id
             FROM updates
             JOIN jobs ON jobs.id = updates.job_id
-            WHERE updates.image_path = ? OR updates.receipt_path = ?
+            WHERE updates.image_path = ? OR updates.receipt_path = ? OR updates.image_path = ? OR updates.receipt_path = ?
             LIMIT 1
             """,
-            (stored_path, stored_path),
+            (stored_path, stored_path, filename, filename),
         ).fetchone()
 
     if update is None:
@@ -2745,7 +2748,12 @@ def uploaded_file(filename):
         flash("You do not have permission to view that file.", "error")
         return redirect(url_for("index"))
 
-    return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
+    if (UPLOAD_FOLDER / filename).exists():
+        return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
+    legacy_name = stored_path.replace("uploads/", "", 1)
+    if (UPLOAD_FOLDER / legacy_name).exists():
+        return send_from_directory(app.config["UPLOAD_FOLDER"], legacy_name)
+    return "", 404
 
 
 @app.cli.command("migrate-local-uploads")
