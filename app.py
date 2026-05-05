@@ -309,24 +309,8 @@ def supabase_storage_configured():
 
 
 def ensure_storage_buckets():
-    global STORAGE_BUCKETS_READY
-    if STORAGE_BUCKETS_READY:
-        return
-    if not supabase_storage_configured():
-        return
-
-    client = get_supabase_client()
-    for bucket_name in SUPABASE_STORAGE_BUCKETS.values():
-        try:
-            try:
-                client.storage.create_bucket(bucket_name, options={"public": True})
-            except TypeError:
-                client.storage.create_bucket(bucket_name, {"public": True})
-        except Exception as exc:
-            message = str(exc).lower()
-            if "already" not in message and "exist" not in message and "duplicate" not in message:
-                app.logger.warning("Could not create Supabase bucket %s: %s", bucket_name, exc)
-    STORAGE_BUCKETS_READY = True
+    # ❌ Disable automatic bucket creation (causes timeout on Render)
+    return
 
 
 def get_postgres_pool():
@@ -955,22 +939,48 @@ def storage_path_for_upload(kind, source_filename, job_id=None, extension=None):
 
 def upload_to_supabase_storage(bucket_name, storage_path, content, content_type):
     client = get_supabase_client()
-    app.logger.debug("Uploading: %s", storage_path)
-    res = client.storage.from_(bucket_name).upload(
-        path=storage_path,
-        file=content,
-        file_options={"content-type": content_type},
-    )
-    app.logger.debug("Upload response: %s", res)
-    if isinstance(res, dict) and res.get("error"):
-        raise Exception(res["error"])
 
-    public_url = client.storage.from_(bucket_name).get_public_url(storage_path)
-    app.logger.debug("Public URL response: %s", public_url)
-    if isinstance(public_url, dict):
-        return public_url.get("publicUrl") or public_url.get("public_url") or public_url.get("data", {}).get("publicUrl") or ""
-    return str(public_url)
+    try:
+        app.logger.info("Uploading: %s", storage_path)
 
+        res = client.storage.from_(bucket_name).upload(
+            path=storage_path,
+            file=content,
+            file_options={
+                "content-type": content_type,
+                "upsert": True  # 🔥 important fix
+            },
+        )
+
+        app.logger.info("Upload response: %s", res)
+
+        # ✅ Safe error handling
+        if isinstance(res, dict) and res.get("error"):
+            error_msg = res["error"].get("message", str(res["error"]))
+            raise Exception(error_msg)
+
+        # ✅ Get public URL safely
+        public_url_data = client.storage.from_(bucket_name).get_public_url(storage_path)
+
+        app.logger.info("Public URL response: %s", public_url_data)
+
+        if isinstance(public_url_data, dict):
+            public_url = (
+                public_url_data.get("publicUrl")
+                or public_url_data.get("public_url")
+                or public_url_data.get("data", {}).get("publicUrl")
+            )
+        else:
+            public_url = public_url_data
+
+        if not public_url:
+            raise Exception("Failed to generate public URL")
+
+        return public_url
+
+    except Exception as e:
+        app.logger.error("UPLOAD FAILED: %s", str(e))
+        raise
 
 def save_upload_to_storage(uploaded_file, bucket_key, kind, job_id=None, compress_images=True):
     if not supabase_storage_configured():
