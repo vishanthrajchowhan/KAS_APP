@@ -948,7 +948,7 @@ def upload_to_supabase_storage(bucket_name, storage_path, content, content_type)
             file=content,
             file_options={
                 "content-type": content_type,
-                "upsert": True  # 🔥 important fix
+                "upsert": "true"  # 🔥 important fix
             },
         )
 
