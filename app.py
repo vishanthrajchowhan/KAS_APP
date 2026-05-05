@@ -948,7 +948,6 @@ def upload_to_supabase_storage(bucket_name, storage_path, content, content_type)
             file=content,
             file_options={
                 "content-type": content_type,
-                "upsert": "true"  # 🔥 important fix
             },
         )
 
@@ -1017,10 +1016,18 @@ def is_public_url(value):
 def storage_public_url(bucket_key, storage_path):
     if not storage_path or not bucket_key or not supabase_storage_configured():
         return ""
-    public_url = get_supabase_client().storage.from_(SUPABASE_STORAGE_BUCKETS[bucket_key]).get_public_url(storage_path)
-    if isinstance(public_url, dict):
-        return public_url.get("publicUrl") or public_url.get("public_url") or public_url.get("data", {}).get("publicUrl") or ""
-    return str(public_url)
+    storage = get_supabase_client().storage.from_(SUPABASE_STORAGE_BUCKETS[bucket_key])
+
+    try:
+        signed_url = storage.create_signed_url(storage_path, 60 * 60 * 24 * 7)
+        if isinstance(signed_url, dict):
+            return signed_url.get("signedUrl") or signed_url.get("signed_url") or signed_url.get("data", {}).get("signedUrl") or ""
+        return str(signed_url)
+    except Exception:
+        public_url = storage.get_public_url(storage_path)
+        if isinstance(public_url, dict):
+            return public_url.get("publicUrl") or public_url.get("public_url") or public_url.get("data", {}).get("publicUrl") or ""
+        return str(public_url)
 
 
 def media_url(stored_value, bucket_key=None):
@@ -1273,7 +1280,7 @@ def group_updates(update_rows):
                     {
                         "id": row["id"],
                         "path": row["image_path"],
-                        "url": row.get("photo_url") or media_url(row["image_path"], "job_photos"),
+                        "url": media_url(row["image_path"], "job_photos") or row.get("photo_url") or "",
                         "client_visible": normalize_bool(row.get("client_visible")),
                     }
                 )
@@ -1281,7 +1288,7 @@ def group_updates(update_rows):
             group_lookup[group_key]["receipts"].append(
                 {
                     "path": row["receipt_path"],
-                    "url": row.get("receipt_url") or media_url(row["receipt_path"], "receipts"),
+                    "url": media_url(row["receipt_path"], "receipts") or row.get("receipt_url") or "",
                     "name": display_file_name(row["receipt_path"]),
                 }
             )
