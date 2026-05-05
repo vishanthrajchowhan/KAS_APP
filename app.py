@@ -4,6 +4,7 @@ from io import BytesIO
 from datetime import datetime, timedelta
 from functools import wraps
 from pathlib import Path
+from urllib.parse import unquote, urlparse
 
 from dotenv import load_dotenv
 from flask import (
@@ -14,6 +15,7 @@ from flask import (
     redirect,
     render_template,
     request,
+    send_file,
     send_from_directory,
     session,
     url_for,
@@ -1013,6 +1015,27 @@ def is_public_url(value):
     return str(value or "").startswith(("http://", "https://"))
 
 
+def supabase_storage_reference_from_url(value):
+    value = str(value or "").strip()
+    if not value:
+        return None, None
+
+    parsed = urlparse(value)
+    path = parsed.path or ""
+    for prefix in ("/storage/v1/object/public/", "/storage/v1/object/sign/"):
+        if prefix in path:
+            storage_reference = path.split(prefix, 1)[1]
+            bucket_name, _, storage_path = storage_reference.partition("/")
+            if not bucket_name or not storage_path:
+                return None, None
+            bucket_key = next((key for key, name in SUPABASE_STORAGE_BUCKETS.items() if name == bucket_name), None)
+            if not bucket_key:
+                return None, None
+            return bucket_key, unquote(storage_path)
+
+    return None, None
+
+
 def storage_public_url(bucket_key, storage_path):
     if not storage_path or not bucket_key or not supabase_storage_configured():
         return ""
@@ -1035,19 +1058,22 @@ def media_url(stored_value, bucket_key=None):
     if not stored_value:
         return ""
     if is_public_url(stored_value):
+        parsed_bucket_key, parsed_storage_path = supabase_storage_reference_from_url(stored_value)
+        if parsed_bucket_key and parsed_storage_path:
+            return url_for("supabase_media", bucket_key=parsed_bucket_key, storage_path=parsed_storage_path)
         return stored_value
     if stored_value.startswith("uploads/"):
         legacy_name = stored_value.replace("uploads/", "", 1)
         if (UPLOAD_FOLDER / legacy_name).exists():
             return url_for("uploaded_file", filename=legacy_name)
         if bucket_key:
-            return storage_public_url(bucket_key, legacy_name)
+            return url_for("supabase_media", bucket_key=bucket_key, storage_path=legacy_name)
         return url_for("uploaded_file", filename=legacy_name)
     local_file = UPLOAD_FOLDER / stored_value
     if local_file.exists():
         return url_for("uploaded_file", filename=stored_value)
     if bucket_key:
-        return storage_public_url(bucket_key, stored_value)
+        return url_for("supabase_media", bucket_key=bucket_key, storage_path=stored_value)
     return stored_value
 
 
@@ -1276,19 +1302,21 @@ def group_updates(update_rows):
 
         if row["image_path"]:
             if not is_client() or normalize_bool(row.get("client_visible")):
+                photo_source = row.get("image_path") or row.get("photo_url") or ""
                 group_lookup[group_key]["photos"].append(
                     {
                         "id": row["id"],
                         "path": row["image_path"],
-                        "url": media_url(row["image_path"], "job_photos") or row.get("photo_url") or "",
+                        "url": media_url(photo_source, "job_photos"),
                         "client_visible": normalize_bool(row.get("client_visible")),
                     }
                 )
         if row["receipt_path"]:
+            receipt_source = row.get("receipt_path") or row.get("receipt_url") or ""
             group_lookup[group_key]["receipts"].append(
                 {
                     "path": row["receipt_path"],
-                    "url": media_url(row["receipt_path"], "receipts") or row.get("receipt_url") or "",
+                    "url": media_url(receipt_source, "receipts"),
                     "name": display_file_name(row["receipt_path"]),
                 }
             )
@@ -2784,6 +2812,61 @@ def uploaded_file(filename):
         if public_url:
             return redirect(public_url)
     return "", 404
+
+
+@app.route("/media/<bucket_key>/<path:storage_path>")
+@login_required
+def supabase_media(bucket_key, storage_path):
+    bucket_name = SUPABASE_STORAGE_BUCKETS.get(bucket_key)
+    if not bucket_name:
+        return "", 404
+
+    with get_db_connection() as conn:
+        update = conn.execute(
+            """
+            SELECT updates.job_id, updates.image_path, updates.photo_url, updates.receipt_path, updates.receipt_url, updates.client_visible, jobs.assigned_to, jobs.client_id
+            FROM updates
+            JOIN jobs ON jobs.id = updates.job_id
+            WHERE updates.image_path = ? OR updates.photo_url = ? OR updates.receipt_path = ? OR updates.receipt_url = ?
+            LIMIT 1
+            """,
+            (storage_path, storage_path, storage_path, storage_path),
+        ).fetchone()
+
+    if update is None:
+        return "", 404
+
+    is_receipt = bucket_key == "receipts"
+    if is_receipt and not can_manage_receipts():
+        return "", 403
+    if not is_receipt and is_client() and not normalize_bool(update["client_visible"]):
+        return "", 403
+
+    fake_job = {
+        "assigned_to": update["assigned_to"],
+        "client_id": update["client_id"],
+    }
+    if not can_view_job(fake_job):
+        return "", 403
+
+    try:
+        storage = get_supabase_client().storage.from_(bucket_name)
+        media_bytes = storage.download(storage_path)
+        if hasattr(media_bytes, "read"):
+            media_bytes = media_bytes.read()
+        if isinstance(media_bytes, dict):
+            media_bytes = media_bytes.get("data") or media_bytes.get("body") or b""
+        if not media_bytes:
+            return "", 404
+    except Exception:
+        return "", 404
+
+    extension = extension_for_file(storage_path)
+    return send_file(
+        BytesIO(media_bytes),
+        mimetype=content_type_for_extension(extension),
+        download_name=display_file_name(storage_path),
+    )
 
 
 @app.cli.command("migrate-local-uploads")
