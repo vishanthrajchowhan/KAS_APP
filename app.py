@@ -1373,6 +1373,9 @@ def can_view_job(job):
     return False
 
 
+
+
+
 def visible_jobs_where():
     if is_admin():
         return "", []
@@ -1433,6 +1436,36 @@ def role_required(*roles):
         return wrapped_view
 
     return decorator
+
+
+@app.route("/_diag")
+@role_required("admin")
+def diagnostics():
+    """Protected diagnostic endpoint to verify Supabase/storage connectivity on the host.
+
+    Returns JSON summarizing whether the Supabase client initializes and whether storage buckets respond.
+    """
+    info = {"client_init": False, "buckets": {}}
+    try:
+        client = get_supabase_client()
+        info["client_init"] = True
+    except Exception as exc:
+        return jsonify({"ok": False, "error": "supabase_init_failed", "detail": str(exc)}), 500
+
+    for key, bucket_name in SUPABASE_STORAGE_BUCKETS.items():
+        try:
+            resp = client.storage.from_(bucket_name).list(path="", limit=1)
+            # resp may be a dict with 'data' or an object; normalize
+            items = []
+            if isinstance(resp, dict):
+                items = resp.get("data") or []
+            elif hasattr(resp, "get"):
+                items = resp.get("data") or []
+            info["buckets"][key] = {"name": bucket_name, "list_ok": True, "sample_count": len(items)}
+        except Exception as exc:
+            info["buckets"][key] = {"name": bucket_name, "list_ok": False, "error": str(exc)}
+
+    return jsonify({"ok": True, "info": info})
 
 
 @app.before_request
