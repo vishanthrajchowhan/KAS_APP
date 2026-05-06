@@ -1,4 +1,5 @@
 import os
+import re
 import time
 import uuid
 from io import BytesIO
@@ -297,10 +298,23 @@ def supabase_key_looks_publishable(supabase_key):
     return normalized_key.startswith("sb_publishable_") or "publishable" in normalized_key
 
 
+def normalized_supabase_key():
+    return re.sub(r"\s+", "", os.environ.get("SUPABASE_KEY", ""))
+
+
+def safe_error_detail(exc):
+    detail = str(exc)
+    for secret in (os.environ.get("SUPABASE_KEY", ""), normalized_supabase_key()):
+        if secret:
+            detail = detail.replace(secret, "[redacted]")
+    detail = re.sub(r"sb_(?:secret|service_role|publishable|anon)_[A-Za-z0-9._-]+", "[redacted]", detail)
+    return detail
+
+
 def get_supabase_client():
     global SUPABASE_CLIENT, SUPABASE_HTTP_CLIENT
     supabase_url = os.environ.get("SUPABASE_URL", "").strip()
-    supabase_key = os.environ.get("SUPABASE_KEY", "").strip()
+    supabase_key = normalized_supabase_key()
     if not supabase_url or not supabase_key:
         raise RuntimeError("SUPABASE_URL and SUPABASE_KEY are required for Supabase Storage uploads.")
     if supabase_key_looks_publishable(supabase_key):
@@ -322,7 +336,7 @@ def get_supabase_client():
 
 
 def supabase_storage_configured():
-    return bool(os.environ.get("SUPABASE_URL", "").strip() and os.environ.get("SUPABASE_KEY", "").strip())
+    return bool(os.environ.get("SUPABASE_URL", "").strip() and normalized_supabase_key())
 
 
 def ensure_storage_buckets():
@@ -1489,7 +1503,7 @@ def diagnostics():
         client = get_supabase_client()
         info["client_init"] = True
     except Exception as exc:
-        return jsonify({"ok": False, "error": "supabase_init_failed", "detail": str(exc)}), 500
+        return jsonify({"ok": False, "error": "supabase_init_failed", "detail": safe_error_detail(exc)}), 500
 
     for key, bucket_name in SUPABASE_STORAGE_BUCKETS.items():
         bucket_info = {"name": bucket_name}
@@ -1510,7 +1524,7 @@ def diagnostics():
                 }
             )
         except Exception as exc:
-            bucket_info.update({"list_ok": False, "list_error": str(exc)})
+            bucket_info.update({"list_ok": False, "list_error": safe_error_detail(exc)})
 
         if key == "job_photos":
             test_path = f"diagnostics/{uuid.uuid4().hex}.txt"
@@ -1528,13 +1542,13 @@ def diagnostics():
                     bucket_info["test_cleanup_ok"] = True
                 except Exception as cleanup_exc:
                     bucket_info["test_cleanup_ok"] = False
-                    bucket_info["test_cleanup_error"] = str(cleanup_exc)
+                    bucket_info["test_cleanup_error"] = safe_error_detail(cleanup_exc)
             except Exception as exc:
                 bucket_info.update(
                     {
                         "test_upload_ok": False,
                         "test_upload_error_type": type(exc).__name__,
-                        "test_upload_error": str(exc),
+                        "test_upload_error": safe_error_detail(exc),
                     }
                 )
 
