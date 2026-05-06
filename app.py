@@ -3641,7 +3641,8 @@ def delete_estimate(estimate_id):
     return redirect(url_for("estimates"))
 
 
-
+@app.route("/test-db")
+def test_db():
     ok, result = test_postgres_connection()
     return (
         jsonify(
@@ -3655,6 +3656,16 @@ def delete_estimate(estimate_id):
         ),
         200 if ok else 500,
     )
+
+
+@app.route("/test-supabase")
+def test_supabase():
+    try:
+        client = get_supabase_client()
+        res = client.table("jobs").select("*").limit(1).execute()
+        return jsonify({"status": "connected", "data": res.data})
+    except Exception as exc:
+        return jsonify({"status": "error", "error": str(exc)}), 500
 
 
 @app.errorhandler(413)
