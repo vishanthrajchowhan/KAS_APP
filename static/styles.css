@@ -471,6 +471,13 @@ h3 {
     font-size: 0.86rem;
 }
 
+.button-compact {
+    min-height: 34px;
+    padding: 7px 10px;
+    border-radius: 10px;
+    font-size: 0.82rem;
+}
+
 .button-full {
     width: 100%;
 }
@@ -897,6 +904,17 @@ input[type="file"] {
     color: var(--primary);
     font-weight: 700;
     overflow-wrap: anywhere;
+}
+
+.receipt-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    align-items: center;
+}
+
+.receipt-row a {
+    min-width: 0;
 }
 
 .table-card {

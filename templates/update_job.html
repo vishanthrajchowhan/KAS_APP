@@ -289,6 +289,10 @@
                                                 <span>Visible to client</span>
                                             </label>
                                         </form>
+                                        <form method="post" action="{{ url_for('delete_photo', update_id=photo.id) }}" onsubmit="return confirm('Delete this photo?');">
+                                            <input type="hidden" name="next" value="{{ request.path }}">
+                                            <button class="button button-danger button-compact" type="submit">Delete photo</button>
+                                        </form>
                                     {% endif %}
                                 </div>
                             {% else %}
@@ -301,9 +305,17 @@
                     <div class="receipt-list">
                         <h3>Receipts / Bills</h3>
                         {% for receipt in update.receipts %}
-                            <a href="{{ receipt.url }}" target="_blank" rel="noopener">
-                                {{ receipt.name }}
-                            </a>
+                            <div class="receipt-row">
+                                <a href="{{ receipt.url }}" target="_blank" rel="noopener">
+                                    {{ receipt.name }}
+                                </a>
+                                {% if can_manage_jobs %}
+                                    <form method="post" action="{{ url_for('delete_receipt', update_id=receipt.id) }}" onsubmit="return confirm('Delete this receipt?');">
+                                        <input type="hidden" name="next" value="{{ request.path }}">
+                                        <button class="button button-danger button-compact" type="submit">Delete</button>
+                                    </form>
+                                {% endif %}
+                            </div>
                         {% endfor %}
                     </div>
                 {% endif %}

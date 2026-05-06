@@ -1,4 +1,5 @@
 import os
+import time
 import uuid
 from io import BytesIO
 from datetime import datetime, timedelta
@@ -1064,6 +1065,24 @@ def storage_public_url(bucket_key, storage_path):
         return str(public_url)
 
 
+def delete_storage_object(bucket_key, stored_path, stored_url=None):
+    storage_path = stored_path
+    if is_public_url(stored_url or ""):
+        parsed_bucket_key, parsed_storage_path = supabase_storage_reference_from_url(stored_url)
+        if parsed_bucket_key == bucket_key and parsed_storage_path:
+            storage_path = parsed_storage_path
+
+    if not storage_path or not supabase_storage_configured():
+        return False
+
+    bucket_name = SUPABASE_STORAGE_BUCKETS.get(bucket_key)
+    if not bucket_name:
+        return False
+
+    get_supabase_client().storage.from_(bucket_name).remove([storage_path])
+    return True
+
+
 def media_url(stored_value, bucket_key=None):
     stored_value = stored_value or ""
     if not stored_value:
@@ -1326,6 +1345,7 @@ def group_updates(update_rows):
             receipt_source = row.get("receipt_path") or row.get("receipt_url") or ""
             group_lookup[group_key]["receipts"].append(
                 {
+                    "id": row["id"],
                     "path": row["receipt_path"],
                     "url": media_url(receipt_source, "receipts"),
                     "name": display_file_name(row["receipt_path"]),
@@ -1456,7 +1476,7 @@ def diagnostics():
 
     Returns JSON summarizing whether the Supabase client initializes and whether storage buckets respond.
     """
-    info = {"client_init": False, "buckets": {}}
+    info = {"client_init": False, "storage_timeout_seconds": SUPABASE_STORAGE_TIMEOUT, "buckets": {}}
     try:
         client = get_supabase_client()
         info["client_init"] = True
@@ -1464,17 +1484,53 @@ def diagnostics():
         return jsonify({"ok": False, "error": "supabase_init_failed", "detail": str(exc)}), 500
 
     for key, bucket_name in SUPABASE_STORAGE_BUCKETS.items():
+        bucket_info = {"name": bucket_name}
         try:
-            resp = client.storage.from_(bucket_name).list(path="", limit=1)
+            start = time.perf_counter()
+            resp = client.storage.from_(bucket_name).list(path="", options={"limit": 1})
             # resp may be a dict with 'data' or an object; normalize
             items = []
             if isinstance(resp, dict):
                 items = resp.get("data") or []
             elif hasattr(resp, "get"):
                 items = resp.get("data") or []
-            info["buckets"][key] = {"name": bucket_name, "list_ok": True, "sample_count": len(items)}
+            bucket_info.update(
+                {
+                    "list_ok": True,
+                    "list_seconds": round(time.perf_counter() - start, 3),
+                    "sample_count": len(items),
+                }
+            )
         except Exception as exc:
-            info["buckets"][key] = {"name": bucket_name, "list_ok": False, "error": str(exc)}
+            bucket_info.update({"list_ok": False, "list_error": str(exc)})
+
+        if key == "job_photos":
+            test_path = f"diagnostics/{uuid.uuid4().hex}.txt"
+            try:
+                start = time.perf_counter()
+                upload_to_supabase_storage(bucket_name, test_path, b"storage diagnostic", "text/plain")
+                bucket_info.update(
+                    {
+                        "test_upload_ok": True,
+                        "test_upload_seconds": round(time.perf_counter() - start, 3),
+                    }
+                )
+                try:
+                    client.storage.from_(bucket_name).remove([test_path])
+                    bucket_info["test_cleanup_ok"] = True
+                except Exception as cleanup_exc:
+                    bucket_info["test_cleanup_ok"] = False
+                    bucket_info["test_cleanup_error"] = str(cleanup_exc)
+            except Exception as exc:
+                bucket_info.update(
+                    {
+                        "test_upload_ok": False,
+                        "test_upload_error_type": type(exc).__name__,
+                        "test_upload_error": str(exc),
+                    }
+                )
+
+        info["buckets"][key] = bucket_info
 
     return jsonify({"ok": True, "info": info})
 
@@ -2790,6 +2846,75 @@ def update_photo_visibility(update_id):
     if next_url.startswith("/"):
         return redirect(next_url)
     return redirect(url_for("update_job", job_id=photo["job_id"]))
+
+
+def delete_update_media(update_id, media_kind):
+    if media_kind == "photo":
+        bucket_key = "job_photos"
+        path_column = "image_path"
+        url_column = "photo_url"
+        missing_message = "Photo not found."
+        success_message = "Photo deleted."
+    else:
+        bucket_key = "receipts"
+        path_column = "receipt_path"
+        url_column = "receipt_url"
+        missing_message = "Receipt not found."
+        success_message = "Receipt deleted."
+
+    next_url = request.form.get("next") or ""
+    storage_delete_failed = False
+    with get_db_connection() as conn:
+        media = conn.execute(
+            f"""
+            SELECT id, job_id, notes, image_path, photo_url, receipt_path, receipt_url
+            FROM updates
+            WHERE id = ? AND {path_column} IS NOT NULL
+            """,
+            (update_id,),
+        ).fetchone()
+        if media is None:
+            flash(missing_message, "error")
+            return redirect(next_url if next_url.startswith("/") else url_for("index"))
+
+        try:
+            delete_storage_object(bucket_key, media[path_column], media[url_column])
+        except Exception as exc:
+            storage_delete_failed = True
+            app.logger.warning("Storage delete failed for update %s: %s", update_id, exc)
+
+        has_notes = bool(media["notes"])
+        has_other_media = bool(media["receipt_path"] if media_kind == "photo" else media["image_path"])
+        if has_notes or has_other_media:
+            conn.execute(
+                f"UPDATE updates SET {path_column} = NULL, {url_column} = NULL WHERE id = ?",
+                (update_id,),
+            )
+        else:
+            conn.execute("DELETE FROM updates WHERE id = ?", (update_id,))
+
+    if storage_delete_failed:
+        flash(f"{success_message} The database record was removed, but storage cleanup needs a retry.", "error")
+    else:
+        flash(success_message, "success")
+
+    if next_url.startswith("/"):
+        return redirect(next_url)
+    return redirect(url_for("update_job", job_id=media["job_id"]))
+
+
+@app.route("/photo/<int:update_id>/delete", methods=("POST",))
+@login_required
+@role_required("admin")
+def delete_photo(update_id):
+    return delete_update_media(update_id, "photo")
+
+
+@app.route("/receipt/<int:update_id>/delete", methods=("POST",))
+@login_required
+@role_required("admin")
+def delete_receipt(update_id):
+    return delete_update_media(update_id, "receipt")
 
 
 @app.route("/delete/<int:job_id>", methods=("POST",))
