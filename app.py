@@ -20,10 +20,11 @@ from flask import (
     session,
     url_for,
 )
+from httpx import TimeoutException
 from psycopg import errors
 from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
-from supabase import create_client
+from supabase import ClientOptions, create_client
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 
@@ -38,6 +39,7 @@ PUBLIC_LOGO_FILE = STATIC_UPLOAD_FOLDER / "company-logo.png"
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
 ALLOWED_LOGO_EXTENSIONS = {"png", "jpg", "jpeg", "webp"}
 ALLOWED_RECEIPT_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp", "pdf", "doc", "docx", "xls", "xlsx"}
+SUPABASE_STORAGE_TIMEOUT = int(os.environ.get("SUPABASE_STORAGE_TIMEOUT", "90"))
 SUPABASE_STORAGE_BUCKETS = {
     "job_photos": "job-photos",
     "receipts": "receipts",
@@ -302,7 +304,11 @@ def get_supabase_client():
     if supabase_key_looks_publishable(supabase_key):
         raise RuntimeError("SUPABASE_KEY must be the secret/service-role key, not the publishable key.")
     if SUPABASE_CLIENT is None:
-        SUPABASE_CLIENT = create_client(supabase_url, supabase_key)
+        SUPABASE_CLIENT = create_client(
+            supabase_url,
+            supabase_key,
+            options=ClientOptions(storage_client_timeout=SUPABASE_STORAGE_TIMEOUT),
+        )
     return SUPABASE_CLIENT
 
 
@@ -979,6 +985,11 @@ def upload_to_supabase_storage(bucket_name, storage_path, content, content_type)
 
         return public_url
 
+    except TimeoutException as exc:
+        app.logger.error("UPLOAD TIMED OUT: %s", str(exc))
+        raise RuntimeError(
+            "Supabase Storage took too long to accept the upload. Please try a smaller photo or try again."
+        ) from exc
     except Exception as e:
         app.logger.error("UPLOAD FAILED: %s", str(e))
         raise
