@@ -21,7 +21,7 @@ from flask import (
     session,
     url_for,
 )
-from httpx import TimeoutException
+from httpx import Client as HttpxClient, TimeoutException
 from psycopg import errors
 from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
@@ -276,6 +276,7 @@ def build_postgres_conninfo():
 POSTGRES_CONNINFO = build_postgres_conninfo()
 POSTGRES_POOL = None
 SUPABASE_CLIENT = None
+SUPABASE_HTTP_CLIENT = None
 STORAGE_BUCKETS_READY = False
 if POSTGRES_CONNINFO:
     POSTGRES_POOL = ConnectionPool(
@@ -297,7 +298,7 @@ def supabase_key_looks_publishable(supabase_key):
 
 
 def get_supabase_client():
-    global SUPABASE_CLIENT
+    global SUPABASE_CLIENT, SUPABASE_HTTP_CLIENT
     supabase_url = os.environ.get("SUPABASE_URL", "").strip()
     supabase_key = os.environ.get("SUPABASE_KEY", "").strip()
     if not supabase_url or not supabase_key:
@@ -305,10 +306,17 @@ def get_supabase_client():
     if supabase_key_looks_publishable(supabase_key):
         raise RuntimeError("SUPABASE_KEY must be the secret/service-role key, not the publishable key.")
     if SUPABASE_CLIENT is None:
+        SUPABASE_HTTP_CLIENT = HttpxClient(
+            timeout=SUPABASE_STORAGE_TIMEOUT,
+            http2=False,
+        )
         SUPABASE_CLIENT = create_client(
             supabase_url,
             supabase_key,
-            options=ClientOptions(storage_client_timeout=SUPABASE_STORAGE_TIMEOUT),
+            options=ClientOptions(
+                storage_client_timeout=SUPABASE_STORAGE_TIMEOUT,
+                httpx_client=SUPABASE_HTTP_CLIENT,
+            ),
         )
     return SUPABASE_CLIENT
 
