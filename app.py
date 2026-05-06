@@ -6,7 +6,7 @@ from io import BytesIO
 from datetime import datetime, timedelta
 from functools import wraps
 from pathlib import Path
-from urllib.parse import unquote, urlparse
+from urllib.parse import quote, unquote, urlparse
 
 from dotenv import load_dotenv
 from flask import (
@@ -337,6 +337,17 @@ def get_supabase_client():
 
 def supabase_storage_configured():
     return bool(os.environ.get("SUPABASE_URL", "").strip() and normalized_supabase_key())
+
+
+def supabase_storage_headers(content_type=None):
+    supabase_key = normalized_supabase_key()
+    headers = {
+        "apikey": supabase_key,
+        "authorization": f"Bearer {supabase_key}",
+    }
+    if content_type:
+        headers["content-type"] = content_type
+    return headers
 
 
 def ensure_storage_buckets():
@@ -969,45 +980,29 @@ def storage_path_for_upload(kind, source_filename, job_id=None, extension=None):
 
 
 def upload_to_supabase_storage(bucket_name, storage_path, content, content_type):
-    client = get_supabase_client()
-
     try:
         app.logger.info("Uploading: %s", storage_path)
-
-        res = client.storage.from_(bucket_name).upload(
-            path=storage_path,
-            file=content,
-            file_options={
-                "content-type": content_type,
-            },
-        )
-
-        app.logger.info("Upload response: %s", res)
-
-        # ✅ Safe error handling
-        if isinstance(res, dict) and res.get("error"):
-            error_msg = res["error"].get("message", str(res["error"]))
-            raise Exception(error_msg)
-
-        # ✅ Get public URL safely
-        public_url_data = client.storage.from_(bucket_name).get_public_url(storage_path)
-
-        app.logger.info("Public URL response: %s", public_url_data)
-
-        if isinstance(public_url_data, dict):
-            public_url = (
-                public_url_data.get("publicUrl")
-                or public_url_data.get("public_url")
-                or public_url_data.get("data", {}).get("publicUrl")
+        supabase_url = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
+        encoded_path = quote(storage_path, safe="/")
+        upload_url = f"{supabase_url}/storage/v1/object/{bucket_name}/{encoded_path}"
+        with HttpxClient(timeout=SUPABASE_STORAGE_TIMEOUT, http2=False) as http_client:
+            response = http_client.post(
+                upload_url,
+                content=content,
+                headers=supabase_storage_headers(content_type),
             )
-        else:
-            public_url = public_url_data
 
-        if not public_url:
-            raise Exception("Failed to generate public URL")
+        if response.status_code >= 400:
+            try:
+                error_detail = response.json()
+            except ValueError:
+                error_detail = response.text
+            safe_detail = safe_error_detail(error_detail)
+            app.logger.error("Upload response %s: %s", response.status_code, safe_detail)
+            raise RuntimeError(f"Supabase upload failed with status {response.status_code}: {safe_detail}")
 
-        return public_url
-
+        app.logger.info("Upload response %s: %s", response.status_code, response.text)
+        return f"{supabase_url}/storage/v1/object/public/{bucket_name}/{encoded_path}"
     except TimeoutException as exc:
         app.logger.error("UPLOAD TIMED OUT: %s", str(exc))
         raise RuntimeError(
@@ -3861,3 +3856,4 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", "5000"))
     is_production = os.environ.get("RENDER") == "true" or os.environ.get("FLASK_ENV") == "production"
     app.run(host="0.0.0.0", port=port, debug=not is_production)
+
