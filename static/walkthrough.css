@@ -1,3 +1,25 @@
+/* CompanyCam-style Walkthrough Recorder Modal */
+
+#walkthrough-modal {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+#walkthrough-modal video {
+  display: block;
+}
+
+#walkthrough-modal button {
+  transition: background 0.2s, transform 0.1s;
+}
+
+#walkthrough-modal button:active {
+  transform: scale(0.95);
+}
+
+#walkthrough-modal button:hover {
+  opacity: 0.9;
+}
+
 /* Walkthrough timeline and UI styles */
 .timeline { 
   display: flex; 
@@ -87,6 +109,22 @@
   object-fit: cover;
 }
 
-#walkthrough-timer {
-  font-family: monospace;
+#wt-timer {
+  font-family: 'Courier New', monospace;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  #walkthrough-modal {
+    font-size: 14px;
+  }
+  
+  #walkthrough-modal button {
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+  
+  .thumb {
+    width: 120px;
+  }
 }

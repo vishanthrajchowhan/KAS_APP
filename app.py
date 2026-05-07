@@ -4121,6 +4121,7 @@ def walkthrough_media(filename):
 def api_walkthrough_upload():
     video = request.files.get("video")
     job_id = request.form.get("job_id")
+    notes = request.form.get("notes", "")
     if video is None or video.filename == "":
         return jsonify({"error": "No video file provided"}), 400
     if not allowed_video_file(video.filename):
@@ -4145,6 +4146,20 @@ def api_walkthrough_upload():
         )
         row = cur.fetchone()
         walkthrough_id = row["id"] if row else None
+
+    # Store user notes in an update if provided
+    if notes and walkthrough_id:
+        try:
+            with get_db_connection() as conn:
+                conn.execute(
+                    """
+                    INSERT INTO updates (job_id, notes, user_id, timestamp, client_visible)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (job_id, f"[Walkthrough #{walkthrough_id}]\n{notes}", g.user_id if hasattr(g, "user_id") else None, now, False),
+                )
+        except Exception:
+            app.logger.exception("Failed to store walkthrough notes")
 
     # Process synchronously for MVP
     try:
