@@ -49,6 +49,20 @@ try:
 except Exception:
     HTML = None
 
+try:
+    import pdfkit
+except Exception:
+    pdfkit = None
+
+try:
+    from reportlab.lib.pagesizes import letter, A4
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, PageBreak
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch
+    ReportLab = True
+except Exception:
+    ReportLab = False
+
 
 BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
@@ -448,8 +462,72 @@ def generate_ai_report(transcript: str, job: dict | None = None) -> dict:
 
 def generate_pdf_from_report(html_content: str, out_pdf_path: str) -> None:
     if HTML is None:
-        raise RuntimeError("WeasyPrint is not installed")
-    HTML(string=html_content).write_pdf(out_pdf_path)
+        # Fallback to pdfkit if WeasyPrint is not available
+        if pdfkit is None:
+            # Final fallback: use reportlab for text-based PDF
+            if not ReportLab:
+                raise RuntimeError("PDF generation unavailable. Install one: 'pip install weasyprint' or 'pip install pdfkit'")
+            generate_pdf_with_reportlab(html_content, out_pdf_path)
+        else:
+            # pdfkit requires wkhtmltopdf binary on PATH
+            try:
+                pdfkit.from_string(html_content, out_pdf_path)
+            except OSError as e:
+                raise RuntimeError(f"pdfkit error (wkhtmltopdf not found): {e}")
+    else:
+        HTML(string=html_content).write_pdf(out_pdf_path)
+
+
+def generate_pdf_with_reportlab(html_content: str, out_pdf_path: str) -> None:
+    """Generate PDF using reportlab as fallback (text-based format)"""
+    from reportlab.lib.pagesizes import letter
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch
+    from reportlab.lib.enums import TA_LEFT, TA_CENTER
+    import re
+    
+    # Extract text content from HTML (basic parsing)
+    content = html_content
+    # Remove script and style tags
+    content = re.sub(r'<script[^>]*>.*?</script>', '', content, flags=re.DOTALL | re.IGNORECASE)
+    content = re.sub(r'<style[^>]*>.*?</style>', '', content, flags=re.DOTALL | re.IGNORECASE)
+    # Remove HTML tags but keep text
+    content = re.sub(r'<h[1-6][^>]*>(.*?)</h[1-6]>', r'<b>\1</b>', content, flags=re.IGNORECASE)
+    content = re.sub(r'<strong[^>]*>(.*?)</strong>', r'<b>\1</b>', content, flags=re.IGNORECASE)
+    content = re.sub(r'<em[^>]*>(.*?)</em>', r'<i>\1</i>', content, flags=re.IGNORECASE)
+    content = re.sub(r'<br\s*/?>', '\n', content, flags=re.IGNORECASE)
+    content = re.sub(r'<[^>]+>', '', content)  # Remove remaining tags
+    content = re.sub(r'\n\s*\n', '\n', content)  # Clean up whitespace
+    
+    # Create PDF
+    doc = SimpleDocTemplate(out_pdf_path, pagesize=letter)
+    story = []
+    styles = getSampleStyleSheet()
+    
+    # Add title
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=18,
+        textColor='#2b6cb0',
+        spaceAfter=12,
+    )
+    story.append(Paragraph('🎥 Walkthrough Report', title_style))
+    story.append(Spacer(1, 0.3*inch))
+    
+    # Add content
+    for line in content.split('\n'):
+        line = line.strip()
+        if not line:
+            story.append(Spacer(1, 0.1*inch))
+        else:
+            p = Paragraph(line, styles['Normal'])
+            story.append(p)
+            story.append(Spacer(1, 0.05*inch))
+    
+    # Build PDF
+    doc.build(story)
 
 
 def supabase_storage_configured():
