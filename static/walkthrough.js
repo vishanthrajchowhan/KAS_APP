@@ -22,6 +22,7 @@ function closeWalkthroughModal() {
     if (recordingActive) stopRecording();
     if (videoStream) videoStream.getTracks().forEach(t => t.stop());
     modal.remove();
+    try { document.body.style.overflow = ''; document.documentElement.style.overflow = ''; } catch (e) {}
   }
 }
 
@@ -40,6 +41,7 @@ async function startRecording(jobId) {
 
     // Header with close button
     const header = document.createElement('div');
+    header.className = 'wt-header';
     header.style.cssText = `
       display: flex; justify-content: space-between; align-items: center;
       padding: 12px 16px; background: #2b6cb0; color: white;
@@ -65,11 +67,10 @@ async function startRecording(jobId) {
     videoElement.muted = true;
     videoElement.playsinline = true;
     videoElement.style.cssText = `
-      width: 100%; 
-      aspect-ratio: 9 / 16;
-      background: #000; 
+      width: 100%;
+      background: #000;
       object-fit: cover;
-      flex: 1;
+      display: block;
     `;
 
     // Hidden canvas for snapshots
@@ -90,8 +91,9 @@ async function startRecording(jobId) {
 
     // Video container
     const videoContainer = document.createElement('div');
+    videoContainer.className = 'wt-video-container';
     videoContainer.style.cssText = `
-      position: relative; flex: 1;
+      position: relative; flex: 1 1 auto; min-height: 0;
     `;
     videoContainer.appendChild(videoElement);
     videoContainer.appendChild(timerDisplay);
@@ -106,6 +108,7 @@ async function startRecording(jobId) {
 
     // Controls area
     const controls = document.createElement('div');
+    controls.className = 'wt-controls';
     controls.style.cssText = `
       padding: 12px 16px; background: white;
       display: flex; gap: 8px; justify-content: center;
@@ -152,10 +155,10 @@ async function startRecording(jobId) {
 
     // Notes area
     const notesSection = document.createElement('div');
+    notesSection.className = 'wt-notes';
     notesSection.style.cssText = `
-      padding: 16px; background: white; 
-      border-top: 1px solid #ddd; max-height: 200px; 
-      overflow-y: auto;
+      padding: 12px 16px; background: white;
+      border-top: 1px solid #ddd; max-height: 160px; overflow-y: auto;
     `;
     const notesLabel = document.createElement('label');
     notesLabel.style.cssText = `
@@ -182,6 +185,8 @@ async function startRecording(jobId) {
     modal.appendChild(controls);
     modal.appendChild(notesSection);
     modal.appendChild(canvasElement);
+    // Prevent background scrolling while modal is open
+    try { document.body.style.overflow = 'hidden'; document.documentElement.style.overflow = 'hidden'; } catch (e) {}
     document.body.appendChild(modal);
 
     // Request camera
@@ -315,7 +320,8 @@ async function uploadWalkthrough(jobId, modal) {
     
     // Cleanup
     if (videoStream) videoStream.getTracks().forEach(t => t.stop());
-    modal.remove();
+    // Close via helper to restore scrolling
+    closeWalkthroughModal();
     
     alert(`✅ Walkthrough uploaded! (ID: ${data.id})\n\nRedirecting to report...`);
     setTimeout(() => {
