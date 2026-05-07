@@ -23,6 +23,7 @@ function closeWalkthroughModal() {
     if (videoStream) videoStream.getTracks().forEach(t => t.stop());
     modal.remove();
     try { document.body.style.overflow = ''; document.documentElement.style.overflow = ''; } catch (e) {}
+    document.body.classList.remove('wt-modal-open');
   }
 }
 
@@ -31,6 +32,8 @@ async function startRecording(jobId) {
     // Create modal container
     const modal = document.createElement('div');
     modal.id = 'walkthrough-modal';
+    const isCompactMobile = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
+    if (isCompactMobile) modal.classList.add('wt-compact-mobile');
     modal.style.cssText = `
       position: fixed; top: 0; left: 0; 
       width: 100%; height: 100%; 
@@ -72,6 +75,13 @@ async function startRecording(jobId) {
       object-fit: cover;
       display: block;
     `;
+    if (isCompactMobile) {
+      videoElement.style.height = 'calc(100vh - 170px)';
+      videoElement.style.maxHeight = 'calc(100vh - 170px)';
+    } else {
+      videoElement.style.aspectRatio = '9 / 16';
+      videoElement.style.flex = '1';
+    }
 
     // Hidden canvas for snapshots
     canvasElement = document.createElement('canvas');
@@ -100,6 +110,7 @@ async function startRecording(jobId) {
 
     // Instructions
     const instructions = document.createElement('div');
+    if (isCompactMobile) instructions.classList.add('wt-hide-on-mobile');
     instructions.style.cssText = `
       padding: 12px 16px; background: #f5f5f5; 
       font-size: 13px; color: #666; text-align: center;
@@ -109,6 +120,7 @@ async function startRecording(jobId) {
     // Controls area
     const controls = document.createElement('div');
     controls.className = 'wt-controls';
+    if (isCompactMobile) controls.classList.add('wt-mobile-controls');
     controls.style.cssText = `
       padding: 12px 16px; background: white;
       display: flex; gap: 8px; justify-content: center;
@@ -152,10 +164,19 @@ async function startRecording(jobId) {
     controls.appendChild(recordBtn);
     controls.appendChild(snapBtn);
     controls.appendChild(doneBtn);
+    if (isCompactMobile) {
+      recordBtn.style.minWidth = '96px';
+      snapBtn.style.minWidth = '84px';
+      doneBtn.style.minWidth = '84px';
+      recordBtn.style.padding = '9px 12px';
+      snapBtn.style.padding = '9px 12px';
+      doneBtn.style.padding = '9px 12px';
+    }
 
     // Notes area
     const notesSection = document.createElement('div');
     notesSection.className = 'wt-notes';
+    if (isCompactMobile) notesSection.classList.add('wt-hide-on-mobile');
     notesSection.style.cssText = `
       padding: 12px 16px; background: white;
       border-top: 1px solid #ddd; max-height: 160px; overflow-y: auto;
@@ -187,6 +208,7 @@ async function startRecording(jobId) {
     modal.appendChild(canvasElement);
     // Prevent background scrolling while modal is open
     try { document.body.style.overflow = 'hidden'; document.documentElement.style.overflow = 'hidden'; } catch (e) {}
+    if (isCompactMobile) document.body.classList.add('wt-modal-open');
     document.body.appendChild(modal);
 
     // Request camera
