@@ -28,6 +28,8 @@
         <h3>🎥 AI Walkthrough</h3>
         <p style="font-size: 13px; color: #666; margin: 8px 0 12px;">Record a video walkthrough of the jobsite while taking photos and notes. AI will transcribe your speech and generate a professional report.</p>
         <button class="button button-primary" onclick="startRecording({{ job.id }})" style="width: 100%; padding: 12px;">▶️ Start Walkthrough</button>
+                <!-- Mobile floating button (visible on small screens) -->
+                <button class="wt-fab" onclick="startRecording({{ job.id }})" aria-label="Start Walkthrough">🎥</button>
       </article>
     </section>
 

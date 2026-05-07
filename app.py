@@ -33,6 +33,7 @@ import subprocess
 import tempfile
 import shutil
 import json
+import threading
 
 try:
     import cv2
@@ -4239,13 +4240,33 @@ def api_walkthrough_upload():
         except Exception:
             app.logger.exception("Failed to store walkthrough notes")
 
-    # Process synchronously for MVP
+    # Start background processing so upload returns quickly on mobile
     try:
-        process_walkthrough(walkthrough_id, save_path)
+        if walkthrough_id:
+            t = threading.Thread(target=process_walkthrough, args=(walkthrough_id, save_path), daemon=True)
+            t.start()
     except Exception as exc:
-        app.logger.exception("Walkthrough processing failed: %s", exc)
+        app.logger.exception("Failed to start background walkthrough processing: %s", exc)
 
     return jsonify({"id": walkthrough_id, "video_url": url_for("walkthrough_media", filename=unique_name)}), 201
+
+
+@app.route("/api/walkthroughs/<int:walkthrough_id>/status")
+@login_required
+def api_walkthrough_status(walkthrough_id: int):
+    """Return basic status for a walkthrough: whether transcript and pdf are available."""
+    with get_db_connection() as conn:
+        row = conn.execute("SELECT id, transcript, pdf_url, created_at FROM walkthroughs WHERE id = ?", (walkthrough_id,)).fetchone()
+        if not row:
+            return jsonify({"ok": False, "error": "not_found"}), 404
+        status = {
+            "ok": True,
+            "id": row["id"],
+            "transcript_available": bool(row.get("transcript")),
+            "pdf_available": bool(row.get("pdf_url")),
+            "created_at": row.get("created_at"),
+        }
+    return jsonify(status)
 
 
 def process_walkthrough(walkthrough_id: int, video_path: Path) -> None:

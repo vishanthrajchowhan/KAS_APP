@@ -185,9 +185,10 @@ async function startRecording(jobId) {
     document.body.appendChild(modal);
 
     // Request camera
-    const constraints = { 
+    // Use lower resolution and frame rate for mobile performance
+    const constraints = {
       audio: { echoCancellation: true, noiseSuppression: true },
-      video: { facingMode: 'environment', width: { ideal: 1280 } }
+      video: { facingMode: 'environment', width: { ideal: 720 }, height: { ideal: 1280 }, frameRate: { ideal: 24 } }
     };
     videoStream = await navigator.mediaDevices.getUserMedia(constraints);
     videoElement.srcObject = videoStream;
@@ -204,7 +205,14 @@ async function startRecording(jobId) {
 
     recordedChunks = [];
     snapshots = [];
-    mediaRecorder = new MediaRecorder(videoStream, { mimeType });
+    // Lower bitrate to reduce upload size and speed up mobile uploads
+    const recorderOptions = { mimeType };
+    try {
+      recorderOptions.bitsPerSecond = 900000; // ~0.9 Mbps
+    } catch (e) {
+      // ignore
+    }
+    mediaRecorder = new MediaRecorder(videoStream, recorderOptions);
     mediaRecorder.ondataavailable = (e) => { 
       if (e.data && e.data.size > 0) recordedChunks.push(e.data); 
     };
@@ -228,7 +236,35 @@ async function startRecording(jobId) {
     };
 
   } catch (err) {
-    alert('Camera error: ' + err.message);
+    // If getUserMedia or MediaRecorder not supported (e.g., some iOS browsers), provide a file-input fallback
+    console.warn('Camera/MediaRecorder error:', err);
+    const fallback = confirm('Camera recording is not available in this browser. Would you like to upload a recorded video file from your device instead?');
+    if (fallback) {
+      const fileInput = document.createElement('input');
+      fileInput.type = 'file';
+      fileInput.accept = 'video/*';
+      fileInput.capture = 'environment';
+      fileInput.onchange = async (ev) => {
+        const file = ev.target.files[0];
+        if (!file) return;
+        try {
+          alert('📤 Uploading selected video...');
+          const fd = new FormData();
+          fd.append('video', file, file.name);
+          fd.append('job_id', jobId);
+          const res = await fetch('/api/walkthroughs/upload', { method: 'POST', body: fd });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Upload failed');
+          alert('✅ Walkthrough uploaded via file input. Redirecting...');
+          window.location.href = `/walkthroughs/${data.id}`;
+        } catch (e) {
+          alert('Upload failed: ' + e.message);
+        }
+      };
+      fileInput.click();
+    } else {
+      alert('Camera error: ' + err.message);
+    }
     console.error('Camera access error:', err);
   }
 }
