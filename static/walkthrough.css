@@ -1,0 +1,6 @@
+/* Minimal styles for walkthrough timeline */
+.timeline { display:flex; gap:12px; flex-wrap:wrap; }
+.thumb { position:relative; width:160px }
+.thumb img { width:100%; height:auto; border:1px solid #ddd }
+.thumb .ts { position:absolute; right:6px; bottom:6px; background:rgba(0,0,0,0.6); color:#fff; padding:2px 6px; font-size:12px; border-radius:4px }
+.btn { display:inline-block; padding:8px 12px; background:#2b6cb0; color:#fff; text-decoration:none; border-radius:4px }

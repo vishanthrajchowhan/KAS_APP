@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container">
+  <h2>Walkthrough Report - #{{ walkthrough.id }}</h2>
+  <p><strong>Job:</strong> {{ walkthrough.job_id }}</p>
+  <p><strong>Created:</strong> {{ walkthrough.created_at }}</p>
+  <a class="btn" href="{{ url_for('download_walkthrough_pdf', walkthrough_id=walkthrough.id) }}">Download PDF</a>
+
+  <h3>AI Summary</h3>
+  <pre>{{ ai | tojson(indent=2) }}</pre>
+
+  <h3>Transcript</h3>
+  <pre style="white-space: pre-wrap;">{{ transcript }}</pre>
+
+  <h3>Timeline</h3>
+  <div id="timeline" class="timeline">
+    {% for f in frames %}
+      <div class="thumb">
+        <img src="{{ f.frame_url }}" alt="frame-{{ loop.index }}"/>
+        <div class="ts">{{ f.timestamp_seconds }}s</div>
+      </div>
+    {% else %}
+      <p>No frames extracted.</p>
+    {% endfor %}
+  </div>
+</div>
+<script src="{{ url_for('static', filename='walkthrough.js') }}"></script>
+<link rel="stylesheet" href="{{ url_for('static', filename='walkthrough.css') }}">
+{% endblock %}

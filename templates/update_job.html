@@ -22,6 +22,10 @@
             </div>
         {% endif %}
     </div>
+    <div class="walkthrough-actions" style="margin-top:12px">
+        <button class="button button-primary" onclick="startRecording({{ job.id }})">Start Walkthrough</button>
+        <button class="button" onclick="stopRecording()">Stop Walkthrough</button>
+    </div>
 
     <section class="analytics-grid" aria-label="Construction workspace">
         <article class="panel">
@@ -55,6 +59,9 @@
             </div>
         </article>
     </section>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='walkthrough.css') }}">
+    <script src="{{ url_for('static', filename='walkthrough.js') }}"></script>
 
     {% if can_edit_job %}
         <form class="form-card" method="post" action="{{ url_for('submit_update') }}" enctype="multipart/form-data">
