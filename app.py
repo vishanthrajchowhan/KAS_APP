@@ -302,6 +302,16 @@ def normalized_supabase_key():
     return re.sub(r"\s+", "", os.environ.get("SUPABASE_KEY", ""))
 
 
+def normalized_supabase_url():
+    raw_url = os.environ.get("SUPABASE_URL", "").strip()
+    if not raw_url:
+        return ""
+    parsed_url = urlparse(raw_url)
+    if not parsed_url.scheme or not parsed_url.netloc:
+        return raw_url.rstrip("/")
+    return f"{parsed_url.scheme}://{parsed_url.netloc}"
+
+
 def safe_error_detail(exc):
     detail = str(exc)
     for secret in (os.environ.get("SUPABASE_KEY", ""), normalized_supabase_key()):
@@ -313,7 +323,7 @@ def safe_error_detail(exc):
 
 def get_supabase_client():
     global SUPABASE_CLIENT, SUPABASE_HTTP_CLIENT
-    supabase_url = os.environ.get("SUPABASE_URL", "").strip()
+    supabase_url = normalized_supabase_url()
     supabase_key = normalized_supabase_key()
     if not supabase_url or not supabase_key:
         raise RuntimeError("SUPABASE_URL and SUPABASE_KEY are required for Supabase Storage uploads.")
@@ -336,7 +346,7 @@ def get_supabase_client():
 
 
 def supabase_storage_configured():
-    return bool(os.environ.get("SUPABASE_URL", "").strip() and normalized_supabase_key())
+    return bool(normalized_supabase_url() and normalized_supabase_key())
 
 
 def supabase_storage_headers(content_type=None):
@@ -982,7 +992,7 @@ def storage_path_for_upload(kind, source_filename, job_id=None, extension=None):
 def upload_to_supabase_storage(bucket_name, storage_path, content, content_type):
     try:
         app.logger.info("Uploading: %s", storage_path)
-        supabase_url = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
+        supabase_url = normalized_supabase_url()
         encoded_path = quote(storage_path, safe="/")
         upload_url = f"{supabase_url}/storage/v1/object/{bucket_name}/{encoded_path}"
         with HttpxClient(timeout=SUPABASE_STORAGE_TIMEOUT, http2=False) as http_client:
