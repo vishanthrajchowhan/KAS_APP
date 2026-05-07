@@ -8,6 +8,38 @@ let videoStream;
 let videoElement;
 let canvasElement;
 let snapshots = [];
+let currentFacingMode = 'environment';
+
+function buildVideoConstraints(facingMode, useExact = false) {
+  const facing = useExact ? { exact: facingMode } : { ideal: facingMode };
+  return {
+    audio: { echoCancellation: true, noiseSuppression: true },
+    video: {
+      facingMode: facing,
+      width: { ideal: 1280 },
+      height: { ideal: 720 },
+      frameRate: { ideal: 24, max: 30 }
+    }
+  };
+}
+
+async function startCameraStream(preferredFacingMode) {
+  const attempts = [
+    () => navigator.mediaDevices.getUserMedia(buildVideoConstraints(preferredFacingMode, true)),
+    () => navigator.mediaDevices.getUserMedia(buildVideoConstraints(preferredFacingMode, false)),
+    () => navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true }, video: true })
+  ];
+
+  let lastError = null;
+  for (const attempt of attempts) {
+    try {
+      return await attempt();
+    } catch (e) {
+      lastError = e;
+    }
+  }
+  throw lastError || new Error('Unable to access camera');
+}
 
 function formatTime(seconds) {
   const h = Math.floor(seconds / 3600);
@@ -72,13 +104,11 @@ async function startRecording(jobId) {
     videoElement.style.cssText = `
       width: 100%;
       background: #000;
-      object-fit: cover;
+      object-fit: contain;
       display: block;
+      height: 100%;
     `;
-    if (isCompactMobile) {
-      videoElement.style.height = 'calc(100vh - 170px)';
-      videoElement.style.maxHeight = 'calc(100vh - 170px)';
-    } else {
+    if (!isCompactMobile) {
       videoElement.style.aspectRatio = '9 / 16';
       videoElement.style.flex = '1';
     }
@@ -148,6 +178,16 @@ async function startRecording(jobId) {
     `;
     snapBtn.onclick = () => takeSnapshot();
 
+    // Camera switch button
+    const cameraBtn = document.createElement('button');
+    cameraBtn.id = 'wt-camera-btn';
+    cameraBtn.textContent = '🔄 Camera';
+    cameraBtn.style.cssText = `
+      padding: 10px 14px; background: #6d4c41; color: white;
+      border: none; border-radius: 4px; cursor: pointer;
+      font-weight: bold; font-size: 14px;
+    `;
+
     // Done button
     const doneBtn = document.createElement('button');
     doneBtn.textContent = '✓ Done';
@@ -163,13 +203,16 @@ async function startRecording(jobId) {
 
     controls.appendChild(recordBtn);
     controls.appendChild(snapBtn);
+    controls.appendChild(cameraBtn);
     controls.appendChild(doneBtn);
     if (isCompactMobile) {
       recordBtn.style.minWidth = '96px';
       snapBtn.style.minWidth = '84px';
+      cameraBtn.style.minWidth = '92px';
       doneBtn.style.minWidth = '84px';
       recordBtn.style.padding = '9px 12px';
       snapBtn.style.padding = '9px 12px';
+      cameraBtn.style.padding = '9px 12px';
       doneBtn.style.padding = '9px 12px';
     }
 
@@ -211,14 +254,34 @@ async function startRecording(jobId) {
     if (isCompactMobile) document.body.classList.add('wt-modal-open');
     document.body.appendChild(modal);
 
-    // Request camera
-    // Use lower resolution and frame rate for mobile performance
-    const constraints = {
-      audio: { echoCancellation: true, noiseSuppression: true },
-      video: { facingMode: 'environment', width: { ideal: 720 }, height: { ideal: 1280 }, frameRate: { ideal: 24 } }
-    };
-    videoStream = await navigator.mediaDevices.getUserMedia(constraints);
+    // Request camera with robust fallback and preferred rear camera
+    currentFacingMode = 'environment';
+    videoStream = await startCameraStream(currentFacingMode);
     videoElement.srcObject = videoStream;
+    videoElement.onloadedmetadata = () => {
+      if (videoElement.videoWidth && videoElement.videoHeight) {
+        videoElement.style.aspectRatio = `${videoElement.videoWidth} / ${videoElement.videoHeight}`;
+      }
+      const track = videoStream && videoStream.getVideoTracks ? videoStream.getVideoTracks()[0] : null;
+      const settings = track && track.getSettings ? track.getSettings() : null;
+      const activeFacing = settings && settings.facingMode ? settings.facingMode : currentFacingMode;
+      videoElement.classList.toggle('wt-user-camera', activeFacing === 'user');
+    };
+
+    cameraBtn.onclick = async () => {
+      try {
+        if (recordingActive) {
+          alert('Stop recording before switching camera.');
+          return;
+        }
+        currentFacingMode = currentFacingMode === 'environment' ? 'user' : 'environment';
+        if (videoStream) videoStream.getTracks().forEach(t => t.stop());
+        videoStream = await startCameraStream(currentFacingMode);
+        videoElement.srcObject = videoStream;
+      } catch (e) {
+        alert('Unable to switch camera: ' + e.message);
+      }
+    };
 
     // Setup recording
     let mimeType = 'video/webm';

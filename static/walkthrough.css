@@ -19,9 +19,9 @@
 #walkthrough-modal video {
   display: block;
   width: 100%;
-  height: auto;
-  max-height: calc(100vh - 220px);
-  object-fit: cover;
+  height: 100%;
+  max-height: 100%;
+  object-fit: contain;
 }
 
 #walkthrough-modal button {
@@ -91,7 +91,10 @@
   position: relative;
   flex: 1 1 auto;
   min-height: 0; /* allow flex children to shrink on mobile */
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
   overflow: hidden;
 }
 
@@ -195,8 +198,8 @@
 
   #walkthrough-modal.wt-compact-mobile video {
     width: 100%;
-    height: calc(100vh - 168px) !important;
-    max-height: calc(100vh - 168px) !important;
+    height: 100% !important;
+    max-height: 100% !important;
   }
 
   #walkthrough-modal.wt-compact-mobile .wt-controls {
