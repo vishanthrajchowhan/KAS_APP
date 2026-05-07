@@ -837,6 +837,121 @@ input[type="file"] {
     position: relative;
 }
 
+.timeline-day {
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr);
+    gap: 14px;
+}
+
+.timeline-day-rail {
+    position: relative;
+    display: flex;
+    justify-content: center;
+}
+
+.timeline-day-rail::before {
+    content: "";
+    position: absolute;
+    top: 22px;
+    bottom: -38px;
+    width: 2px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--primary) 18%, var(--line));
+}
+
+.timeline-day:last-child .timeline-day-rail::before {
+    bottom: 22px;
+}
+
+.timeline-day-rail span {
+    position: relative;
+    z-index: 1;
+    width: 16px;
+    height: 16px;
+    margin-top: 28px;
+    border: 3px solid var(--surface);
+    border-radius: 999px;
+    background: var(--primary);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 22%, transparent);
+}
+
+.timeline-day-card {
+    overflow: hidden;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+}
+
+.timeline-day-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 20px 22px;
+    border-bottom: 1px solid var(--line);
+    background: color-mix(in srgb, var(--surface-2) 68%, var(--surface));
+}
+
+.timeline-day-header h3 {
+    margin: 2px 0 0;
+    font-size: 1.2rem;
+}
+
+.timeline-day-stats {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.timeline-day-stats span {
+    padding: 7px 10px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--surface);
+    color: var(--muted);
+    font-size: 0.8rem;
+    font-weight: 800;
+}
+
+.timeline-entry-list {
+    display: grid;
+}
+
+.timeline-entry {
+    padding: 20px 22px;
+}
+
+.timeline-entry + .timeline-entry {
+    border-top: 1px solid var(--line);
+}
+
+.timeline-entry-meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.timeline-entry-meta time {
+    color: var(--ink);
+    font-size: 0.95rem;
+    font-weight: 800;
+}
+
+.timeline-entry-meta span {
+    padding: 5px 8px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--primary) 10%, var(--surface));
+    color: var(--primary);
+    font-size: 0.72rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
 .timeline-card {
     display: grid;
     grid-template-columns: 20px 1fr;
@@ -876,7 +991,7 @@ input[type="file"] {
 
 .photo-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(150px, 190px));
+    grid-template-columns: repeat(auto-fill, minmax(142px, 174px));
     align-items: start;
     gap: 14px;
     margin-top: 12px;
@@ -1696,6 +1811,28 @@ tbody tr:last-child td {
     .timeline-card {
         grid-template-columns: 14px 1fr;
         gap: 8px;
+    }
+
+    .timeline-day {
+        grid-template-columns: 1fr;
+    }
+
+    .timeline-day-rail {
+        display: none;
+    }
+
+    .timeline-day-header {
+        align-items: flex-start;
+        flex-direction: column;
+        padding: 18px;
+    }
+
+    .timeline-day-stats {
+        justify-content: flex-start;
+    }
+
+    .timeline-entry {
+        padding: 18px;
     }
 
     .photo-grid {
@@ -2557,7 +2694,7 @@ body {
 .photo-visibility-card {
     display: grid;
     gap: 8px;
-    max-width: 190px;
+    max-width: 174px;
 }
 
 .photo-visibility-card .remember-me-row {

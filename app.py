@@ -1348,8 +1348,21 @@ def group_updates(update_rows):
     for row in update_rows:
         group_key = row["update_group"] or f"{row['timestamp']}|{row['notes'] or ''}"
         if group_key not in group_lookup:
+            timestamp = row["timestamp"] or ""
+            try:
+                parsed_timestamp = datetime.fromisoformat(timestamp)
+                date_key = parsed_timestamp.date().isoformat()
+                display_date = parsed_timestamp.strftime("%b %d, %Y")
+                display_time = parsed_timestamp.strftime("%I:%M %p").lstrip("0")
+            except (TypeError, ValueError):
+                date_key = timestamp[:10] if timestamp else "undated"
+                display_date = date_key
+                display_time = timestamp[11:16] if len(timestamp) >= 16 else ""
             group_lookup[group_key] = {
-                "timestamp": row["timestamp"],
+                "timestamp": timestamp,
+                "date_key": date_key,
+                "display_date": display_date,
+                "display_time": display_time,
                 "notes": row["notes"],
                 "author_role": row["author_role"],
                 "photos": [],
@@ -1382,6 +1395,29 @@ def group_updates(update_rows):
     if is_client():
         grouped = [entry for entry in grouped if entry["notes"] or entry["photos"]]
     return grouped
+
+
+def group_updates_by_day(updates):
+    days = []
+    day_lookup = {}
+    for update in updates:
+        date_key = update.get("date_key") or "undated"
+        if date_key not in day_lookup:
+            day_lookup[date_key] = {
+                "date_key": date_key,
+                "display_date": update.get("display_date") or date_key,
+                "updates": [],
+                "photo_count": 0,
+                "receipt_count": 0,
+            }
+            days.append(day_lookup[date_key])
+        day = day_lookup[date_key]
+        day["updates"].append(update)
+        day["photo_count"] += len(update.get("photos") or [])
+        day["receipt_count"] += len(update.get("receipts") or [])
+    for day in days:
+        day["update_count"] = len(day["updates"])
+    return days
 
 
 def get_job_or_404(job_id):
@@ -2475,12 +2511,14 @@ def update_job(job_id):
             sync_job_tasks(conn, job_id, split_services(job.get("service_type")))
             tasks = fetch_job_tasks(conn, job_id)
     updates = group_updates(update_rows)
+    update_days = group_updates_by_day(updates)
 
     return render_template(
         "update_job.html",
         job=job,
         selected_service_types=split_services(job.get("service_type")),
         updates=updates,
+        update_days=update_days,
         statuses=STATUSES,
         service_types=JOB_SERVICE_TYPES,
         pre_construction_statuses=PRE_CONSTRUCTION_STATUSES,
@@ -2541,11 +2579,13 @@ def job_progress(job_id):
             sync_job_tasks(conn, job_id, split_services(job.get("service_type")))
             tasks = fetch_job_tasks(conn, job_id)
     updates = group_updates(update_rows)
+    update_days = group_updates_by_day(updates)
 
     return render_template(
         "job_progress.html",
         job=job,
         updates=updates,
+        update_days=update_days,
         progress=progress,
         can_view_financials=can_view_financials(),
         can_manage_receipts=can_manage_receipts(),
