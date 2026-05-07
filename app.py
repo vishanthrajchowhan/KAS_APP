@@ -4235,30 +4235,54 @@ def process_walkthrough(walkthrough_id: int, video_path: Path) -> None:
                 )
 
         # Render PDF report
-        html = render_template("walkthrough_report.html", transcript=transcript, ai=ai_json, frames=frames)
+        with get_db_connection() as conn:
+            wt_row = conn.execute("SELECT created_by, created_at FROM walkthroughs WHERE id = ?", (walkthrough_id,)).fetchone()
+        created_by_id = wt_row.get("created_by") if wt_row else None
+        created_at_str = wt_row.get("created_at") if wt_row else datetime.now().isoformat(timespec="seconds")
+        created_by_name = "Crew Member"
+        if created_by_id:
+            with get_db_connection() as conn:
+                user_row = conn.execute("SELECT name FROM users WHERE id = ?", (created_by_id,)).fetchone()
+                created_by_name = user_row["name"] if user_row else "Crew Member"
+
+        html = render_template(
+            "walkthrough_report.html",
+            transcript=transcript,
+            ai=ai_json,
+            frames=frames,
+            created_at=created_at_str,
+            created_by=created_by_name,
+        )
         reports_dir = UPLOAD_FOLDER / "reports"
         reports_dir.mkdir(parents=True, exist_ok=True)
         out_pdf = reports_dir / f"walkthrough_{walkthrough_id}.pdf"
         try:
+            if HTML is None:
+                raise RuntimeError("WeasyPrint (HTML) not installed. Cannot generate PDF. Install via: pip install weasyprint")
+            app.logger.info("Generating PDF for walkthrough %s...", walkthrough_id)
             generate_pdf_from_report(html, str(out_pdf))
+            app.logger.info("PDF generated successfully: %s", out_pdf)
             pdf_url = str(out_pdf)
             # Upload PDF to Supabase reports bucket if configured
             if supabase_storage_configured():
                 try:
+                    app.logger.info("Uploading PDF to Supabase...")
                     up_pdf = upload_local_file_to_storage(out_pdf, "reports", "report", job_id=job_id)
                     pdf_url = up_pdf.get("url")
+                    app.logger.info("PDF uploaded to Supabase: %s", pdf_url)
                 except Exception:
-                    app.logger.exception("Failed to upload PDF to Supabase")
+                    app.logger.exception("Failed to upload PDF to Supabase, keeping local URL")
 
             with get_db_connection() as conn:
                 conn.execute("UPDATE walkthroughs SET pdf_url = ? WHERE id = ?", (pdf_url, walkthrough_id))
                 now = datetime.now().isoformat(timespec="seconds")
                 conn.execute(
                     "INSERT INTO walkthrough_reports (walkthrough_id, report_text, pdf_url, created_by, created_at) VALUES (?, ?, ?, ?, ?)",
-                    (walkthrough_id, report_text, pdf_url, g.user_id if hasattr(g, "user_id") else None, now),
+                    (walkthrough_id, report_text, pdf_url, created_by_id, now),
                 )
-        except Exception:
-            app.logger.exception("PDF generation failed")
+            app.logger.info("Walkthrough %s completed successfully", walkthrough_id)
+        except Exception as e:
+            app.logger.exception("PDF generation failed for walkthrough %s: %s", walkthrough_id, e)
     finally:
         shutil.rmtree(str(tmpdir), ignore_errors=True)
 

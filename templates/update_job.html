@@ -22,10 +22,17 @@
             </div>
         {% endif %}
     </div>
-    <div class="walkthrough-actions" style="margin-top:12px">
-        <button class="button button-primary" onclick="startRecording({{ job.id }})">Start Walkthrough</button>
-        <button class="button" onclick="stopRecording()">Stop Walkthrough</button>
-    </div>
+
+    <section class="analytics-grid" style="margin-top: 20px;">
+      <article class="panel">
+        <h3>🎥 AI Walkthrough</h3>
+        <p style="font-size: 13px; color: #666; margin: 8px 0 12px;">Record a video walkthrough of the jobsite. AI will transcribe your speech and generate a professional report with photos and insights.</p>
+        <div class="walkthrough-actions">
+          <button class="button button-primary" onclick="startRecording({{ job.id }})">▶️ Start Walkthrough</button>
+          <button class="button" onclick="stopRecording()">⏹️ Stop & Upload</button>
+        </div>
+      </article>
+    </section>
 
     <section class="analytics-grid" aria-label="Construction workspace">
         <article class="panel">
