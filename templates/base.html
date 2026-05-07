@@ -97,6 +97,8 @@
 
                     <div class="topbar-right">
                         <button class="icon-button" type="button" id="theme-toggle" aria-label="Toggle dark mode">◐</button>
+                        <button class="icon-button" type="button" id="install-header-btn" title="Install app">⬇️</button>
+                        <button class="icon-button" type="button" id="install-diagnostics-btn" title="PWA Diagnostics">🔍</button>
 
                         <div class="notification-menu" id="notification-menu">
                             <button class="icon-button notification-dot{% if notification_count %} has-unread{% endif %}" type="button" id="notification-trigger" aria-expanded="false" aria-label="Open notifications">
@@ -227,6 +229,28 @@
         <button class="button" type="button" id="ios-tip-dismiss">Got it</button>
     </div>
 
+    <!-- Floating Install FAB (visible on mobile) -->
+    <button id="install-fab" class="install-fab" hidden title="Install app">⬇️</button>
+
+    <!-- PWA Diagnostics Modal -->
+    <div id="pwa-diagnostics-modal" class="pwa-modal" hidden aria-hidden="true">
+        <div class="pwa-modal-panel">
+            <header>
+                <strong>PWA Diagnostics</strong>
+                <button id="pwa-diagnostics-close" class="icon-button">✕</button>
+            </header>
+            <div id="pwa-diagnostics-body">
+                <p>Running checks…</p>
+                <pre id="pwa-diagnostics-output" style="white-space:pre-wrap; font-size:13px;"> </pre>
+            </div>
+            <footer>
+                <button id="pwa-diagnostics-refresh" class="button">Run checks</button>
+                <button id="pwa-diagnostics-copy" class="button">Copy JSON</button>
+                <button id="pwa-diagnostics-close-2" class="button">Close</button>
+            </footer>
+        </div>
+    </div>
+
     <script>
     (function () {
         const body = document.body;
@@ -238,6 +262,7 @@
         const notificationTrigger = document.getElementById("notification-trigger");
         const notificationMenu = document.getElementById("notification-menu");
         const themeToggle = document.getElementById("theme-toggle");
+        const installHeaderBtn = document.getElementById("install-header-btn");
         const loadingOverlay = document.getElementById("loading-overlay");
         const installCta = document.getElementById("install-cta");
         const installBtn = document.getElementById("install-btn");
@@ -491,6 +516,128 @@
                 hideInstallPrompts();
             });
         }
+
+        if (installHeaderBtn) {
+            installHeaderBtn.addEventListener('click', async function () {
+                // If we have a deferred prompt (Android/Chrome) show it
+                if (deferredInstallPrompt) {
+                    deferredInstallPrompt.prompt();
+                    try { await deferredInstallPrompt.userChoice; } catch (e) {}
+                    deferredInstallPrompt = null;
+                    hideInstallPrompts();
+                    return;
+                }
+
+                // If iOS, show the iOS install tip
+                if (isIos) {
+                    if (iosInstallTip) iosInstallTip.hidden = false;
+                    return;
+                }
+
+                // Otherwise show the install CTA if available
+                if (installCta) {
+                    installCta.hidden = false;
+                    if (installBtn) installBtn.disabled = !deferredInstallPrompt;
+                }
+            });
+        }
+
+        // Floating FAB install button
+        const installFab = document.getElementById('install-fab');
+        if (installFab) {
+            // Show FAB when install CTA would be shown on mobile
+            function updateFabVisibility() {
+                const shouldShow = !supportsStandalone && !installDismissed && !isIos && !!deferredInstallPrompt;
+                installFab.hidden = !shouldShow;
+            }
+            installFab.addEventListener('click', async function () {
+                if (deferredInstallPrompt) {
+                    deferredInstallPrompt.prompt();
+                    try { await deferredInstallPrompt.userChoice; } catch (e) {}
+                    deferredInstallPrompt = null;
+                    hideInstallPrompts();
+                    installFab.hidden = true;
+                    return;
+                }
+                // fallback: show CTA or iOS tip
+                if (isIos && iosInstallTip) iosInstallTip.hidden = false;
+                if (installCta) installCta.hidden = false;
+            });
+            // update when prompt arrives
+            window.addEventListener('beforeinstallprompt', function () { updateFabVisibility(); });
+            // initial state
+            setTimeout(updateFabVisibility, 300);
+        }
+
+        // PWA diagnostics handlers
+        const diagnosticsBtn = document.getElementById('install-diagnostics-btn');
+        const diagnosticsModal = document.getElementById('pwa-diagnostics-modal');
+        const diagnosticsClose = document.getElementById('pwa-diagnostics-close');
+        const diagnosticsClose2 = document.getElementById('pwa-diagnostics-close-2');
+        const diagnosticsRefresh = document.getElementById('pwa-diagnostics-refresh');
+        const diagnosticsCopy = document.getElementById('pwa-diagnostics-copy');
+        const diagnosticsOutput = document.getElementById('pwa-diagnostics-output');
+
+        function showDiagnostics() {
+            if (!diagnosticsModal) return;
+            diagnosticsModal.hidden = false;
+            diagnosticsModal.setAttribute('aria-hidden', 'false');
+            runDiagnostics();
+        }
+
+        function hideDiagnostics() {
+            if (!diagnosticsModal) return;
+            diagnosticsModal.hidden = true;
+            diagnosticsModal.setAttribute('aria-hidden', 'true');
+        }
+
+        async function runDiagnostics() {
+            const results = {
+                serviceWorkerSupported: 'serviceWorker' in navigator,
+                serviceWorkerRegistered: false,
+                serviceWorkerScript: '{{ url_for('pwa_service_worker') }}',
+                manifestUrl: '{{ url_for('pwa_manifest') }}',
+                manifestLoaded: false,
+                manifest: null,
+                beforeInstallPromptAvailable: !!deferredInstallPrompt,
+                displayMode: (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone) ? 'standalone' : 'browser',
+                timestamp: new Date().toISOString(),
+            };
+
+            // check SW registration
+            try {
+                const reg = await navigator.serviceWorker.getRegistration();
+                results.serviceWorkerRegistered = !!reg;
+                if (reg && reg.active) results.serviceWorkerScope = reg.scope;
+            } catch (e) {
+                results.swError = String(e);
+            }
+
+            // fetch manifest
+            try {
+                const r = await fetch(results.manifestUrl, { cache: 'no-store' });
+                if (r.ok) {
+                    results.manifestLoaded = true;
+                    try { results.manifest = await r.json(); } catch (e) { results.manifest = await r.text(); }
+                } else {
+                    results.manifestError = r.status + ' ' + r.statusText;
+                }
+            } catch (e) {
+                results.manifestError = String(e);
+            }
+
+            diagnosticsOutput.textContent = JSON.stringify(results, null, 2);
+            diagnosticsOutput.dataset.json = JSON.stringify(results);
+        }
+
+        if (diagnosticsBtn) diagnosticsBtn.addEventListener('click', showDiagnostics);
+        if (diagnosticsClose) diagnosticsClose.addEventListener('click', hideDiagnostics);
+        if (diagnosticsClose2) diagnosticsClose2.addEventListener('click', hideDiagnostics);
+        if (diagnosticsRefresh) diagnosticsRefresh.addEventListener('click', runDiagnostics);
+        if (diagnosticsCopy) diagnosticsCopy.addEventListener('click', function () {
+            const data = diagnosticsOutput.dataset.json || diagnosticsOutput.textContent;
+            navigator.clipboard && navigator.clipboard.writeText(data).then(() => alert('Copied diagnostics to clipboard')); 
+        });
 
         if (iosTipDismiss) {
             iosTipDismiss.addEventListener("click", function () {

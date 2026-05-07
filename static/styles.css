@@ -1697,6 +1697,53 @@ tbody tr:last-child td {
         padding-top: max(12px, env(safe-area-inset-top));
     }
 
+    /* Floating install FAB */
+    .install-fab {
+        position: fixed;
+        right: 16px;
+        bottom: calc(120px + env(safe-area-inset-bottom));
+        z-index: 60;
+        width: 56px;
+        height: 56px;
+        border-radius: 28px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--primary);
+        color: #fff;
+        border: none;
+        box-shadow: 0 8px 20px rgba(0,0,0,0.18);
+        font-size: 20px;
+    }
+    .install-fab[hidden] { display: none !important; }
+
+
+    /* PWA Diagnostics modal */
+    .pwa-modal {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        z-index: 120;
+        background: rgba(0,0,0,0.45);
+    }
+    .pwa-modal[hidden] { display: none; }
+    .pwa-modal-panel {
+        width: min(720px, calc(100vw - 32px));
+        background: var(--surface);
+        border-radius: 10px;
+        box-shadow: var(--shadow-lg);
+        padding: 12px;
+        border: 1px solid var(--line-strong);
+    }
+    .pwa-modal-panel header { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+    .pwa-modal-panel footer { display:flex; gap:8px; justify-content:flex-end; margin-top:10px; }
+    .pwa-modal-panel pre { max-height: 48vh; overflow:auto; background: #0f1720; color: #dbeafe; padding:8px; border-radius:6px; }
+/* Desktop: show small install button near topbar if needed */
+.install-fab { display: none; }
+@media (min-width: 901px) {
+    .install-fab { display: none; }
+}
     .auth-shell {
         grid-template-columns: 1fr;
         gap: 16px;
