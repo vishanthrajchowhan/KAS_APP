@@ -2930,6 +2930,93 @@ def delete_update_media(update_id, media_kind):
     return redirect(url_for("update_job", job_id=media["job_id"]))
 
 
+def delete_update_media_record(conn, media, media_kind):
+    if media_kind == "photo":
+        bucket_key = "job_photos"
+        path_column = "image_path"
+        url_column = "photo_url"
+        other_column = "receipt_path"
+    else:
+        bucket_key = "receipts"
+        path_column = "receipt_path"
+        url_column = "receipt_url"
+        other_column = "image_path"
+
+    storage_delete_failed = False
+    try:
+        delete_storage_object(bucket_key, media[path_column], media[url_column])
+    except Exception as exc:
+        storage_delete_failed = True
+        app.logger.warning("Storage delete failed for update %s: %s", media["id"], exc)
+    has_notes = bool(media["notes"])
+    has_other_media = bool(media[other_column])
+    if has_notes or has_other_media:
+        conn.execute(
+            f"UPDATE updates SET {path_column} = NULL, {url_column} = NULL WHERE id = ?",
+            (media["id"],),
+        )
+    else:
+        conn.execute("DELETE FROM updates WHERE id = ?", (media["id"],))
+    return storage_delete_failed
+
+
+def selected_media_ids(field_name):
+    selected_ids = []
+    for raw_id in request.form.getlist(field_name):
+        try:
+            selected_ids.append(int(raw_id))
+        except (TypeError, ValueError):
+            continue
+    return sorted(set(selected_ids))
+
+
+@app.route("/media/bulk-delete", methods=("POST",))
+@login_required
+@role_required("admin")
+def bulk_delete_media():
+    next_url = request.form.get("next") or ""
+    photo_ids = selected_media_ids("photo_ids")
+    receipt_ids = selected_media_ids("receipt_ids")
+    total_selected = len(photo_ids) + len(receipt_ids)
+    if total_selected == 0:
+        flash("Select photos or receipts to delete.", "error")
+        return redirect(next_url if next_url.startswith("/") else url_for("index"))
+
+    deleted_count = 0
+    storage_delete_failed = False
+    with get_db_connection() as conn:
+        for media_kind, media_ids, path_column in (
+            ("photo", photo_ids, "image_path"),
+            ("receipt", receipt_ids, "receipt_path"),
+        ):
+            if not media_ids:
+                continue
+            placeholders = ", ".join("?" for _ in media_ids)
+            rows = conn.execute(
+                f"""
+                SELECT id, job_id, notes, image_path, photo_url, receipt_path, receipt_url
+                FROM updates
+                WHERE id IN ({placeholders}) AND {path_column} IS NOT NULL
+                """,
+                tuple(media_ids),
+            ).fetchall()
+            for media in rows:
+                if delete_update_media_record(conn, media, media_kind):
+                    storage_delete_failed = True
+                deleted_count += 1
+
+    if deleted_count:
+        message = f"Deleted {deleted_count} media item{'s' if deleted_count != 1 else ''}."
+        if storage_delete_failed:
+            flash(f"{message} Some storage cleanup needs a retry.", "error")
+        else:
+            flash(message, "success")
+    else:
+        flash("Selected media was not found.", "error")
+
+    return redirect(next_url if next_url.startswith("/") else url_for("index"))
+
+
 @app.route("/photo/<int:update_id>/delete", methods=("POST",))
 @login_required
 @role_required("admin")

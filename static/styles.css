@@ -876,8 +876,10 @@ input[type="file"] {
 
 .photo-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    gap: 10px;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 190px));
+    align-items: start;
+    gap: 14px;
+    margin-top: 12px;
 }
 
 .photo-grid img {
@@ -911,6 +913,10 @@ input[type="file"] {
     grid-template-columns: minmax(0, 1fr) auto;
     gap: 8px;
     align-items: center;
+}
+
+.receipt-row.receipt-row-selectable {
+    grid-template-columns: auto minmax(0, 1fr) auto;
 }
 
 .receipt-row a {
@@ -1693,7 +1699,16 @@ tbody tr:last-child td {
     }
 
     .photo-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+    }
+
+    .photo-visibility-card {
+        max-width: none;
+    }
+
+    .media-bulk-actions {
+        align-items: stretch;
+        flex-direction: column;
     }
 }
 
@@ -2542,6 +2557,7 @@ body {
 .photo-visibility-card {
     display: grid;
     gap: 8px;
+    max-width: 190px;
 }
 
 .photo-visibility-card .remember-me-row {
@@ -2551,6 +2567,59 @@ body {
     border: 1px solid var(--line);
     border-radius: 10px;
     background: color-mix(in srgb, var(--surface-2) 75%, transparent);
+}
+
+.media-bulk-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin: 14px 0 4px;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--surface-2);
+}
+
+.media-bulk-actions span {
+    color: var(--muted);
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.media-tile-frame {
+    position: relative;
+    overflow: hidden;
+    border-radius: 10px;
+}
+
+.media-tile-frame a {
+    display: block;
+}
+
+.media-select {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    z-index: 1;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: calc(100% - 16px);
+    padding: 5px 7px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--surface) 92%, transparent);
+    color: var(--ink);
+    box-shadow: var(--shadow-sm);
+    font-size: 0.72rem;
+    font-weight: 800;
+}
+
+.media-select input,
+.media-checkbox {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--danger-text);
 }
 
 .image-visibility-toggle {
