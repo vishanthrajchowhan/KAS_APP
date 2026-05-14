@@ -56,6 +56,7 @@
         </article>
 
         <article class="panel">
+            <!-- TODO: connect to job_tasks table in Phase 2 -->
             <h3>Material Checklist</h3>
             <div class="material-cards">
                 <label class="material-card"><input type="checkbox">Surface prep complete</label>
@@ -278,14 +279,14 @@
             
             <label>Portal Link</label>
             <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
-                <input type="text" value="{{ url_for('portal_job_view', token=job.portal_token, _external=True) }}" readonly style="flex: 1; padding: 0.75rem; border: 1px solid #dee2e6; border-radius: 6px; font-family: monospace; font-size: 0.9rem;">
+                <input type="text" value="{{ url_for('client_portal', token=job.portal_token, _external=True) }}" readonly style="flex: 1; padding: 0.75rem; border: 1px solid #dee2e6; border-radius: 6px; font-family: monospace; font-size: 0.9rem;">
                 <button type="button" class="button button-secondary" onclick="copyPortalLink(this)" style="white-space: nowrap;">📋 Copy</button>
             </div>
             
             <label>Send to Client</label>
             <div style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem;">
                 <input type="email" id="client_email_input" placeholder="Client email address" style="flex: 1; padding: 0.75rem; border: 1px solid #dee2e6; border-radius: 6px;">
-                <form method="post" action="{{ url_for('send_portal_email', job_id=job.id) }}" style="display: contents;">
+                <form method="post" action="{{ url_for('send_portal_email_page', job_id=job.id) }}" style="display: contents;">
                     <input type="hidden" name="client_email" id="client_email_hidden">
                     <button type="submit" class="button button-primary" onclick="document.getElementById('client_email_hidden').value = document.getElementById('client_email_input').value;">📧 Send</button>
                 </form>
@@ -330,7 +331,7 @@
                             {% set update_loop = day_loop ~ '-' ~ loop.index %}
                             <section class="timeline-entry">
                                 <div class="timeline-entry-meta">
-                                    <time datetime="{{ update.timestamp }}">{{ update.display_time or update.timestamp|replace('T', ' ') }}</time>
+                                    <time datetime="{{ update.timestamp }}">{{ update.display_time or (update.timestamp | fmtdate) }}</time>
                                     {% if update.author_role == "client" %}
                                         <span>Client Comment</span>
                                     {% else %}

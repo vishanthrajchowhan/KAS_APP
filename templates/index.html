@@ -42,7 +42,7 @@
 
 <section class="dashboard-kpis stagger-grid" aria-label="Business summary">
     <article class="kpi-card kpi-primary glass-panel reveal">
-        <div class="kpi-icon">◫</div>
+        <div class="kpi-icon"><span data-lucide="briefcase"></span></div>
         <div class="kpi-copy">
             <span class="kpi-value" data-count="{{ ops_metrics.open_jobs }}">{{ ops_metrics.open_jobs }}</span>
             <p>Open Jobs</p>
@@ -50,7 +50,7 @@
         </div>
     </article>
     <article class="kpi-card glass-panel reveal">
-        <div class="kpi-icon">⌁</div>
+        <div class="kpi-icon"><span data-lucide="file-text"></span></div>
         <div class="kpi-copy">
             <span class="kpi-value" data-count="{{ ops_metrics.pending_estimates }}">{{ ops_metrics.pending_estimates }}</span>
             <p>Pending Estimates</p>
@@ -58,7 +58,7 @@
         </div>
     </article>
     <article class="kpi-card glass-panel reveal">
-        <div class="kpi-icon">📅</div>
+        <div class="kpi-icon"><span data-lucide="calendar"></span></div>
         <div class="kpi-copy">
             <span class="kpi-value" data-count="{{ ops_metrics.scheduled_this_week }}">{{ ops_metrics.scheduled_this_week }}</span>
             <p>Scheduled This Week</p>
@@ -66,7 +66,7 @@
         </div>
     </article>
     <article class="kpi-card glass-panel reveal">
-        <div class="kpi-icon">⏳</div>
+        <div class="kpi-icon"><span data-lucide="clock"></span></div>
         <div class="kpi-copy">
             <span class="kpi-value" data-count="{{ ops_metrics.jobs_waiting_approval }}">{{ ops_metrics.jobs_waiting_approval }}</span>
             <p>Jobs Waiting Approval</p>
@@ -74,7 +74,7 @@
         </div>
     </article>
     <article class="kpi-card glass-panel reveal">
-        <div class="kpi-icon">📝</div>
+        <div class="kpi-icon"><span data-lucide="edit-3"></span></div>
         <div class="kpi-copy">
             <span class="kpi-value" data-count="{{ ops_metrics.field_updates_today }}">{{ ops_metrics.field_updates_today }}</span>
             <p>Field Updates Today</p>
@@ -82,7 +82,7 @@
         </div>
     </article>
     <article class="kpi-card glass-panel reveal">
-        <div class="kpi-icon">⚠</div>
+        <div class="kpi-icon"><span data-lucide="alert-triangle"></span></div>
         <div class="kpi-copy">
             <span class="kpi-value" data-count="{{ ops_metrics.overdue_jobs }}">{{ ops_metrics.overdue_jobs }}</span>
             <p>Overdue Jobs</p>
@@ -90,7 +90,7 @@
         </div>
     </article>
     <article class="kpi-card glass-panel reveal">
-        <div class="kpi-icon">👷</div>
+        <div class="kpi-icon"><span data-lucide="hard-hat"></span></div>
         <div class="kpi-copy">
             <span class="kpi-value" data-count="{{ ops_metrics.team_assigned_today }}">{{ ops_metrics.team_assigned_today }}</span>
             <p>Team Assigned Today</p>
@@ -108,7 +108,6 @@
             <button class="modal-close" type="button">✕</button>
         </header>
         <form id="quick-update-form" class="form-card" method="post" action="{{ url_for('submit_update') }}" enctype="multipart/form-data">
-            <input type="hidden" name="job_id" id="quick_job_id" value="{{ latest_job_id }}">
             <section class="form-section">
                 <label for="quick_job_select">Job</label>
                 <select id="quick_job_select" name="job_id">
@@ -119,6 +118,16 @@
 
                 <label for="quick_notes">What happened on site today?</label>
                 <textarea id="quick_notes" name="notes" rows="4" placeholder="Describe the work completed, observations, or issues found."></textarea>
+
+                {% if can_manage_jobs %}
+                <label for="quick_status">Job Status</label>
+                <select id="quick_status" name="status">
+                    <option value="">-- Select Status --</option>
+                    {% for status in statuses %}
+                        <option value="{{ status }}" {% if status == latest_job_status %}selected{% endif %}>{{ status }}</option>
+                    {% endfor %}
+                </select>
+                {% endif %}
 
                 <div class="quick-buttons">
                     <label>Update type</label>
@@ -133,13 +142,14 @@
                     <input type="hidden" name="update_type" id="quick_update_type" value="Work done">
                 </div>
 
-                <div style="margin-top:0.75rem;">
-                    <label>Priority</label>
-                    <div class="button-group">
-                        <label><input type="radio" name="priority" value="Normal" checked> Normal</label>
-                        <label><input type="radio" name="priority" value="Needs attention"> Needs attention</label>
-                        <label><input type="radio" name="priority" value="Urgent"> Urgent</label>
-                    </div>
+                                <div style="margin-top:0.75rem;">
+                                    <label>Priority</label>
+                                    <div class="priority-btn-group" id="priority-group">
+                                        <button type="button" class="priority-option priority-normal active" data-value="Normal" onclick="setPriority(this)">Normal</button>
+                                        <button type="button" class="priority-option priority-attention" data-value="Needs attention" onclick="setPriority(this)">Needs attention</button>
+                                        <button type="button" class="priority-option priority-urgent" data-value="Urgent" onclick="setPriority(this)">Urgent</button>
+                                    </div>
+                                    <input type="hidden" name="priority" id="quick_priority" value="Normal">
                 </div>
 
                 <label for="quick_images">Site photos</label>
@@ -171,6 +181,12 @@
 </div>
 
 <script>
+function setPriority(btn) {
+    document.querySelectorAll('.priority-option').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('quick_priority').value = btn.dataset.value;
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     const modal = document.getElementById('quick-update-modal');
     const openBtn = document.getElementById('open-quick-update');
@@ -394,7 +410,7 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
 
             <div class="job-actions">
-                <a class="button button-primary" href="{{ url_for('update_job', job_id=job.id) }}">View</a>
+                <a class="button button-primary" href="{{ url_for('job_progress', job_id=job.id) }}">View</a>
                 <a class="button" href="{{ url_for('update_job', job_id=job.id) }}">Edit</a>
                 <a class="button" href="{{ url_for('job_progress', job_id=job.id) }}">Timeline</a>
                 {% if can_manage_jobs %}

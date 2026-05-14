@@ -465,6 +465,58 @@ h3 {
     border-color: color-mix(in srgb, var(--danger-text) 20%, transparent);
 }
 
+.type-btn {
+    padding: 6px 12px;
+    border: 1px solid var(--border, #ddd);
+    border-radius: 20px;
+    font-size: 12px;
+    cursor: pointer;
+    background: transparent;
+}
+
+.type-btn.active {
+    background: #0f6a47;
+    color: #fff;
+    border-color: #0f6a47;
+}
+
+.priority-btn-group {
+    display: flex;
+    gap: 8px;
+    margin-top: 6px;
+}
+
+.priority-option {
+    flex: 1;
+    padding: 8px 4px;
+    border: 1px solid var(--border, #ddd);
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    background: var(--bg, #fff);
+    color: var(--text, #333);
+    transition: all 0.15s;
+}
+
+.priority-option.active.priority-normal {
+    background: #e1f5ee;
+    border-color: #0f6a47;
+    color: #0f6a47;
+}
+
+.priority-option.active.priority-attention {
+    background: #fef3c7;
+    border-color: #d97706;
+    color: #92400e;
+}
+
+.priority-option.active.priority-urgent {
+    background: #fee2e2;
+    border-color: #dc2626;
+    color: #991b1b;
+}
+
 .button-small {
     min-height: 38px;
     padding: 8px 12px;
@@ -1428,14 +1480,26 @@ tbody tr:last-child td {
 
 .material-card,
 .crew-card {
-    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
     border: 1px solid var(--line);
     border-radius: 10px;
     background: var(--surface-2);
+    cursor: pointer;
+    transition: background 0.15s;
 }
 
 .material-card input {
-    margin-right: 8px;
+    margin: 0;
+}
+
+.material-card:has(input:checked) {
+    background: #e1f5ee;
+    border-color: #0f6a47;
+    text-decoration: line-through;
+    color: #0f6a47;
 }
 
 .crew-status {
@@ -2083,21 +2147,15 @@ tbody tr:last-child td {
 }
 
 .dashboard-hero-actions {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    display: flex;
+    flex-wrap: wrap;
     gap: 10px;
-    align-content: start;
-    min-width: min(360px, 100%);
+    margin-top: 1.25rem;
 }
 
 .dashboard-hero-actions .button {
-    width: 100%;
-    justify-content: center;
-    white-space: nowrap;
-}
-
-.dashboard-hero-actions .button-primary {
-    grid-column: span 2;
+    min-width: 120px;
+    text-align: center;
 }
 
 .button-disabled {
@@ -2149,6 +2207,12 @@ tbody tr:last-child td {
     font-size: 1.1rem;
     font-weight: 800;
     box-shadow: 0 12px 24px rgba(15, 106, 71, 0.18);
+}
+
+.kpi-icon svg {
+    width: 22px;
+    height: 22px;
+    stroke: #0f6a47;
 }
 
 .kpi-copy {
@@ -2250,9 +2314,61 @@ tbody tr:last-child td {
 }
 
 .job-card {
+    border-left: 4px solid transparent;
     border-radius: 22px;
     background:
         linear-gradient(180deg, color-mix(in srgb, var(--surface) 96%, transparent), color-mix(in srgb, var(--surface-2) 74%, transparent));
+}
+
+.job-card:has(.status-lead),
+.job-board-card:has(.status-lead),
+.job-card:has(.status-estimating),
+.job-board-card:has(.status-estimating) {
+    border-left-color: #94a3b8;
+}
+
+.job-card:has(.status-proposal-sent),
+.job-board-card:has(.status-proposal-sent),
+.job-card:has(.status-negotiation),
+.job-board-card:has(.status-negotiation) {
+    border-left-color: #f59e0b;
+}
+
+.job-card:has(.status-approved),
+.job-board-card:has(.status-approved) {
+    border-left-color: #10b981;
+}
+
+.job-card:has(.status-scheduled),
+.job-board-card:has(.status-scheduled) {
+    border-left-color: #3b82f6;
+}
+
+.job-card:has(.status-started),
+.job-board-card:has(.status-started),
+.job-card:has(.status-in-progress),
+.job-board-card:has(.status-in-progress) {
+    border-left-color: #0f6a47;
+}
+
+.job-card:has(.status-completed),
+.job-board-card:has(.status-completed) {
+    border-left-color: #059669;
+}
+
+.job-card:has(.status-invoiced),
+.job-board-card:has(.status-invoiced) {
+    border-left-color: #8b5cf6;
+}
+
+.job-card:has(.status-paid),
+.job-board-card:has(.status-paid) {
+    border-left-color: #6366f1;
+}
+
+.job-card:has(.status-rejected),
+.job-board-card:has(.status-rejected) {
+    border-left-color: #ef4444;
 }
 
 .job-card-top h2 {
@@ -2310,11 +2426,12 @@ tbody tr:last-child td {
     }
 
     .dashboard-hero-actions {
-        grid-template-columns: 1fr;
+        width: 100%;
+        flex-direction: column;
     }
 
-    .dashboard-hero-actions .button-primary {
-        grid-column: auto;
+    .dashboard-hero-actions .button {
+        width: 100%;
     }
 
     .dashboard-kpis {

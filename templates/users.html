@@ -85,6 +85,7 @@
                         <th>Email</th>
                         <th>Phone</th>
                         <th>Role</th>
+                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -94,6 +95,9 @@
                             <td>{{ user.email }}</td>
                             <td>{{ user.phone or '—' }}</td>
                             <td>{{ user.role|title }}</td>
+                            <td>
+                                <button type="button" class="button button-small" onclick="alert('Password reset is not implemented yet.');">Reset Password</button>
+                            </td>
                         </tr>
                     {% endfor %}
                 </tbody>

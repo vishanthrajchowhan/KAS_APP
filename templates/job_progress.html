@@ -9,7 +9,7 @@
         {% if g.user.role == "employee" %}
             <p>{{ job.name }} at {{ job.location }}</p>
         {% else %}
-            <p>{{ job.name }} for {{ job.client_name or "client not set" }} at {{ job.location }}</p>
+            <p>{{ job.client_name or "No client assigned" }} · {{ job.service_type or "General work" }}</p>
         {% endif %}
     </div>
     <a class="button button-primary" href="{{ url_for('update_job', job_id=job.id) }}">Open Job</a>
@@ -30,24 +30,29 @@
 </section>
 
 <section class="dashboard-stats progress-stats" aria-label="Job progress summary">
-    <div>
-        <span>{{ task_summary.percent }}%</span>
+    <div class="stat-card glass-panel">
+        <span data-lucide="check-circle" style="color:#0f6a47;width:20px;height:20px;"></span>
+        <span class="kpi-value">{{ task_summary.percent }}%</span>
         <p>Tasks Done</p>
     </div>
-    <div>
-        <span>{{ progress.update_count or 0 }}</span>
+    <div class="stat-card glass-panel">
+        <span data-lucide="message-square" style="color:#0f6a47;width:20px;height:20px;"></span>
+        <span class="kpi-value">{{ progress.update_count or 0 }}</span>
         <p>Updates</p>
     </div>
-    <div>
-        <span>{{ progress.photo_count or 0 }}</span>
+    <div class="stat-card glass-panel">
+        <span data-lucide="camera" style="color:#0f6a47;width:20px;height:20px;"></span>
+        <span class="kpi-value">{{ progress.photo_count or 0 }}</span>
         <p>Photos</p>
     </div>
-    <div>
-        <span>{% if progress.first_update %}{{ progress.first_update[:10] }}{% else %}-{% endif %}</span>
+    <div class="stat-card glass-panel">
+        <span data-lucide="calendar" style="color:#0f6a47;width:20px;height:20px;"></span>
+        <span class="kpi-value">{{ progress.first_update | fmtdate }}</span>
         <p>First Update</p>
     </div>
-    <div>
-        <span>{% if progress.last_update %}{{ progress.last_update[:10] }}{% else %}-{% endif %}</span>
+    <div class="stat-card glass-panel">
+        <span data-lucide="clock" style="color:#0f6a47;width:20px;height:20px;"></span>
+        <span class="kpi-value">{{ progress.last_update | fmtdate }}</span>
         <p>Latest Update</p>
     </div>
 </section>
@@ -131,7 +136,7 @@
                             {% set update_loop = day_loop ~ '-' ~ loop.index %}
                             <section class="timeline-entry">
                                 <div class="timeline-entry-meta">
-                                    <time datetime="{{ update.timestamp }}">{{ update.display_time or update.timestamp|replace('T', ' ') }}</time>
+                                    <time datetime="{{ update.timestamp }}">{{ update.display_time or (update.timestamp | fmtdate) }}</time>
                                     {% if update.author_role == "client" %}
                                         <span>Client Comment</span>
                                     {% else %}
@@ -221,4 +226,7 @@
         </section>
     {% endif %}
 </section>
+<script>
+if (window.lucide) lucide.createIcons();
+</script>
 {% endblock %}

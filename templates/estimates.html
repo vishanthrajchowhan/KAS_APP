@@ -35,25 +35,27 @@
     {% endif %}
 
     <div class="filters premium-filters-bar reveal">
-        <form method="get" action="{{ url_for('estimates') }}" style="display: contents;">
-            <input type="text" name="q" placeholder="Search client, company, estimate #..." value="{{ filters.q or '' }}">
-            <select name="status">
-                <option value="">All Statuses</option>
-                {% for status in statuses %}
-                    <option value="{{ status }}" {% if filters.status == status %}selected{% endif %}>{{ status }}</option>
-                {% endfor %}
-            </select>
-            <select name="sort">
-                <option value="newest" {% if filters.sort == 'newest' %}selected{% endif %}>Newest First</option>
-                <option value="oldest" {% if filters.sort == 'oldest' %}selected{% endif %}>Oldest First</option>
-                <option value="name" {% if filters.sort == 'name' %}selected{% endif %}>Client Name</option>
-                <option value="value" {% if filters.sort == 'value' %}selected{% endif %}>Highest Value</option>
-            </select>
-            <input type="date" id="estimate-date-filter" placeholder="Date">
-            <input type="number" id="estimate-min-amount" min="0" step="0.01" placeholder="Min amount">
-            <input type="number" id="estimate-max-amount" min="0" step="0.01" placeholder="Max amount">
-            <button type="submit" class="button">Filter</button>
-            <a href="{{ url_for('estimates') }}" class="button">Clear</a>
+        <form method="get" action="{{ url_for('estimates') }}" style="display:block;width:100%;">
+            <div class="filters-row" style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;">
+                <input type="text" name="q" placeholder="Search client, estimate #..." value="{{ filters.q or '' }}" style="flex:2;min-width:160px;">
+                <select name="status" style="flex:1;min-width:120px;">
+                    <option value="">All Statuses</option>
+                    {% for status in statuses %}
+                        <option value="{{ status }}" {% if filters.status == status %}selected{% endif %}>{{ status }}</option>
+                    {% endfor %}
+                </select>
+                <select name="sort" style="flex:1;min-width:120px;">
+                    <option value="newest" {% if filters.sort == 'newest' %}selected{% endif %}>Newest First</option>
+                    <option value="oldest" {% if filters.sort == 'oldest' %}selected{% endif %}>Oldest First</option>
+                    <option value="name" {% if filters.sort == 'name' %}selected{% endif %}>Client Name</option>
+                    <option value="value" {% if filters.sort == 'value' %}selected{% endif %}>Highest Value</option>
+                </select>
+                <input type="date" id="estimate-date-filter" style="flex:1;min-width:120px;">
+                <input type="number" id="estimate-min-amount" placeholder="Min $" style="flex:0 0 80px;">
+                <input type="number" id="estimate-max-amount" placeholder="Max $" style="flex:0 0 80px;">
+                <button type="submit" class="button button-primary">Filter</button>
+                <a href="{{ url_for('estimates') }}" class="button">Clear</a>
+            </div>
         </form>
     </div>
 
@@ -63,7 +65,7 @@
             <div class="estimate-card glass-panel reveal" data-created-at="{{ est.created_at[:10] if est.created_at else '' }}" data-amount="{{ est.total or 0 }}">
                 <div class="estimate-header">
                     <div class="estimate-number">{{ est.estimate_number }}</div>
-                    <div class="estimate-client">{{ est.client_name }}</div>
+                    <div class="estimate-client" style="text-transform: capitalize;">{{ est.client_name|lower|title }}</div>
                     {% if est.company_name %}
                         <div class="estimate-service">{{ est.company_name }}</div>
                     {% endif %}
