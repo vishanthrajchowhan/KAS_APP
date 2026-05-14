@@ -32,7 +32,7 @@
             <a class="button" href="{{ url_for('clients') }}">Clients</a>
             <a class="button" href="{{ url_for('employees') }}">Employees</a>
             {% if latest_job_id %}
-                <a class="button" href="{{ url_for('update_job', job_id=latest_job_id) }}">Add Update</a>
+                <button id="open-quick-update" type="button" class="button">Add Update</button>
             {% else %}
                 <span class="button button-disabled" aria-disabled="true">Add Update</span>
             {% endif %}
@@ -98,6 +98,135 @@
         </div>
     </article>
 </section>
+
+<!-- Quick Add Update Modal -->
+<div id="quick-update-modal" class="modal" aria-hidden="true" style="display:none;">
+    <div class="modal-backdrop"></div>
+    <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="quick-update-title" style="max-width:800px;">
+        <header class="modal-header">
+            <h3 id="quick-update-title">Add field update</h3>
+            <button class="modal-close" type="button">✕</button>
+        </header>
+        <form id="quick-update-form" class="form-card" method="post" action="{{ url_for('submit_update') }}" enctype="multipart/form-data">
+            <input type="hidden" name="job_id" id="quick_job_id" value="{{ latest_job_id }}">
+            <section class="form-section">
+                <label for="quick_job_select">Job</label>
+                <select id="quick_job_select" name="job_id">
+                    {% for j in jobs %}
+                        <option value="{{ j.id }}" {% if j.id == latest_job_id %}selected{% endif %}>Job #{{ j.id }} — {{ j.title or j.address or j.client_name }}</option>
+                    {% endfor %}
+                </select>
+
+                <label for="quick_notes">What happened on site today?</label>
+                <textarea id="quick_notes" name="notes" rows="4" placeholder="Describe the work completed, observations, or issues found."></textarea>
+
+                <div class="quick-buttons">
+                    <label>Update type</label>
+                    <div class="button-group" id="update-type-group">
+                        <button type="button" data-value="Work done" class="type-btn active">Work done</button>
+                        <button type="button" data-value="Issue found" class="type-btn">Issue found</button>
+                        <button type="button" data-value="Inspection" class="type-btn">Inspection</button>
+                        <button type="button" data-value="Materials" class="type-btn">Materials</button>
+                        <button type="button" data-value="Weather delay" class="type-btn">Weather delay</button>
+                        <button type="button" data-value="Phase complete" class="type-btn">Phase complete</button>
+                    </div>
+                    <input type="hidden" name="update_type" id="quick_update_type" value="Work done">
+                </div>
+
+                <div style="margin-top:0.75rem;">
+                    <label>Priority</label>
+                    <div class="button-group">
+                        <label><input type="radio" name="priority" value="Normal" checked> Normal</label>
+                        <label><input type="radio" name="priority" value="Needs attention"> Needs attention</label>
+                        <label><input type="radio" name="priority" value="Urgent"> Urgent</label>
+                    </div>
+                </div>
+
+                <label for="quick_images">Site photos</label>
+                <input id="quick_images" name="images" type="file" accept="image/*" multiple>
+
+                <fieldset>
+                    <legend>Quick checklist</legend>
+                    <label><input type="checkbox" name="checklist" value="Surface preparation done"> Surface preparation done</label>
+                    <label><input type="checkbox" name="checklist" value="Sealant / materials applied"> Sealant / materials applied</label>
+                    <label><input type="checkbox" name="checklist" value="Area cleaned up after work"> Area cleaned up after work</label>
+                    <label><input type="checkbox" name="checklist" value="Client or building contact notified"> Client or building contact notified</label>
+                    <label><input type="checkbox" name="checklist" value="Ready for next phase / inspection"> Ready for next phase / inspection</label>
+                </fieldset>
+
+                <div style="margin-top:1rem;">
+                    <label>Visibility</label>
+                    <label><input type="checkbox" name="photos_client_visible" value="1" checked> Share with client</label>
+                    <label><input type="checkbox" name="notify_client_email" value="1"> Notify client by email</label>
+                    <label><input type="checkbox" name="internal_only" value="1"> Internal note only</label>
+                </div>
+            </section>
+
+            <div style="display:flex; gap:0.5rem; justify-content:flex-end; margin-top:1rem;">
+                <button type="button" class="button cancel-quick-update">Cancel</button>
+                <button type="submit" class="button button-primary">Post update ⇢</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const modal = document.getElementById('quick-update-modal');
+    const openBtn = document.getElementById('open-quick-update');
+    const closeBtn = document.querySelector('.modal-close');
+    const cancelBtn = document.querySelector('.cancel-quick-update');
+    const backdrop = document.querySelector('.modal-backdrop');
+
+    function openQuickUpdate() {
+        if (modal) {
+            modal.style.display = 'flex';
+            modal.classList.add('show');
+            modal.setAttribute('aria-hidden', 'false');
+        }
+    }
+
+    function closeQuickUpdate() {
+        if (modal) {
+            modal.style.display = 'none';
+            modal.classList.remove('show');
+            modal.setAttribute('aria-hidden', 'true');
+        }
+    }
+
+    if (openBtn) {
+        openBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            openQuickUpdate();
+        });
+    }
+
+    if (closeBtn) {
+        closeBtn.addEventListener('click', closeQuickUpdate);
+    }
+
+    if (backdrop) {
+        backdrop.addEventListener('click', closeQuickUpdate);
+    }
+
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', closeQuickUpdate);
+    }
+
+    // update type buttons
+    document.querySelectorAll('#update-type-group .type-btn').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            document.querySelectorAll('#update-type-group .type-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            const updateTypeInput = document.getElementById('quick_update_type');
+            if (updateTypeInput) {
+                updateTypeInput.value = btn.getAttribute('data-value');
+            }
+        });
+    });
+});
+</script>
 
 <section class="dashboard-workspace">
     <div class="dashboard-panels">

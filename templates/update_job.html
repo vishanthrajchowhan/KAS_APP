@@ -264,6 +264,44 @@
             <button class="button button-primary button-full" type="submit">Send Comment</button>
         </form>
     {% endif %}
+
+    <!-- Client Portal Admin Section - Outside Forms -->
+    {% if can_manage_jobs %}
+    <section class="form-section" style="background: #f0f7f4; border-left: 4px solid #0f6a47; padding: 1.5rem; border-radius: 8px; margin-top: 2rem;">
+        <h2 style="color: #0f6a47; margin-top: 0;">🔗 Client Portal</h2>
+        <p class="help-text">Share a public-facing portal link with your client to track project progress and view updates without login.</p>
+        
+        {% if job.portal_enabled and job.portal_token %}
+            <div class="alert alert-success" style="background: #d1e7dd; border: 1px solid #0f6a47; color: #0f6a47; padding: 1rem; border-radius: 6px; margin-bottom: 1rem;">
+                <strong>✓ Portal Enabled</strong> · Portal is active and client can view updates.
+            </div>
+            
+            <label>Portal Link</label>
+            <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+                <input type="text" value="{{ url_for('portal_job_view', token=job.portal_token, _external=True) }}" readonly style="flex: 1; padding: 0.75rem; border: 1px solid #dee2e6; border-radius: 6px; font-family: monospace; font-size: 0.9rem;">
+                <button type="button" class="button button-secondary" onclick="copyPortalLink(this)" style="white-space: nowrap;">📋 Copy</button>
+            </div>
+            
+            <label>Send to Client</label>
+            <div style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem;">
+                <input type="email" id="client_email_input" placeholder="Client email address" style="flex: 1; padding: 0.75rem; border: 1px solid #dee2e6; border-radius: 6px;">
+                <form method="post" action="{{ url_for('send_portal_email', job_id=job.id) }}" style="display: contents;">
+                    <input type="hidden" name="client_email" id="client_email_hidden">
+                    <button type="submit" class="button button-primary" onclick="document.getElementById('client_email_hidden').value = document.getElementById('client_email_input').value;">📧 Send</button>
+                </form>
+            </div>
+            
+            <form method="post" action="{{ url_for('disable_job_portal', job_id=job.id) }}" style="display: inline;">
+                <button type="submit" class="button button-danger" onclick="return confirm('Disable portal access for this job?');" style="background: #dc3545;">🔒 Disable Portal</button>
+            </form>
+        {% else %}
+            <p class="help-text" style="color: #666; margin-bottom: 1rem;">Portal is not enabled yet. Enable it to generate a shareable link.</p>
+            <form method="post" action="{{ url_for('enable_job_portal', job_id=job.id) }}" style="display: inline;">
+                <button type="submit" class="button button-primary" style="background: #0f6a47;">🔓 Enable Portal</button>
+            </form>
+        {% endif %}
+    </section>
+    {% endif %}
 </section>
 
 <section class="updates">
@@ -378,4 +416,18 @@
         <p class="muted">No updates have been submitted for this job yet.</p>
     {% endif %}
 </section>
+
+<script>
+function copyPortalLink(button) {
+    const input = button.previousElementSibling;
+    input.select();
+    document.execCommand('copy');
+    const originalText = button.textContent;
+    button.textContent = '✓ Copied';
+    setTimeout(() => {
+        button.textContent = originalText;
+    }, 2000);
+}
+</script>
+
 {% endblock %}

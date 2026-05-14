@@ -1,0 +1,30 @@
+{% extends "portal/base.html" %}
+
+{% block title %}Project Report | {{ job.name }}{% endblock %}
+
+{% block content %}
+<div class="portal-content">
+    <div style="margin-bottom: 2rem;">
+        <a href="{{ url_for('portal_job_view', token=token) }}" style="color: #0f6a47; text-decoration: none; font-weight: 600;">← Back to Project</a>
+    </div>
+    
+    <h1 style="color: #0f6a47; margin-bottom: 0.5rem;">📊 Project Report</h1>
+    <p style="color: #6c757d; margin-bottom: 2rem;">{{ job.name }} · {{ job.location }}</p>
+    
+    {% if report and report.report_text %}
+    <div style="background: #f8f9fa; padding: 2rem; border-radius: 12px; line-height: 1.8; color: #495057;">
+        {{ report.report_text | safe }}
+    </div>
+    {% else %}
+    <div style="padding: 2rem; background: #f8f9fa; border-radius: 8px; text-align: center; color: #6c757d;">
+        <p>Report data not available.</p>
+    </div>
+    {% endif %}
+    
+    {% if report and report.pdf_url %}
+    <div style="margin-top: 2rem;">
+        <a href="{{ report.pdf_url }}" class="document-action" target="_blank" style="display: inline-block;">📥 Download PDF Report</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

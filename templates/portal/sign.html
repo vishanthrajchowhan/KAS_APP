@@ -1,0 +1,82 @@
+{% extends "portal/base.html" %}
+
+{% block title %}Sign Document | {{ job.name }}{% endblock %}
+
+{% block content %}
+<div class="portal-content">
+    <div style="margin-bottom: 2rem;">
+        <a href="{{ url_for('portal_job_view', token=token) }}" style="color: #0f6a47; text-decoration: none; font-weight: 600;">← Back to Project</a>
+    </div>
+    
+    <h1 style="color: #0f6a47; margin-bottom: 0.5rem;">✍️ Document Signature</h1>
+    <p style="color: #6c757d; margin-bottom: 2rem;">{{ document.name }} · {{ job.name }}</p>
+    
+    {% if document.signed_at %}
+    <div class="banner" style="background: #d1e7dd; border: 1px solid #0f6a47; color: #0f6a47; margin-bottom: 2rem;">
+        <div class="banner-content">
+            <div class="banner-icon">✓</div>
+            <div>
+                <strong>Signed:</strong> {{ document.signed_by_name }} on {{ document.signed_at[:10] }}
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <form id="signForm" style="max-width: 500px;">
+        <div style="margin-bottom: 1.5rem;">
+            <label for="signed_by_name" style="display: block; font-weight: 600; color: #495057; margin-bottom: 0.5rem;">
+                Full Name *
+            </label>
+            <input 
+                type="text" 
+                id="signed_by_name" 
+                name="signed_by_name" 
+                placeholder="Enter your full name"
+                required
+                style="width: 100%; padding: 0.75rem; border: 1px solid #dee2e6; border-radius: 6px; font-size: 1rem;"
+            >
+        </div>
+        
+        <div style="padding: 1rem; background: #f8f9fa; border-radius: 8px; margin-bottom: 1.5rem; color: #6c757d; font-size: 0.95rem;">
+            <p style="margin: 0;">By signing, you acknowledge that you have reviewed and accept the {{ document.document_type or 'document' }}.</p>
+        </div>
+        
+        <button 
+            type="submit" 
+            style="width: 100%; padding: 0.75rem; background: #0f6a47; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 1rem;"
+        >
+            ✓ Sign Document
+        </button>
+        <div id="signStatus" style="margin-top: 1rem; text-align: center;"></div>
+    </form>
+    {% endif %}
+</div>
+
+<script>
+document.getElementById('signForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const statusDiv = document.getElementById('signStatus');
+    const nameInput = document.getElementById('signed_by_name');
+    
+    try {
+        const response = await fetch('{{ url_for("portal_sign_submit", token=token, doc_id=document.id) }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: `signed_by_name=${encodeURIComponent(nameInput.value)}`
+        });
+        
+        const data = await response.json();
+        
+        if (data.ok) {
+            statusDiv.innerHTML = '<div class="banner" style="background: #d1e7dd; border: 1px solid #0f6a47; color: #0f6a47;"><strong>✓ Document signed successfully!</strong> Redirecting...</div>';
+            setTimeout(() => window.location.href = '{{ url_for("portal_job_view", token=token) }}', 1500);
+        } else {
+            statusDiv.innerHTML = '<div class="banner warning" style="color: #856404; background: #fff3cd; border: 1px solid #ffc107;"><strong>Error:</strong> ' + data.error + '</div>';
+        }
+    } catch (error) {
+        statusDiv.innerHTML = '<div class="banner warning" style="color: #856404; background: #fff3cd; border: 1px solid #ffc107;"><strong>Error:</strong> Failed to sign document. Please try again.</div>';
+    }
+});
+</script>
+{% endblock %}

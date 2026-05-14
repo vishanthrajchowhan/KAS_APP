@@ -1,0 +1,168 @@
+{% extends "portal/base.html" %}
+
+{% block title %}{{ job.name }} | Project Status{% endblock %}
+
+{% block content %}
+<div class="portal-content">
+    <!-- Job Header -->
+    <div style="margin-bottom: 2rem;">
+        <h1 style="margin: 0 0 0.5rem 0; color: #0f6a47;">{{ job.name }}</h1>
+        <p style="margin: 0 0 1rem 0; color: #6c757d; font-size: 0.95rem;">{{ job.location }}</p>
+        <div style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: center;">
+            <span class="status-pill {% if job.status in ['In Progress', 'Started'] %}in-progress{% elif job.status == 'Completed' %}completed{% else %}pending{% endif %}">
+                {{ job.status }}{% if job.created_at %} · Started {{ job.created_at[:10] | replace('-', ' ') | regex_replace(r'(\d{4})\s(\d{2})\s(\d{2})', r'\2/\3/\1') }}{% endif %}
+            </span>
+        </div>
+    </div>
+    
+    <!-- Unsigned Documents Banner -->
+    {% if has_unsigned_docs %}
+    <div class="banner warning" style="margin-bottom: 2rem;">
+        <div class="banner-content">
+            <div class="banner-icon">⚠️</div>
+            <div>
+                <strong>Action Required:</strong> You have {{ unsigned_doc_count }} document{{ 's' if unsigned_doc_count > 1 else '' }} awaiting your signature.
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Status Timeline -->
+    <div class="timeline">
+        <div class="timeline-item {% if job.status in ['Completed', 'Invoiced', 'Paid'] %}done{% elif job.status in ['Approved', 'Scheduled', 'Started', 'In Progress'] %}active{% endif %}">
+            <div class="timeline-dot">✓</div>
+            <div class="timeline-label">Estimate Approved</div>
+        </div>
+        <div class="timeline-item {% if job.status in ['Started', 'In Progress', 'Completed', 'Invoiced', 'Paid'] %}done{% elif job.status in ['Scheduled'] %}active{% endif %}">
+            <div class="timeline-dot">→</div>
+            <div class="timeline-label">Work Started</div>
+        </div>
+        <div class="timeline-item {% if job.status in ['In Progress', 'Completed', 'Invoiced', 'Paid'] %}done{% elif job.status == 'In Progress' %}active{% endif %}">
+            <div class="timeline-dot">◐</div>
+            <div class="timeline-label">In Progress</div>
+        </div>
+        <div class="timeline-item {% if job.status in ['Completed', 'Invoiced', 'Paid'] %}done{% endif %}">
+            <div class="timeline-dot">🔍</div>
+            <div class="timeline-label">Final Inspection</div>
+        </div>
+        <div class="timeline-item {% if job.status in ['Completed', 'Invoiced', 'Paid'] %}done{% endif %}">
+            <div class="timeline-dot">★</div>
+            <div class="timeline-label">Complete</div>
+        </div>
+    </div>
+    
+    <!-- Stat Cards -->
+    <div class="stat-cards">
+        {% if job.due_date %}
+        <div class="stat-card">
+            <div class="stat-card-label">Estimated Completion</div>
+            <div class="stat-card-value">{{ job.due_date[:10] | replace('-', '/') }}</div>
+        </div>
+        {% endif %}
+        
+        {% if estimate and estimate.total %}
+        <div class="stat-card">
+            <div class="stat-card-label">Project Total</div>
+            <div class="stat-card-value">${{ estimate.total | default(0) | round(2) }}</div>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- Field Updates Feed -->
+    {% if update_days %}
+    <div class="updates-feed">
+        <h2 style="color: #0f6a47; margin-top: 2rem;">Project Updates</h2>
+        {% for day in update_days %}
+        <div class="update-day">
+            <div class="update-day-header">{{ day.display_date }}</div>
+            {% for update in day.updates %}
+            <div class="update-item">
+                {% if update.notes %}
+                <div class="update-header">
+                    <span class="update-author">{{ update.author_role or 'Team' }}</span>
+                    <span class="update-time">{{ update.display_time }}</span>
+                </div>
+                <div class="update-notes">{{ update.notes }}</div>
+                {% endif %}
+                
+                {% if update.photos %}
+                <div class="photo-grid">
+                    {% for photo in update.photos %}
+                    <div class="photo-item">
+                        <img src="{{ photo.url }}" alt="Update photo" loading="lazy" decoding="async">
+                        <div class="photo-date">{{ update.display_date }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div style="padding: 2rem; background: #f8f9fa; border-radius: 8px; text-align: center; color: #6c757d; margin: 2rem 0;">
+        <p>No updates have been shared yet. Check back soon!</p>
+    </div>
+    {% endif %}
+    
+    <!-- Documents Section -->
+    {% if documents or estimate %}
+    <div class="documents-list">
+        <h2 style="color: #0f6a47; margin-top: 2rem;">Project Documents</h2>
+        
+        {% if estimate %}
+        <div class="document-item">
+            <div class="document-icon">📄</div>
+            <div class="document-meta">
+                <div class="document-name">Estimate</div>
+                <div class="document-type">{{ estimate.service_type or 'Service Estimate' }}</div>
+            </div>
+            <a href="{{ url_for('view_estimate', estimate_id=estimate.id) }}" class="document-action">View</a>
+        </div>
+        {% endif %}
+        
+        {% for doc in documents %}
+        <div class="document-item">
+            <div class="document-icon">
+                {% if doc.document_type == 'pdf' %}📋{% elif doc.document_type == 'image' %}🖼️{% elif doc.document_type == 'report' %}📊{% else %}📄{% endif %}
+            </div>
+            <div class="document-meta">
+                <div class="document-name">{{ doc.name }}</div>
+                <div class="document-type">
+                    {% if doc.signed_at %}✓ Signed on {{ doc.signed_at[:10] }}{% else %}{{ doc.document_type or 'Document' }}{% endif %}
+                </div>
+            </div>
+            {% if doc.requires_client_signature and not doc.signed_at %}
+            <a href="{{ url_for('portal_sign_page', token=token, doc_id=doc.id) }}" class="document-action">Sign</a>
+            {% elif doc.file_url %}
+            <a href="{{ doc.file_url }}" class="document-action" target="_blank">Download</a>
+            {% else %}
+            <span class="document-action" style="background: #6c757d; cursor: default;">Unavailable</span>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    
+    <!-- Contact Info -->
+    <div class="contact-strip">
+        <div class="contact-strip-title">Questions?</div>
+        <div class="contact-info">
+            {% if workspace_settings.company_phone %}
+            <div class="contact-item">
+                <span>📞</span>
+                <a href="tel:{{ workspace_settings.company_phone }}">{{ workspace_settings.company_phone }}</a>
+            </div>
+            {% endif %}
+            
+            {% if workspace_settings.company_email %}
+            <div class="contact-item">
+                <span>📧</span>
+                <a href="mailto:{{ workspace_settings.company_email }}">{{ workspace_settings.company_email }}</a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -2,6 +2,7 @@ import os
 import re
 import time
 import uuid
+import secrets
 from io import BytesIO
 from datetime import datetime, timedelta
 from functools import wraps
@@ -296,6 +297,20 @@ app.config["UPLOAD_FOLDER"] = str(UPLOAD_FOLDER)
 app.config["MAX_CONTENT_LENGTH"] = 25 * 1024 * 1024
 app.config["VAPID_PUBLIC_KEY"] = os.environ.get("VAPID_PUBLIC_KEY", "").strip()
 
+# Flask-Mail configuration for Client Portal
+app.config["MAIL_SERVER"] = os.environ.get("MAIL_SERVER", "smtp.gmail.com")
+app.config["MAIL_PORT"] = int(os.environ.get("MAIL_PORT", 587))
+app.config["MAIL_USE_TLS"] = os.environ.get("MAIL_USE_TLS", "true").lower() == "true"
+app.config["MAIL_USERNAME"] = os.environ.get("MAIL_USERNAME", "")
+app.config["MAIL_PASSWORD"] = os.environ.get("MAIL_PASSWORD", "")
+app.config["MAIL_DEFAULT_SENDER"] = os.environ.get("MAIL_DEFAULT_SENDER", os.environ.get("MAIL_USERNAME", "noreply@kas-app.com"))
+app.config.setdefault("DATABASE_INITIALIZED", False)
+
+try:
+    from flask_mail import Mail, Message
+    mail = Mail(app)
+except Exception:
+    mail = None
 
 def build_postgres_conninfo():
     database_url = os.environ.get("DATABASE_URL", "").strip()
@@ -591,10 +606,13 @@ class PgConnection:
 
     def __exit__(self, exc_type, exc, tb):
         if self.conn:
-            if exc_type:
-                self.conn.rollback()
-            else:
-                self.conn.commit()
+            try:
+                if exc_type:
+                    self.conn.rollback()
+                else:
+                    self.conn.commit()
+            except Exception:
+                pass
         return self._pool_ctx.__exit__(exc_type, exc, tb)
 
     @staticmethod
@@ -788,7 +806,39 @@ def init_db():
             )
             """
         )
+        # Client Portal feature: documents and portal views
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS documents (
+                id BIGSERIAL PRIMARY KEY,
+                job_id BIGINT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+                name TEXT NOT NULL,
+                document_type TEXT,
+                file_path TEXT NOT NULL,
+                file_url TEXT,
+                client_visible BOOLEAN NOT NULL DEFAULT FALSE,
+                requires_client_signature BOOLEAN NOT NULL DEFAULT FALSE,
+                signed_at TEXT,
+                signed_by_name TEXT,
+                signed_ip TEXT,
+                created_at TEXT NOT NULL,
+                created_by BIGINT REFERENCES users(id) ON DELETE SET NULL
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS portal_views (
+                id BIGSERIAL PRIMARY KEY,
+                job_id BIGINT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+                viewed_at TEXT NOT NULL,
+                ip_address TEXT
+            )
+            """
+        )
         migrate_workspace_settings_table(conn)
+        migrate_jobs_table_portal(conn)
+        migrate_estimates_table_portal(conn)
         seed_default_users(conn)
 
 
@@ -871,6 +921,17 @@ def migrate_updates_table(conn):
 def migrate_estimates_table(conn):
     conn.execute("ALTER TABLE estimates ADD COLUMN IF NOT EXISTS other_service_details TEXT")
     conn.execute("ALTER TABLE estimates ADD COLUMN IF NOT EXISTS deleted_at TEXT")
+
+
+def migrate_jobs_table_portal(conn):
+    """Add Client Portal fields to jobs table."""
+    conn.execute("ALTER TABLE jobs ADD COLUMN IF NOT EXISTS portal_token TEXT UNIQUE")
+    conn.execute("ALTER TABLE jobs ADD COLUMN IF NOT EXISTS portal_enabled BOOLEAN NOT NULL DEFAULT FALSE")
+
+
+def migrate_estimates_table_portal(conn):
+    """Link estimates to jobs for portal documents."""
+    conn.execute("ALTER TABLE estimates ADD COLUMN IF NOT EXISTS job_id BIGINT REFERENCES jobs(id) ON DELETE SET NULL")
 
 
 def migrate_workspace_settings_table(conn):
@@ -1827,7 +1888,9 @@ def diagnostics():
 
 @app.before_request
 def ensure_database():
-    init_db()
+    if not app.config.get("DATABASE_INITIALIZED"):
+        init_db()
+        app.config["DATABASE_INITIALIZED"] = True
     user_id = session.get("user_id")
     g.user = None
     if user_id:
@@ -4432,6 +4495,343 @@ def download_walkthrough_pdf(walkthrough_id: int):
         return send_file(str(pdf_path), as_attachment=True, download_name=pdf_path.name)
 
 
+# ============================================================================
+# CLIENT PORTAL ROUTES
+# ============================================================================
+
+
+def generate_portal_token():
+    """Generate a secure portal token for a job."""
+    return secrets.token_urlsafe(32)
+
+
+def get_job_by_portal_token(token):
+    """Fetch job by portal token if portal is enabled."""
+    with get_db_connection() as conn:
+        job = conn.execute(
+            "SELECT * FROM jobs WHERE portal_token = ? AND portal_enabled = TRUE",
+            (token,),
+        ).fetchone()
+    return job
+
+
+def get_job_documents(conn, job_id):
+    """Fetch all client-visible documents for a job."""
+    docs = conn.execute(
+        """
+        SELECT * FROM documents
+        WHERE job_id = ? AND client_visible = TRUE
+        ORDER BY created_at DESC
+        """,
+        (job_id,),
+    ).fetchall()
+    return docs or []
+
+
+def get_portal_views(conn, job_id):
+    """Fetch portal view history for a job."""
+    views = conn.execute(
+        """
+        SELECT viewed_at, ip_address FROM portal_views
+        WHERE job_id = ?
+        ORDER BY viewed_at DESC
+        LIMIT 50
+        """,
+        (job_id,),
+    ).fetchall()
+    return views or []
+
+
+@app.route("/portal/<token>", methods=("GET",))
+def portal_job_view(token):
+    """Main client portal view for a job."""
+    job = get_job_by_portal_token(token)
+    if job is None:
+        return render_template("404.html"), 404
+    
+    job_id = job["id"]
+    now = datetime.now().isoformat(timespec="seconds")
+    client_ip = request.remote_addr or "unknown"
+    
+    # Log the portal view
+    with get_db_connection() as conn:
+        conn.execute(
+            """
+            INSERT INTO portal_views (job_id, viewed_at, ip_address)
+            VALUES (?, ?, ?)
+            """,
+            (job_id, now, client_ip),
+        )
+        
+        # Fetch job details, updates, documents
+        updates = conn.execute(
+            """
+            SELECT * FROM updates
+            WHERE job_id = ? AND client_visible = TRUE
+            ORDER BY timestamp DESC
+            """,
+            (job_id,),
+        ).fetchall()
+        
+        documents = get_job_documents(conn, job_id)
+        
+        # Fetch linked estimate if exists
+        estimate = conn.execute(
+            """
+            SELECT * FROM estimates
+            WHERE job_id = ? AND deleted_at IS NULL
+            ORDER BY created_at DESC
+            LIMIT 1
+            """,
+            (job_id,),
+        ).fetchone()
+    
+    # Group updates for display
+    grouped_updates = group_updates(updates)
+    update_days = group_updates_by_day(grouped_updates)
+    
+    # Check for unsigned documents
+    unsigned_docs = [d for d in documents if d.get("requires_client_signature") and not d.get("signed_at")]
+    
+    return render_template(
+        "portal/job.html",
+        job=job,
+        update_days=update_days,
+        documents=documents,
+        estimate=estimate,
+        token=token,
+        has_unsigned_docs=len(unsigned_docs) > 0,
+        unsigned_doc_count=len(unsigned_docs),
+        workspace_settings=g.__dict__.get("workspace_settings", {}),
+    )
+
+
+@app.route("/portal/<token>/report/<int:report_id>", methods=("GET",))
+def portal_report_view(token, report_id):
+    """View AI walkthrough report in portal."""
+    job = get_job_by_portal_token(token)
+    if job is None:
+        return render_template("404.html"), 404
+    
+    job_id = job["id"]
+    
+    with get_db_connection() as conn:
+        report = conn.execute(
+            """
+            SELECT wr.* FROM walkthrough_reports wr
+            JOIN walkthroughs w ON wr.walkthrough_id = w.id
+            WHERE w.job_id = ? AND wr.id = ?
+            """,
+            (job_id, report_id),
+        ).fetchone()
+    
+    if report is None:
+        return render_template("404.html"), 404
+    
+    return render_template(
+        "portal/report.html",
+        job=job,
+        report=report,
+        token=token,
+        workspace_settings=g.__dict__.get("workspace_settings", {}),
+    )
+
+
+@app.route("/portal/<token>/sign/<int:doc_id>", methods=("GET",))
+def portal_sign_page(token, doc_id):
+    """Sign-off page for a document."""
+    job = get_job_by_portal_token(token)
+    if job is None:
+        return render_template("404.html"), 404
+    
+    job_id = job["id"]
+    
+    with get_db_connection() as conn:
+        document = conn.execute(
+            """
+            SELECT * FROM documents
+            WHERE id = ? AND job_id = ? AND requires_client_signature = TRUE
+            """,
+            (doc_id, job_id),
+        ).fetchone()
+    
+    if document is None:
+        return render_template("404.html"), 404
+    
+    return render_template(
+        "portal/sign.html",
+        job=job,
+        document=document,
+        token=token,
+        workspace_settings=g.__dict__.get("workspace_settings", {}),
+    )
+
+
+@app.route("/portal/<token>/sign/<int:doc_id>", methods=("POST",))
+def portal_sign_submit(token, doc_id):
+    """Save signature for a document."""
+    job = get_job_by_portal_token(token)
+    if job is None:
+        return jsonify({"ok": False, "error": "Job not found"}), 404
+    
+    job_id = job["id"]
+    signed_by_name = request.form.get("signed_by_name", "").strip()
+    
+    if not signed_by_name:
+        return jsonify({"ok": False, "error": "Please enter your name"}), 400
+    
+    signed_ip = request.remote_addr or "unknown"
+    now = datetime.now().isoformat(timespec="seconds")
+    
+    with get_db_connection() as conn:
+        document = conn.execute(
+            """
+            SELECT * FROM documents
+            WHERE id = ? AND job_id = ? AND requires_client_signature = TRUE
+            """,
+            (doc_id, job_id),
+        ).fetchone()
+        
+        if document is None:
+            return jsonify({"ok": False, "error": "Document not found"}), 404
+        
+        # Update document with signature
+        conn.execute(
+            """
+            UPDATE documents
+            SET signed_at = ?, signed_by_name = ?, signed_ip = ?
+            WHERE id = ?
+            """,
+            (now, signed_by_name, signed_ip, doc_id),
+        )
+    
+    return jsonify({"ok": True, "message": "Document signed successfully"})
+
+
+@app.route("/job/<int:job_id>/portal/enable", methods=("POST",))
+@login_required
+@role_required("admin")
+def enable_job_portal(job_id):
+    """Enable portal for a job and generate token if needed."""
+    job = get_job_or_404(job_id)
+    if job is None:
+        return redirect(url_for("index"))
+    
+    with get_db_connection() as conn:
+        # Generate token if not exists
+        if not job.get("portal_token"):
+            token = generate_portal_token()
+            conn.execute(
+                """
+                UPDATE jobs SET portal_token = ?, portal_enabled = TRUE WHERE id = ?
+                """,
+                (token, job_id),
+            )
+        else:
+            # Just enable
+            conn.execute(
+                "UPDATE jobs SET portal_enabled = TRUE WHERE id = ?",
+                (job_id,),
+            )
+    
+    flash("Client portal enabled for this job.", "success")
+    return redirect(url_for("update_job", job_id=job_id))
+
+
+@app.route("/job/<int:job_id>/portal/disable", methods=("POST",))
+@login_required
+@role_required("admin")
+def disable_job_portal(job_id):
+    """Disable portal for a job."""
+    job = get_job_or_404(job_id)
+    if job is None:
+        return redirect(url_for("index"))
+    
+    with get_db_connection() as conn:
+        conn.execute(
+            "UPDATE jobs SET portal_enabled = FALSE WHERE id = ?",
+            (job_id,),
+        )
+    
+    flash("Client portal disabled for this job.", "success")
+    return redirect(url_for("update_job", job_id=job_id))
+
+
+@app.route("/job/<int:job_id>/portal/send-email", methods=("POST",))
+@login_required
+@role_required("admin")
+def send_portal_email(job_id):
+    """Send portal link to client via email."""
+    job = get_job_or_404(job_id)
+    if job is None:
+        return redirect(url_for("index"))
+    
+    if not job.get("portal_enabled") or not job.get("portal_token"):
+        flash("Portal is not enabled for this job.", "error")
+        return redirect(url_for("update_job", job_id=job_id))
+    
+    client_email = request.form.get("client_email", "").strip()
+    if not client_email:
+        flash("Please provide a client email address.", "error")
+        return redirect(url_for("update_job", job_id=job_id))
+    
+    with get_db_connection() as conn:
+        workspace = load_workspace_settings(conn)
+    
+    portal_url = url_for("portal_job_view", token=job["portal_token"], _external=True)
+    
+    try:
+        if mail:
+            msg = Message(
+                subject="Your project update from KAS Waterproofing & Building Services",
+                recipients=[client_email],
+                html=render_template(
+                    "emails/portal_invite.html",
+                    client_name=job.get("client_name", "Valued Client"),
+                    job_address=job.get("location", ""),
+                    portal_url=portal_url,
+                    workspace_settings=workspace,
+                ),
+            )
+            mail.send(msg)
+            flash(f"Portal link sent to {client_email}.", "success")
+        else:
+            flash("Email configuration not available. Portal link is available at: " + portal_url, "info")
+    except Exception as e:
+        app.logger.error("Failed to send portal email: %s", str(e))
+        flash("Failed to send email. Please try again.", "error")
+    
+    return redirect(url_for("update_job", job_id=job_id))
+
+
+@app.route("/job/<int:job_id>/update-visibility", methods=("POST",))
+@login_required
+@role_required("admin")
+def update_client_visibility(job_id):
+    """Toggle client_visible on updates and documents."""
+    job = get_job_or_404(job_id)
+    if job is None:
+        return redirect(url_for("index"))
+    
+    update_id = request.form.get("update_id", type=int)
+    doc_id = request.form.get("doc_id", type=int)
+    visible = request.form.get("visible") == "true"
+    
+    with get_db_connection() as conn:
+        if update_id:
+            conn.execute(
+                "UPDATE updates SET client_visible = ? WHERE id = ? AND job_id = ?",
+                (visible, update_id, job_id),
+            )
+        elif doc_id:
+            conn.execute(
+                "UPDATE documents SET client_visible = ? WHERE id = ? AND job_id = ?",
+                (visible, doc_id, job_id),
+            )
+    
+    return jsonify({"ok": True})
+
+
 @app.errorhandler(413)
 def file_too_large(_error):
     flash("Upload is too large. Please upload fewer or smaller photos.", "error")
@@ -4464,6 +4864,7 @@ if __name__ == "__main__":
         app.logger.info("DATABASE_URL not set. PostgreSQL checks skipped.")
 
     init_db()
+    app.config["DATABASE_INITIALIZED"] = True
     port = int(os.environ.get("PORT", "5000"))
     is_production = os.environ.get("RENDER") == "true" or os.environ.get("FLASK_ENV") == "production"
     app.run(host="0.0.0.0", port=port, debug=not is_production)

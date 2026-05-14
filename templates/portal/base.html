@@ -1,0 +1,462 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0f6a47">
+    <meta name="description" content="Project Status Portal - KAS Waterproofing & Building Services">
+    {% set company_logo_url = workspace_settings.logo_url if workspace_settings else '' %}
+    <title>{% block title %}Project Status | KAS{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="icon" href="{{ workspace_settings.favicon_url if workspace_settings else url_for('static', filename='icons/favicon.svg') }}" type="{{ workspace_settings.favicon_mimetype if workspace_settings else 'image/svg+xml' }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        /* Portal-specific styling */
+        body.portal-layout {
+            background: #f8f9fa;
+        }
+        
+        .portal-header {
+            background: white;
+            border-bottom: 1px solid #e9ecef;
+            padding: 1.5rem 2rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        .portal-brand {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .portal-brand-mark {
+            width: 48px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #0f6a47;
+            color: white;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 1.25rem;
+        }
+        
+        .portal-brand-mark img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 8px;
+        }
+        
+        .portal-brand-text h1 {
+            margin: 0;
+            font-size: 1.125rem;
+            color: #0f6a47;
+            font-weight: 700;
+        }
+        
+        .portal-brand-text p {
+            margin: 0;
+            font-size: 0.875rem;
+            color: #6c757d;
+        }
+        
+        .portal-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        .portal-content {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        
+        .status-pill {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            background: #e9ecef;
+            color: #495057;
+        }
+        
+        .status-pill.in-progress {
+            background: #d1e7dd;
+            color: #0f6a47;
+        }
+        
+        .status-pill.completed {
+            background: #d1e7dd;
+            color: #0f6a47;
+        }
+        
+        .status-pill.pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .timeline {
+            display: flex;
+            gap: 1rem;
+            justify-content: space-between;
+            margin: 2rem 0;
+            flex-wrap: wrap;
+        }
+        
+        .timeline-item {
+            flex: 1;
+            min-width: 150px;
+            text-align: center;
+        }
+        
+        .timeline-dot {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            margin: 0 auto 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: white;
+            background: #e9ecef;
+            font-size: 1rem;
+        }
+        
+        .timeline-item.done .timeline-dot {
+            background: #0f6a47;
+        }
+        
+        .timeline-item.active .timeline-dot {
+            background: #0f6a47;
+            box-shadow: 0 0 0 4px rgba(15, 106, 71, 0.2);
+        }
+        
+        .timeline-label {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #495057;
+        }
+        
+        .timeline-item.done .timeline-label {
+            color: #0f6a47;
+        }
+        
+        .stat-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-radius: 12px;
+            padding: 1.5rem;
+            border: 1px solid #dee2e6;
+        }
+        
+        .stat-card-label {
+            font-size: 0.875rem;
+            color: #6c757d;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .stat-card-value {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: #0f6a47;
+        }
+        
+        .updates-feed {
+            margin: 2rem 0;
+        }
+        
+        .update-day {
+            margin-bottom: 2rem;
+        }
+        
+        .update-day-header {
+            font-size: 0.875rem;
+            font-weight: 700;
+            color: #0f6a47;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding-bottom: 0.75rem;
+            border-bottom: 2px solid #0f6a47;
+            margin-bottom: 1rem;
+        }
+        
+        .update-item {
+            margin-bottom: 1.5rem;
+            padding-bottom: 1.5rem;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .update-item:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+        
+        .update-header {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 0.75rem;
+            align-items: baseline;
+        }
+        
+        .update-author {
+            font-weight: 600;
+            color: #495057;
+            font-size: 0.95rem;
+        }
+        
+        .update-time {
+            font-size: 0.875rem;
+            color: #6c757d;
+        }
+        
+        .update-notes {
+            color: #495057;
+            line-height: 1.6;
+            margin-bottom: 1rem;
+        }
+        
+        .photo-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+        
+        .photo-item {
+            position: relative;
+            border-radius: 8px;
+            overflow: hidden;
+            background: #f8f9fa;
+            aspect-ratio: 1;
+        }
+        
+        .photo-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .photo-date {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(transparent, rgba(0,0,0,0.7));
+            color: white;
+            padding: 0.75rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+        
+        .documents-list {
+            margin: 2rem 0;
+        }
+        
+        .document-item {
+            display: flex;
+            align-items: center;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-bottom: 0.75rem;
+            gap: 1rem;
+            text-decoration: none;
+            color: inherit;
+            transition: background 0.2s;
+        }
+        
+        .document-item:hover {
+            background: #e9ecef;
+        }
+        
+        .document-icon {
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #0f6a47;
+            color: white;
+            border-radius: 6px;
+            flex-shrink: 0;
+        }
+        
+        .document-meta {
+            flex: 1;
+        }
+        
+        .document-name {
+            font-weight: 600;
+            color: #495057;
+        }
+        
+        .document-type {
+            font-size: 0.875rem;
+            color: #6c757d;
+        }
+        
+        .document-action {
+            margin-left: auto;
+            padding: 0.5rem 1rem;
+            background: #0f6a47;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 0.875rem;
+        }
+        
+        .document-action:hover {
+            background: #0a4a31;
+        }
+        
+        .banner {
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+        }
+        
+        .banner.warning {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            color: #856404;
+        }
+        
+        .banner-content {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .banner-icon {
+            flex-shrink: 0;
+            font-size: 1.5rem;
+        }
+        
+        .contact-strip {
+            background: linear-gradient(135deg, #0f6a47 0%, #084a31 100%);
+            color: white;
+            padding: 2rem;
+            border-radius: 12px;
+            margin-top: 2rem;
+            text-align: center;
+        }
+        
+        .contact-strip-title {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .contact-info {
+            display: flex;
+            gap: 2rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        
+        .contact-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .contact-item a {
+            color: white;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        
+        .contact-item a:hover {
+            text-decoration: underline;
+        }
+        
+        @media (max-width: 768px) {
+            .portal-header {
+                padding: 1rem;
+            }
+            
+            .portal-container {
+                padding: 1rem;
+            }
+            
+            .portal-content {
+                padding: 1.5rem;
+            }
+            
+            .timeline {
+                flex-direction: column;
+            }
+            
+            .timeline-item {
+                min-width: unset;
+            }
+            
+            .photo-grid {
+                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            }
+            
+            .contact-info {
+                flex-direction: column;
+                gap: 1rem;
+            }
+        }
+    </style>
+</head>
+<body class="portal-layout">
+    <header class="portal-header">
+        <div class="portal-brand">
+            <div class="portal-brand-mark">
+                {% if company_logo_url %}
+                    <img src="{{ company_logo_url }}" alt="{{ workspace_settings.company_name or 'KAS' }} logo">
+                {% else %}
+                    KAS
+                {% endif %}
+            </div>
+            <div class="portal-brand-text">
+                <h1>{{ workspace_settings.company_name or 'KAS Waterproofing & Building Services' }}</h1>
+                <p>Client Portal</p>
+            </div>
+        </div>
+    </header>
+    
+    <main class="portal-container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} reveal">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>
