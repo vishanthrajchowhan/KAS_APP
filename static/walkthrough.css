@@ -16,6 +16,70 @@
   overflow: hidden;
 }
 
+#walkthrough-modal .wt-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  background: #0f6a47;
+  color: #fff;
+  border-bottom: 1px solid rgba(255,255,255,0.18);
+}
+
+#walkthrough-modal .wt-title {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+#walkthrough-modal .wt-close-btn {
+  background: rgba(255,255,255,0.14);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.28);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
+#wt-status {
+  padding: 10px 16px;
+  background: #f8faf9;
+  color: #33443b;
+  border-top: 1px solid #e4ebe6;
+  font-size: 13px;
+}
+
+#wt-status[data-tone="recording"] {
+  background: #fff4e6;
+  color: #7a4100;
+}
+
+#wt-status[data-tone="success"] {
+  background: #ecf8f0;
+  color: #0f6a47;
+}
+
+#wt-status[data-tone="warning"] {
+  background: #fff8db;
+  color: #6f5500;
+}
+
+#wt-status[data-tone="error"] {
+  background: #fff0f0;
+  color: #a32020;
+}
+
+#wt-photo-count {
+  position: absolute;
+  left: 16px;
+  top: 16px;
+  padding: 8px 10px;
+  background: rgba(0,0,0,0.62);
+  color: #fff;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
 #walkthrough-modal video {
   display: block;
   width: 100%;
@@ -162,7 +226,47 @@
 }
 
 #wt-timer {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  padding: 8px 10px;
+  background: rgba(180, 35, 35, 0.9);
+  color: #fff;
+  border-radius: 6px;
+  font-size: 16px;
+  font-weight: 700;
   font-family: 'Courier New', monospace;
+}
+
+.wt-control {
+  padding: 10px 14px;
+  border: 0;
+  border-radius: 6px;
+  color: #fff;
+  font-weight: 700;
+}
+
+.wt-record { background: #b42323; }
+.wt-snap { background: #1f6fb2; }
+.wt-camera { background: #5b5f66; }
+.wt-done { background: #0f6a47; }
+
+.wt-notes label {
+  display: block;
+  margin-bottom: 6px;
+  color: #24332b;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.wt-notes textarea {
+  width: 100%;
+  min-height: 90px;
+  padding: 10px;
+  border: 1px solid #d7ded9;
+  border-radius: 6px;
+  resize: vertical;
+  font: inherit;
 }
 
 /* Mobile responsiveness */
@@ -237,7 +341,6 @@
   background: #2b6cb0;
   color: white;
   box-shadow: 0 6px 18px rgba(0,0,0,0.18);
-  display: flex;
   align-items: center;
   justify-content: center;
   font-size: 20px;

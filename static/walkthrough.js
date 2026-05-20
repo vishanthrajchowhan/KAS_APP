@@ -1,14 +1,19 @@
-// CompanyCam-style AI Walkthrough Recorder
 let mediaRecorder;
 let recordedChunks = [];
 let recordingTimer;
+let autoSnapshotTimer;
 let recordingSeconds = 0;
 let recordingActive = false;
 let videoStream;
 let videoElement;
 let canvasElement;
 let snapshots = [];
-let currentFacingMode = 'environment';
+let currentFacingMode = "environment";
+let speechRecognition;
+let speechTranscript = "";
+let speechFinalTranscript = "";
+
+const AUTO_SNAPSHOT_SECONDS = 12;
 
 function buildVideoConstraints(facingMode, useExact = false) {
   const facing = useExact ? { exact: facingMode } : { ideal: facingMode };
@@ -34,390 +39,340 @@ async function startCameraStream(preferredFacingMode) {
   for (const attempt of attempts) {
     try {
       return await attempt();
-    } catch (e) {
-      lastError = e;
+    } catch (err) {
+      lastError = err;
     }
   }
-  throw lastError || new Error('Unable to access camera');
+  throw lastError || new Error("Unable to access camera");
 }
 
 function formatTime(seconds) {
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
   const s = seconds % 60;
-  return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
+function setWalkthroughStatus(message, tone = "info") {
+  const status = document.getElementById("wt-status");
+  if (!status) return;
+  status.textContent = message;
+  status.dataset.tone = tone;
+}
+
+function startSpeechCapture() {
+  speechTranscript = "";
+  speechFinalTranscript = "";
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    setWalkthroughStatus("Recording video. Browser speech capture is not available, so server transcription will be used if configured.", "warning");
+    return;
+  }
+
+  speechRecognition = new SpeechRecognition();
+  speechRecognition.continuous = true;
+  speechRecognition.interimResults = true;
+  speechRecognition.lang = "en-US";
+  speechRecognition.onresult = (event) => {
+    let interim = "";
+    for (let i = event.resultIndex; i < event.results.length; i += 1) {
+      const text = event.results[i][0].transcript;
+      if (event.results[i].isFinal) {
+        speechFinalTranscript += `${text.trim()} `;
+      } else {
+        interim += text;
+      }
+    }
+    speechTranscript = `${speechFinalTranscript} ${interim}`.trim();
+  };
+  speechRecognition.onerror = () => {};
+  speechRecognition.onend = () => {
+    if (recordingActive) {
+      try { speechRecognition.start(); } catch (err) {}
+    }
+  };
+  try {
+    speechRecognition.start();
+  } catch (err) {
+    setWalkthroughStatus("Video is recording. Browser speech capture could not start.", "warning");
+  }
 }
 
 function closeWalkthroughModal() {
-  const modal = document.getElementById('walkthrough-modal');
-  if (modal) {
-    if (recordingActive) stopRecording();
-    if (videoStream) videoStream.getTracks().forEach(t => t.stop());
-    modal.remove();
-    try { document.body.style.overflow = ''; document.documentElement.style.overflow = ''; } catch (e) {}
-    document.body.classList.remove('wt-modal-open');
-  }
+  const modal = document.getElementById("walkthrough-modal");
+  if (recordingActive) stopRecording();
+  if (videoStream) videoStream.getTracks().forEach((track) => track.stop());
+  if (modal) modal.remove();
+  document.body.style.overflow = "";
+  document.documentElement.style.overflow = "";
+  document.body.classList.remove("wt-modal-open");
+}
+
+function createButton(label, className) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = className;
+  button.textContent = label;
+  return button;
 }
 
 async function startRecording(jobId) {
   try {
-    // Create modal container
-    const modal = document.createElement('div');
-    modal.id = 'walkthrough-modal';
-    const isCompactMobile = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
-    if (isCompactMobile) modal.classList.add('wt-compact-mobile');
-    modal.style.cssText = `
-      position: fixed; top: 0; left: 0; 
-      width: 100%; height: 100%; 
-      background: white; z-index: 9999;
-      display: flex; flex-direction: column;
-      padding: 0; margin: 0;
-    `;
+    if (!navigator.mediaDevices || !window.MediaRecorder) {
+      throw new Error("Camera recording is not supported in this browser.");
+    }
 
-    // Header with close button
-    const header = document.createElement('div');
-    header.className = 'wt-header';
-    header.style.cssText = `
-      display: flex; justify-content: space-between; align-items: center;
-      padding: 12px 16px; background: #2b6cb0; color: white;
-      border-bottom: 1px solid #ddd;
-    `;
-    const title = document.createElement('div');
-    title.textContent = '🎥 Walkthrough';
-    title.style.fontWeight = 'bold';
-    title.style.fontSize = '16px';
-    const closeBtn = document.createElement('button');
-    closeBtn.textContent = '✕';
-    closeBtn.style.cssText = `
-      background: none; border: none; color: white; font-size: 24px;
-      cursor: pointer; padding: 0; width: 32px; height: 32px;
-    `;
+    const modal = document.createElement("div");
+    modal.id = "walkthrough-modal";
+    const isCompactMobile = window.matchMedia && window.matchMedia("(max-width: 768px)").matches;
+    if (isCompactMobile) modal.classList.add("wt-compact-mobile");
+
+    const header = document.createElement("div");
+    header.className = "wt-header";
+    const title = document.createElement("div");
+    title.className = "wt-title";
+    title.textContent = "AI Walkthrough";
+    const closeBtn = createButton("Close", "wt-close-btn");
     closeBtn.onclick = closeWalkthroughModal;
     header.appendChild(title);
     header.appendChild(closeBtn);
 
-    // Video preview area (full width, responsive)
-    videoElement = document.createElement('video');
+    videoElement = document.createElement("video");
     videoElement.autoplay = true;
     videoElement.muted = true;
-    videoElement.playsinline = true;
-    videoElement.style.cssText = `
-      width: 100%;
-      background: #000;
-      object-fit: contain;
-      display: block;
-      height: 100%;
-    `;
-    if (!isCompactMobile) {
-      videoElement.style.aspectRatio = '9 / 16';
-      videoElement.style.flex = '1';
-    }
+    videoElement.playsInline = true;
 
-    // Hidden canvas for snapshots
-    canvasElement = document.createElement('canvas');
-    canvasElement.style.display = 'none';
+    canvasElement = document.createElement("canvas");
+    canvasElement.style.display = "none";
 
-    // Timer display overlay
-    const timerDisplay = document.createElement('div');
-    timerDisplay.id = 'wt-timer';
-    timerDisplay.style.cssText = `
-      position: absolute; top: 60px; right: 16px;
-      padding: 10px 14px; background: rgba(211, 47, 47, 0.9); 
-      color: white; border-radius: 4px; 
-      font-weight: bold; font-size: 18px; font-family: monospace;
-      z-index: 10001;
-    `;
-    timerDisplay.textContent = '00:00:00';
+    const timerDisplay = document.createElement("div");
+    timerDisplay.id = "wt-timer";
+    timerDisplay.textContent = "0:00:00";
 
-    // Video container
-    const videoContainer = document.createElement('div');
-    videoContainer.className = 'wt-video-container';
-    videoContainer.style.cssText = `
-      position: relative; flex: 1 1 auto; min-height: 0;
-    `;
+    const snapshotCount = document.createElement("div");
+    snapshotCount.id = "wt-photo-count";
+    snapshotCount.textContent = "0 photos";
+
+    const videoContainer = document.createElement("div");
+    videoContainer.className = "wt-video-container";
     videoContainer.appendChild(videoElement);
     videoContainer.appendChild(timerDisplay);
+    videoContainer.appendChild(snapshotCount);
 
-    // Instructions
-    const instructions = document.createElement('div');
-    if (isCompactMobile) instructions.classList.add('wt-hide-on-mobile');
-    instructions.style.cssText = `
-      padding: 12px 16px; background: #f5f5f5; 
-      font-size: 13px; color: #666; text-align: center;
-    `;
-    instructions.textContent = '📸 Take pics and think out loud';
+    const status = document.createElement("div");
+    status.id = "wt-status";
+    status.textContent = "Start recording, speak clearly, and point the camera at each work area.";
 
-    // Controls area
-    const controls = document.createElement('div');
-    controls.className = 'wt-controls';
-    if (isCompactMobile) controls.classList.add('wt-mobile-controls');
-    controls.style.cssText = `
-      padding: 12px 16px; background: white;
-      display: flex; gap: 8px; justify-content: center;
-      flex-wrap: wrap; border-top: 1px solid #ddd;
-    `;
-
-    // Record button
-    const recordBtn = document.createElement('button');
-    recordBtn.id = 'wt-record-btn';
-    recordBtn.textContent = '⏺️ Record';
-    recordBtn.style.cssText = `
-      padding: 10px 20px; background: #d32f2f; color: white;
-      border: none; border-radius: 4px; cursor: pointer;
-      font-weight: bold; font-size: 14px;
-    `;
-
-    // Snap button
-    const snapBtn = document.createElement('button');
-    snapBtn.id = 'wt-snap-btn';
-    snapBtn.textContent = '📷 Snap';
-    snapBtn.style.cssText = `
-      padding: 10px 20px; background: #2b6cb0; color: white;
-      border: none; border-radius: 4px; cursor: pointer;
-      font-weight: bold; font-size: 14px;
-    `;
-    snapBtn.onclick = () => takeSnapshot();
-
-    // Camera switch button
-    const cameraBtn = document.createElement('button');
-    cameraBtn.id = 'wt-camera-btn';
-    cameraBtn.textContent = '🔄 Camera';
-    cameraBtn.style.cssText = `
-      padding: 10px 14px; background: #6d4c41; color: white;
-      border: none; border-radius: 4px; cursor: pointer;
-      font-weight: bold; font-size: 14px;
-    `;
-
-    // Done button
-    const doneBtn = document.createElement('button');
-    doneBtn.textContent = '✓ Done';
-    doneBtn.style.cssText = `
-      padding: 10px 20px; background: #388e3c; color: white;
-      border: none; border-radius: 4px; cursor: pointer;
-      font-weight: bold; font-size: 14px;
-    `;
-    doneBtn.onclick = async () => {
-      if (recordingActive) stopRecording();
-      await uploadWalkthrough(jobId, modal);
-    };
-
+    const controls = document.createElement("div");
+    controls.className = "wt-controls";
+    const recordBtn = createButton("Record", "wt-control wt-record");
+    const snapBtn = createButton("Snap Photo", "wt-control wt-snap");
+    const cameraBtn = createButton("Switch Camera", "wt-control wt-camera");
+    const doneBtn = createButton("Finish", "wt-control wt-done");
     controls.appendChild(recordBtn);
     controls.appendChild(snapBtn);
     controls.appendChild(cameraBtn);
     controls.appendChild(doneBtn);
-    if (isCompactMobile) {
-      recordBtn.style.minWidth = '96px';
-      snapBtn.style.minWidth = '84px';
-      cameraBtn.style.minWidth = '92px';
-      doneBtn.style.minWidth = '84px';
-      recordBtn.style.padding = '9px 12px';
-      snapBtn.style.padding = '9px 12px';
-      cameraBtn.style.padding = '9px 12px';
-      doneBtn.style.padding = '9px 12px';
-    }
 
-    // Notes area
-    const notesSection = document.createElement('div');
-    notesSection.className = 'wt-notes';
-    if (isCompactMobile) notesSection.classList.add('wt-hide-on-mobile');
-    notesSection.style.cssText = `
-      padding: 12px 16px; background: white;
-      border-top: 1px solid #ddd; max-height: 160px; overflow-y: auto;
-    `;
-    const notesLabel = document.createElement('label');
-    notesLabel.style.cssText = `
-      display: block; font-weight: bold; 
-      margin-bottom: 8px; font-size: 13px;
-    `;
-    notesLabel.textContent = '📝 Notes';
-    const notesInput = document.createElement('textarea');
-    notesInput.id = 'wt-notes';
-    notesInput.placeholder = 'Write down observations, issues, next steps...';
-    notesInput.style.cssText = `
-      width: 100%; height: 120px; padding: 8px;
-      border: 1px solid #ddd; border-radius: 4px;
-      font-size: 13px; font-family: inherit;
-      resize: vertical;
-    `;
+    const notesSection = document.createElement("div");
+    notesSection.className = "wt-notes";
+    const notesLabel = document.createElement("label");
+    notesLabel.htmlFor = "wt-notes";
+    notesLabel.textContent = "Field notes";
+    const notesInput = document.createElement("textarea");
+    notesInput.id = "wt-notes";
+    notesInput.placeholder = "Optional: type anything the report must include.";
     notesSection.appendChild(notesLabel);
     notesSection.appendChild(notesInput);
 
-    // Assemble modal
     modal.appendChild(header);
     modal.appendChild(videoContainer);
-    modal.appendChild(instructions);
+    modal.appendChild(status);
     modal.appendChild(controls);
     modal.appendChild(notesSection);
     modal.appendChild(canvasElement);
-    // Prevent background scrolling while modal is open
-    try { document.body.style.overflow = 'hidden'; document.documentElement.style.overflow = 'hidden'; } catch (e) {}
-    if (isCompactMobile) document.body.classList.add('wt-modal-open');
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+    if (isCompactMobile) document.body.classList.add("wt-modal-open");
     document.body.appendChild(modal);
 
-    // Request camera with robust fallback and preferred rear camera
-    currentFacingMode = 'environment';
+    currentFacingMode = "environment";
     videoStream = await startCameraStream(currentFacingMode);
     videoElement.srcObject = videoStream;
+    await videoElement.play().catch(() => {});
+
     videoElement.onloadedmetadata = () => {
       if (videoElement.videoWidth && videoElement.videoHeight) {
         videoElement.style.aspectRatio = `${videoElement.videoWidth} / ${videoElement.videoHeight}`;
       }
-      const track = videoStream && videoStream.getVideoTracks ? videoStream.getVideoTracks()[0] : null;
-      const settings = track && track.getSettings ? track.getSettings() : null;
-      const activeFacing = settings && settings.facingMode ? settings.facingMode : currentFacingMode;
-      videoElement.classList.toggle('wt-user-camera', activeFacing === 'user');
     };
 
     cameraBtn.onclick = async () => {
+      if (recordingActive) {
+        setWalkthroughStatus("Stop recording before switching cameras.", "warning");
+        return;
+      }
       try {
-        if (recordingActive) {
-          alert('Stop recording before switching camera.');
-          return;
-        }
-        currentFacingMode = currentFacingMode === 'environment' ? 'user' : 'environment';
-        if (videoStream) videoStream.getTracks().forEach(t => t.stop());
+        currentFacingMode = currentFacingMode === "environment" ? "user" : "environment";
+        if (videoStream) videoStream.getTracks().forEach((track) => track.stop());
         videoStream = await startCameraStream(currentFacingMode);
         videoElement.srcObject = videoStream;
-      } catch (e) {
-        alert('Unable to switch camera: ' + e.message);
+        await videoElement.play().catch(() => {});
+        setWalkthroughStatus("Camera switched.", "success");
+      } catch (err) {
+        setWalkthroughStatus(`Unable to switch camera: ${err.message}`, "error");
       }
     };
 
-    // Setup recording
-    let mimeType = 'video/webm';
-    if (!MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')) {
-      if (MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')) {
-        mimeType = 'video/webm;codecs=vp8,opus';
-      } else if (MediaRecorder.isTypeSupported('video/webm')) {
-        mimeType = 'video/webm';
-      }
-    }
+    const mimeTypes = [
+      "video/webm;codecs=vp9,opus",
+      "video/webm;codecs=vp8,opus",
+      "video/webm"
+    ];
+    const mimeType = mimeTypes.find((type) => MediaRecorder.isTypeSupported(type)) || "";
+    const recorderOptions = mimeType ? { mimeType, bitsPerSecond: 900000 } : { bitsPerSecond: 900000 };
 
     recordedChunks = [];
     snapshots = [];
-    // Lower bitrate to reduce upload size and speed up mobile uploads
-    const recorderOptions = { mimeType };
-    try {
-      recorderOptions.bitsPerSecond = 900000; // ~0.9 Mbps
-    } catch (e) {
-      // ignore
-    }
     mediaRecorder = new MediaRecorder(videoStream, recorderOptions);
-    mediaRecorder.ondataavailable = (e) => { 
-      if (e.data && e.data.size > 0) recordedChunks.push(e.data); 
+    mediaRecorder.ondataavailable = (event) => {
+      if (event.data && event.data.size > 0) recordedChunks.push(event.data);
     };
 
     recordBtn.onclick = () => {
       if (recordingActive) {
         stopRecording();
-        recordBtn.textContent = '⏺️ Record';
-      } else {
-        recordingSeconds = 0;
-        recordedChunks = [];
-        mediaRecorder.start();
-        recordingActive = true;
-        recordBtn.textContent = '⏹️ Stop';
-        
-        recordingTimer = setInterval(() => {
-          recordingSeconds++;
-          timerDisplay.textContent = formatTime(recordingSeconds);
-        }, 1000);
+        recordBtn.textContent = "Record";
+        setWalkthroughStatus("Recording stopped. Finish to upload the walkthrough.", "success");
+        return;
       }
+
+      recordingSeconds = 0;
+      recordedChunks = [];
+      snapshots = [];
+      snapshotCount.textContent = "0 photos";
+      mediaRecorder.start(1000);
+      recordingActive = true;
+      recordBtn.textContent = "Stop";
+      setWalkthroughStatus("Recording. Speak naturally while the app captures photos.", "recording");
+      startSpeechCapture();
+
+      takeSnapshot("start");
+      recordingTimer = setInterval(() => {
+        recordingSeconds += 1;
+        timerDisplay.textContent = formatTime(recordingSeconds);
+      }, 1000);
+      autoSnapshotTimer = setInterval(() => takeSnapshot("auto"), AUTO_SNAPSHOT_SECONDS * 1000);
     };
 
+    snapBtn.onclick = () => takeSnapshot("manual");
+
+    doneBtn.onclick = async () => {
+      if (recordingActive) {
+        stopRecording();
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
+      await uploadWalkthrough(jobId);
+    };
   } catch (err) {
-    // If getUserMedia or MediaRecorder not supported (e.g., some iOS browsers), provide a file-input fallback
-    console.warn('Camera/MediaRecorder error:', err);
-    const fallback = confirm('Camera recording is not available in this browser. Would you like to upload a recorded video file from your device instead?');
-    if (fallback) {
-      const fileInput = document.createElement('input');
-      fileInput.type = 'file';
-      fileInput.accept = 'video/*';
-      fileInput.capture = 'environment';
-      fileInput.onchange = async (ev) => {
-        const file = ev.target.files[0];
-        if (!file) return;
-        try {
-          alert('📤 Uploading selected video...');
-          const fd = new FormData();
-          fd.append('video', file, file.name);
-          fd.append('job_id', jobId);
-          const res = await fetch('/api/walkthroughs/upload', { method: 'POST', body: fd });
-          const data = await res.json();
-          if (!res.ok) throw new Error(data.error || 'Upload failed');
-          alert('✅ Walkthrough uploaded via file input. Redirecting...');
-          window.location.href = `/walkthroughs/${data.id}`;
-        } catch (e) {
-          alert('Upload failed: ' + e.message);
-        }
-      };
-      fileInput.click();
-    } else {
-      alert('Camera error: ' + err.message);
-    }
-    console.error('Camera access error:', err);
+    console.warn("Camera/MediaRecorder error:", err);
+    const useFallback = confirm("Camera recording is not available in this browser. Upload a recorded video file instead?");
+    if (useFallback) openVideoFallback(jobId);
   }
 }
 
-function takeSnapshot() {
-  if (!videoElement || !canvasElement) return;
-  try {
-    canvasElement.width = videoElement.videoWidth;
-    canvasElement.height = videoElement.videoHeight;
-    const ctx = canvasElement.getContext('2d');
-    ctx.drawImage(videoElement, 0, 0);
-    canvasElement.toBlob((blob) => {
-      snapshots.push(blob);
-      alert(`📸 Snapshot saved (${snapshots.length})`);
-    });
-  } catch (err) {
-    alert('Snapshot error: ' + err.message);
+function takeSnapshot(source = "manual") {
+  if (!videoElement || !canvasElement || !videoElement.videoWidth) {
+    setWalkthroughStatus("Camera is not ready for a photo yet.", "warning");
+    return;
   }
+
+  canvasElement.width = videoElement.videoWidth;
+  canvasElement.height = videoElement.videoHeight;
+  const ctx = canvasElement.getContext("2d");
+  ctx.drawImage(videoElement, 0, 0);
+  canvasElement.toBlob(
+    (blob) => {
+      if (!blob) return;
+      snapshots.push({ blob, timestamp: recordingSeconds, source });
+      const count = document.getElementById("wt-photo-count");
+      if (count) count.textContent = `${snapshots.length} photo${snapshots.length === 1 ? "" : "s"}`;
+      setWalkthroughStatus(`Photo ${snapshots.length} saved at ${formatTime(recordingSeconds)}.`, "success");
+    },
+    "image/jpeg",
+    0.84
+  );
 }
 
 function stopRecording() {
-  if (mediaRecorder && mediaRecorder.state === 'recording') {
+  if (mediaRecorder && mediaRecorder.state === "recording") {
     mediaRecorder.stop();
-    recordingActive = false;
-    clearInterval(recordingTimer);
+  }
+  recordingActive = false;
+  clearInterval(recordingTimer);
+  clearInterval(autoSnapshotTimer);
+  if (speechRecognition) {
+    try { speechRecognition.stop(); } catch (err) {}
   }
 }
 
-async function uploadWalkthrough(jobId, modal) {
-  if (recordedChunks.length === 0) {
-    alert('No video recorded. Press Record first.');
+async function uploadWalkthrough(jobId) {
+  if (!recordedChunks.length) {
+    setWalkthroughStatus("No video recorded. Press Record first.", "error");
     return;
   }
 
   try {
-    const notes = document.getElementById('wt-notes').value;
-    const blob = new Blob(recordedChunks, { type: 'video/webm' });
+    const notesInput = document.getElementById("wt-notes");
+    const notes = notesInput ? notesInput.value.trim() : "";
+    const blob = new Blob(recordedChunks, { type: recordedChunks[0]?.type || "video/webm" });
     const fd = new FormData();
-    fd.append('video', blob, `walk_${Date.now()}.webm`);
-    fd.append('job_id', jobId);
-    if (notes) fd.append('notes', notes);
+    fd.append("video", blob, `walk_${Date.now()}.webm`);
+    fd.append("job_id", jobId);
+    if (notes) fd.append("notes", notes);
+    if (speechTranscript) fd.append("browser_transcript", speechTranscript);
 
-    alert('📤 Uploading walkthrough... this may take a moment');
-    const res = await fetch('/api/walkthroughs/upload', { method: 'POST', body: fd });
+    const snapshotTimes = snapshots.map((snapshot) => snapshot.timestamp);
+    snapshots.forEach((snapshot, index) => {
+      fd.append("snapshots", snapshot.blob, `photo_${String(index + 1).padStart(2, "0")}_${snapshot.timestamp}s.jpg`);
+    });
+    fd.append("snapshot_times", JSON.stringify(snapshotTimes));
+
+    setWalkthroughStatus("Uploading walkthrough and photos. Keep this tab open.", "recording");
+    const res = await fetch("/api/walkthroughs/upload", { method: "POST", body: fd });
     const data = await res.json();
-    
-    if (!res.ok) throw new Error(data.error || 'Upload failed');
-    
-    // Cleanup
-    if (videoStream) videoStream.getTracks().forEach(t => t.stop());
-    // Close via helper to restore scrolling
+    if (!res.ok) throw new Error(data.error || "Upload failed");
+
     closeWalkthroughModal();
-    
-    alert(`✅ Walkthrough uploaded! (ID: ${data.id})\n\nRedirecting to report...`);
-    setTimeout(() => {
-      window.location.href = `/walkthroughs/${data.id}`;
-    }, 1500);
+    window.location.href = `/walkthroughs/${data.id}`;
   } catch (err) {
-    alert('❌ Upload failed: ' + err.message);
-    console.error('Upload error:', err);
+    setWalkthroughStatus(`Upload failed: ${err.message}`, "error");
+    console.error("Upload error:", err);
   }
 }
 
-// Expose to global for button clicks
+function openVideoFallback(jobId) {
+  const fileInput = document.createElement("input");
+  fileInput.type = "file";
+  fileInput.accept = "video/*";
+  fileInput.capture = "environment";
+  fileInput.onchange = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    try {
+      const fd = new FormData();
+      fd.append("video", file, file.name);
+      fd.append("job_id", jobId);
+      const res = await fetch("/api/walkthroughs/upload", { method: "POST", body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Upload failed");
+      window.location.href = `/walkthroughs/${data.id}`;
+    } catch (err) {
+      alert(`Upload failed: ${err.message}`);
+    }
+  };
+  fileInput.click();
+}
+
 window.startRecording = startRecording;
 window.closeWalkthroughModal = closeWalkthroughModal;

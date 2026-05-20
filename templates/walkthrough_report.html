@@ -4,69 +4,68 @@
   <meta charset="utf-8">
   <title>Walkthrough Report</title>
   <style>
-    body { font-family: Arial, sans-serif; margin: 24px; color: #333; line-height: 1.6; }
-    header { display:flex; align-items:center; gap:16px; border-bottom:2px solid #2b6cb0; padding-bottom:16px; margin-bottom:24px; }
-    .logo { width:100px; height:auto; }
-    .header-info h1 { margin:0; font-size:24px; color:#2b6cb0; }
-    .header-info div { font-size:14px; color:#666; margin:4px 0; }
-    .section { margin-top:24px; page-break-inside: avoid; }
-    .section h2 { color:#2b6cb0; border-bottom:1px solid #ddd; padding-bottom:8px; }
-    .frames { display:flex; gap:8px; flex-wrap:wrap; }
-    .frames > div { text-align:center; }
-    .frames img { width:180px; height:auto; border:1px solid #ccc; margin:4px; }
-    .frames div { font-size:12px; color:#666; }
-    pre { background:#f5f5f5; padding:12px; border-radius:4px; overflow-x:auto; white-space: pre-wrap; word-wrap: break-word; }
+    body { font-family: Arial, sans-serif; margin: 24px; color: #26332d; line-height: 1.55; }
+    header { border-bottom: 2px solid #0f6a47; padding-bottom: 14px; margin-bottom: 22px; }
+    h1 { margin: 0 0 8px; font-size: 24px; color: #0f6a47; }
+    h2 { margin: 0 0 10px; color: #0f6a47; border-bottom: 1px solid #dfe7e2; padding-bottom: 6px; }
+    .meta { font-size: 13px; color: #66736c; }
+    .section { margin-top: 22px; page-break-inside: avoid; }
+    .box { background: #f7faf8; border: 1px solid #e1e8e3; border-radius: 6px; padding: 12px; white-space: pre-wrap; }
+    .obs { border: 1px solid #dfe7e2; border-radius: 6px; padding: 12px; margin-bottom: 10px; }
+    .obs-title { font-weight: 700; color: #1f2f27; }
+    .obs-meta { font-size: 12px; color: #66736c; margin: 4px 0 8px; }
+    .frames { display: flex; gap: 10px; flex-wrap: wrap; }
+    .frame { width: 180px; font-size: 12px; color: #66736c; }
+    .frame img { width: 180px; height: auto; border: 1px solid #ccd7d0; border-radius: 4px; display: block; }
+    footer { margin-top: 36px; border-top: 1px solid #dfe7e2; padding-top: 12px; font-size: 12px; color: #66736c; }
   </style>
 </head>
 <body>
   <header>
-    <div>
-      <div class="header-info">
-        <h1>🏗️ Walkthrough Report</h1>
-        <div><strong>Date:</strong> {{ created_at or 'N/A' }}</div>
-        <div><strong>Crew Member:</strong> {{ created_by or 'N/A' }}</div>
-      </div>
-    </div>
+    <h1>Walkthrough Report</h1>
+    <div class="meta"><strong>Date:</strong> {{ created_at or 'N/A' }}</div>
+    <div class="meta"><strong>Crew Member:</strong> {{ created_by or 'N/A' }}</div>
   </header>
 
   <div class="section">
     <h2>Project Summary</h2>
-    <pre>{{ ai.get('project_summary', ai.get('raw', '')) }}</pre>
+    <div class="box">{{ (ai.get('project_summary') or ai.get('client_summary') or ai.get('raw') or 'No summary generated yet.')|report_value }}</div>
   </div>
 
+  {% if ai.get('observations') %}
   <div class="section">
-    <h2>Completed Work</h2>
-    <pre>{{ ai.get('completed_work', '') }}</pre>
+    <h2>Photo-Linked Observations</h2>
+    {% for obs in ai.get('observations') %}
+      <div class="obs">
+        <div class="obs-title">{{ obs.get('area') or 'Observation' }}</div>
+        <div class="obs-meta">
+          {% if obs.get('timestamp_seconds') is not none %}{{ obs.get('timestamp_seconds')|int }}s{% endif %}
+          {% if obs.get('photo_refs') %} | {{ obs.get('photo_refs')|join(', ') if obs.get('photo_refs') is iterable and obs.get('photo_refs') is not string else obs.get('photo_refs') }}{% endif %}
+          {% if obs.get('priority') %} | Priority: {{ obs.get('priority') }}{% endif %}
+        </div>
+        {% if obs.get('employee_notes') %}<div><strong>Notes:</strong> {{ obs.get('employee_notes') }}</div>{% endif %}
+        {% if obs.get('issue') %}<div><strong>Issue:</strong> {{ obs.get('issue') }}</div>{% endif %}
+        {% if obs.get('action_required') %}<div><strong>Action:</strong> {{ obs.get('action_required') }}</div>{% endif %}
+      </div>
+    {% endfor %}
   </div>
+  {% endif %}
 
-  <div class="section">
-    <h2>Materials Used</h2>
-    <pre>{{ ai.get('materials_used', '') }}</pre>
-  </div>
-
-  <div class="section">
-    <h2>Issues Found</h2>
-    <pre>{{ ai.get('issues_found', '') }}</pre>
-  </div>
-
-  <div class="section">
-    <h2>Safety Notes</h2>
-    <pre>{{ ai.get('safety_notes', '') }}</pre>
-  </div>
-
-  <div class="section">
-    <h2>Next Steps</h2>
-    <pre>{{ ai.get('next_steps', '') }}</pre>
-  </div>
+  {% for title, key in [('Completed Work', 'completed_work'), ('Materials Used', 'materials_used'), ('Issues Found', 'issues_found'), ('Safety Notes', 'safety_notes'), ('Next Steps', 'next_steps')] %}
+    <div class="section">
+      <h2>{{ title }}</h2>
+      <div class="box">{{ (ai.get(key) or 'None noted.')|report_value }}</div>
+    </div>
+  {% endfor %}
 
   {% if frames %}
   <div class="section">
-    <h2>📸 Photos Timeline</h2>
+    <h2>Photo Timeline</h2>
     <div class="frames">
       {% for f in frames %}
-        <div>
-          <img src="{{ f.frame_url }}" alt="frame at {{ f.timestamp_seconds }}s">
-          <div>{{ f.timestamp_seconds|int }}s</div>
+        <div class="frame">
+          <img src="{{ f.frame_url }}" alt="Photo {{ loop.index }} at {{ f.timestamp_seconds }} seconds">
+          <div>Photo {{ loop.index }} | {{ f.timestamp_seconds|int }}s</div>
         </div>
       {% endfor %}
     </div>
@@ -74,12 +73,10 @@
   {% endif %}
 
   <div class="section">
-    <h2>Full Transcript</h2>
-    <pre>{{ transcript }}</pre>
+    <h2>Transcript</h2>
+    <div class="box">{{ transcript or 'No transcript available.' }}</div>
   </div>
 
-  <footer style="margin-top:40px; border-top:1px solid #ddd; padding-top:16px; font-size:12px; color:#666;">
-    <p>Generated by KAS Waterproofing AI Walkthrough Note System</p>
-  </footer>
+  <footer>Generated by KAS Waterproofing AI Walkthrough.</footer>
 </body>
 </html>

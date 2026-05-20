@@ -57,6 +57,26 @@
     </div>
 </section>
 
+{% if reports %}
+<section class="panel">
+    <h3>Uploaded Reports</h3>
+    <div class="report-list">
+        {% for r in reports %}
+            <div class="report-row">
+                <div>
+                    <strong>Report for Walkthrough #{{ r.walkthrough_id }}</strong>
+                    <div class="muted">{{ r.created_at }}</div>
+                </div>
+                <div>
+                    <a class="button" href="{{ r.pdf_url }}" target="_blank">Preview</a>
+                    <a class="button" href="{{ r.pdf_url }}" download>Download</a>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
+
 <section class="panel task-progress-panel">
     <div class="section-heading-row">
         <div>

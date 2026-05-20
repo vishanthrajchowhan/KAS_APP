@@ -15,6 +15,7 @@ from flask import (
     abort,
     flash,
     g,
+    has_request_context,
     jsonify,
     redirect,
     render_template,
@@ -312,14 +313,31 @@ from datetime import datetime as _dt
 
 def _fmt_date(val):
     if not val:
-        return "—"
+        return "-"
     try:
         return _dt.fromisoformat(str(val)[:10]).strftime("%b %d, %Y")
     except Exception:
         return str(val)[:10]
 
 
+def _report_value(val):
+    if val is None or val == "":
+        return ""
+    if isinstance(val, list):
+        items = []
+        for item in val:
+            if isinstance(item, dict):
+                items.append("; ".join(f"{key}: {value}" for key, value in item.items() if value not in (None, "")))
+            else:
+                items.append(str(item))
+        return "\n".join(f"- {item}" for item in items if item)
+    if isinstance(val, dict):
+        return "\n".join(f"{key}: {value}" for key, value in val.items() if value not in (None, ""))
+    return str(val)
+
+
 app.jinja_env.filters["fmtdate"] = _fmt_date
+app.jinja_env.filters["report_value"] = _report_value
 
 try:
     from flask_mail import Mail, Message
@@ -418,6 +436,8 @@ def allowed_video_file(filename: str) -> bool:
 
 
 def extract_audio_from_video(video_path: str, out_audio_path: str) -> None:
+    if not shutil.which("ffmpeg"):
+        raise RuntimeError("ffmpeg is not installed. Browser transcript or direct OpenAI media transcription is required.")
     # Extract audio to WAV (mono, 16kHz) for Whisper
     cmd = [
         "ffmpeg",
@@ -439,7 +459,8 @@ def extract_audio_from_video(video_path: str, out_audio_path: str) -> None:
 def transcribe_with_whisper(audio_path: str) -> str:
     if openai is None:
         raise RuntimeError("openai package is not installed")
-    openai.api_key = os.environ.get("OPENAI_API_KEY")
+    if not os.environ.get("OPENAI_API_KEY"):
+        raise RuntimeError("OPENAI_API_KEY is not configured.")
     with open(audio_path, "rb") as f:
         # Using the OpenAI Audio Transcription endpoint (Whisper)
         try:
@@ -455,40 +476,112 @@ def transcribe_with_whisper(audio_path: str) -> str:
             return resp.text if hasattr(resp, "text") else str(resp)
 
 
-def generate_ai_report(transcript: str, job: dict | None = None) -> dict:
+def clean_json_response(text: str) -> str:
+    text = (text or "").strip()
+    if text.startswith("```"):
+        text = re.sub(r"^```(?:json)?\s*", "", text, flags=re.IGNORECASE)
+        text = re.sub(r"\s*```$", "", text)
+    return text.strip()
+
+
+def generate_ai_report(transcript: str, job: dict | None = None, photo_timeline=None, field_notes: str = "") -> dict:
     if openai is None:
         raise RuntimeError("openai package is not installed")
-    openai.api_key = os.environ.get("OPENAI_API_KEY")
+    if not os.environ.get("OPENAI_API_KEY"):
+        raise RuntimeError("OPENAI_API_KEY is not configured.")
+    photo_timeline = photo_timeline or []
+    job_context = {
+        "name": job.get("name") if job else "",
+        "location": job.get("location") if job else "",
+        "client_name": job.get("client_name") if job else "",
+        "service_type": job.get("service_type") if job else "",
+        "description": job.get("description") if job else "",
+        "status": job.get("status") if job else "",
+    }
     system_prompt = (
-        "You are an expert construction project reporter. Parse the transcript and produce a JSON"
-        " with keys: project_summary, completed_work, materials_used, issues_found, safety_notes, next_steps."
-        " Keep answers concise, professional, and formatted for waterproofing/construction context."
+        "You are a senior construction field-report writer for waterproofing and building services. "
+        "Create an organized, factual report from an employee's spoken walkthrough transcript, typed notes, "
+        "job context, and timestamped photos. Do not invent facts. If something is unclear, say it needs verification. "
+        "Return JSON only with these keys: project_summary, observations, completed_work, materials_used, "
+        "issues_found, safety_notes, next_steps, client_summary. observations must be an array of objects with "
+        "area, timestamp_seconds, photo_refs, employee_notes, issue, action_required, priority."
     )
-    user_prompt = f"Transcript:\n\n{transcript}\n\nProduce JSON only."
+    user_prompt = json.dumps(
+        {
+            "job": job_context,
+            "typed_field_notes": field_notes,
+            "photo_timeline": photo_timeline,
+            "transcript": transcript,
+            "report_rules": [
+                "Group observations by location or work area when possible.",
+                "Use photo_refs such as Photo 1, Photo 2 when a timestamped photo supports an observation.",
+                "Keep contractor-facing wording concise and professional.",
+                "Separate completed work from issues and next steps.",
+            ],
+        },
+        ensure_ascii=True,
+    )
     try:
-        completion = openai.ChatCompletion.create(
-            model=os.environ.get("OPENAI_GPT_MODEL", "gpt-4o-mini"),
-            messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}],
-            temperature=0.1,
-            max_tokens=900,
-        )
-        text = completion["choices"][0]["message"]["content"]
-    except Exception:
-        # Fallback to completions
-        completion = openai.Completion.create(
-            engine=os.environ.get("OPENAI_GPT_MODEL", "gpt-4"),
-            prompt=system_prompt + "\n\n" + user_prompt,
-            max_tokens=900,
-            temperature=0.1,
-        )
-        text = completion["choices"][0]["text"]
+        client = openai.OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+        create_kwargs = {
+            "model": os.environ.get("OPENAI_GPT_MODEL", "gpt-4o-mini"),
+            "messages": [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}],
+            "temperature": 0.1,
+            "max_tokens": 1400,
+        }
+        try:
+            completion = client.chat.completions.create(**create_kwargs, response_format={"type": "json_object"})
+        except TypeError:
+            completion = client.chat.completions.create(**create_kwargs)
+        text = completion.choices[0].message.content or ""
+    except Exception as exc:
+        raise RuntimeError(f"OpenAI report generation failed: {exc}") from exc
     # Attempt to parse JSON from model output
     try:
-        parsed = json.loads(text)
+        parsed = json.loads(clean_json_response(text))
     except Exception:
         # If not valid JSON, wrap the raw text
         parsed = {"raw": text}
     return parsed
+
+
+def generate_fallback_walkthrough_report(transcript: str, job: dict | None = None, photo_timeline=None, field_notes: str = "", error: str = "") -> dict:
+    photo_timeline = photo_timeline or []
+    job_name = job.get("name") if job else "this job"
+    summary_parts = [f"Walkthrough report for {job_name}."]
+    if field_notes:
+        summary_parts.append("Typed field notes were provided by the crew.")
+    if transcript:
+        summary_parts.append("Speech transcript was captured in the browser.")
+    if photo_timeline:
+        summary_parts.append(f"{len(photo_timeline)} walkthrough photos were captured.")
+    if error:
+        summary_parts.append(f"AI processing note: {error}")
+
+    observations = [
+        {
+            "area": item["photo_ref"],
+            "timestamp_seconds": item.get("timestamp_seconds"),
+            "photo_refs": [item["photo_ref"]],
+            "employee_notes": "Review this captured walkthrough photo with the spoken/typed notes.",
+            "issue": "",
+            "action_required": "Verify condition and add follow-up details if needed.",
+            "priority": "Review",
+        }
+        for item in photo_timeline
+    ]
+
+    notes = field_notes or transcript or ""
+    return {
+        "project_summary": " ".join(summary_parts),
+        "observations": observations,
+        "completed_work": notes if notes else "No completed work was stated in the captured notes.",
+        "materials_used": "No materials were clearly identified in the captured notes.",
+        "issues_found": "No issues were clearly identified in the captured notes.",
+        "safety_notes": "No safety concerns were clearly identified in the captured notes.",
+        "next_steps": "Review the photo timeline and transcript, then add any missing actions.",
+        "client_summary": "Walkthrough photos and notes were captured for review.",
+    }
 
 
 def generate_pdf_from_report(html_content: str, out_pdf_path: str) -> None:
@@ -504,7 +597,9 @@ def generate_pdf_from_report(html_content: str, out_pdf_path: str) -> None:
             try:
                 pdfkit.from_string(html_content, out_pdf_path)
             except OSError as e:
-                raise RuntimeError(f"pdfkit error (wkhtmltopdf not found): {e}")
+                if not ReportLab:
+                    raise RuntimeError(f"pdfkit error (wkhtmltopdf not found): {e}") from e
+                generate_pdf_with_reportlab(html_content, out_pdf_path)
     else:
         HTML(string=html_content).write_pdf(out_pdf_path)
 
@@ -517,7 +612,48 @@ def generate_pdf_with_reportlab(html_content: str, out_pdf_path: str) -> None:
     from reportlab.lib.units import inch
     from reportlab.lib.enums import TA_LEFT, TA_CENTER
     import re
-    
+    import tempfile
+    import urllib.request
+    from pathlib import Path
+
+    # Extract image sources from HTML to include in PDF
+    image_srcs = re.findall(r'<img[^>]+src=["\']([^"\']+)["\']', html_content, flags=re.IGNORECASE)
+    temp_img_dir = Path(tempfile.mkdtemp())
+    images_files = []
+    for src in image_srcs:
+        try:
+            # Local media served by the app: /walkthroughs/media/...
+            if src.startswith('/walkthroughs/media/'):
+                rel = src.split('/walkthroughs/media/', 1)[1].lstrip('/')
+                candidate = UPLOAD_FOLDER / rel
+                if candidate.exists():
+                    images_files.append(str(candidate))
+                    continue
+            # Local upload paths
+            if src.startswith('uploads/') or src.startswith('static/uploads/'):
+                candidate = BASE_DIR / src
+                if candidate.exists():
+                    images_files.append(str(candidate))
+                    continue
+            # Absolute or relative filesystem path
+            p = Path(src)
+            if p.exists():
+                images_files.append(str(p))
+                continue
+            # Remote URL: download to temp dir
+            parsed = urlparse(src)
+            if parsed.scheme in ('http', 'https'):
+                filename = Path(parsed.path).name or f"img_{len(images_files)}.png"
+                outpath = temp_img_dir / filename
+                try:
+                    urllib.request.urlretrieve(src, outpath)
+                    images_files.append(str(outpath))
+                    continue
+                except Exception:
+                    pass
+        except Exception:
+            continue
+
     # Extract text content from HTML (basic parsing)
     content = html_content
     # Remove script and style tags
@@ -530,12 +666,12 @@ def generate_pdf_with_reportlab(html_content: str, out_pdf_path: str) -> None:
     content = re.sub(r'<br\s*/?>', '\n', content, flags=re.IGNORECASE)
     content = re.sub(r'<[^>]+>', '', content)  # Remove remaining tags
     content = re.sub(r'\n\s*\n', '\n', content)  # Clean up whitespace
-    
+
     # Create PDF
     doc = SimpleDocTemplate(out_pdf_path, pagesize=letter)
     story = []
     styles = getSampleStyleSheet()
-    
+
     # Add title
     title_style = ParagraphStyle(
         'CustomTitle',
@@ -544,9 +680,9 @@ def generate_pdf_with_reportlab(html_content: str, out_pdf_path: str) -> None:
         textColor='#2b6cb0',
         spaceAfter=12,
     )
-    story.append(Paragraph('🎥 Walkthrough Report', title_style))
+    story.append(Paragraph('Walkthrough Report', title_style))
     story.append(Spacer(1, 0.3*inch))
-    
+
     # Add content
     for line in content.split('\n'):
         line = line.strip()
@@ -556,7 +692,25 @@ def generate_pdf_with_reportlab(html_content: str, out_pdf_path: str) -> None:
             p = Paragraph(line, styles['Normal'])
             story.append(p)
             story.append(Spacer(1, 0.05*inch))
-    
+
+    # Append images after text
+    from reportlab.platypus import Image as RLImage
+    for img_path in images_files:
+        try:
+            rlimg = RLImage(img_path)
+            max_width = 6.5 * inch
+            orig_w = rlimg.drawWidth
+            orig_h = rlimg.drawHeight
+            if orig_w > max_width:
+                ratio = max_width / float(orig_w)
+                rlimg.drawWidth = orig_w * ratio
+                rlimg.drawHeight = orig_h * ratio
+            story.append(Spacer(1, 0.2 * inch))
+            story.append(rlimg)
+            story.append(Spacer(1, 0.1 * inch))
+        except Exception:
+            continue
+
     # Build PDF
     doc.build(story)
 
@@ -577,7 +731,7 @@ def supabase_storage_headers(content_type=None):
 
 
 def ensure_storage_buckets():
-    # ❌ Disable automatic bucket creation (causes timeout on Render)
+    # Disable automatic bucket creation; it can timeout on Render.
     return
 
 
@@ -1289,6 +1443,8 @@ def storage_path_for_upload(kind, source_filename, job_id=None, extension=None):
         return f"receipt-job{job_id}-{timestamp}-{unique}-{clean_stem}.{extension}"
     if kind == "logo":
         return f"logo-company-{timestamp}-{unique}.{extension}"
+    if kind == "walkthrough_frame":
+        return f"walkthrough-job{job_id}-{timestamp}-{unique}-{clean_stem}.{extension}"
     return f"document-{timestamp}-{unique}-{clean_stem}.{extension}"
 
 
@@ -1351,6 +1507,36 @@ def upload_local_file_to_storage(local_path, bucket_key, kind, job_id=None):
         content_type_for_extension(extension),
     )
     return {"path": storage_path, "url": public_url}
+
+
+def save_walkthrough_snapshot(uploaded_file, walkthrough_id, job_id, index):
+    if not uploaded_file or not uploaded_file.filename or not allowed_file(uploaded_file.filename):
+        return None
+
+    if supabase_storage_configured():
+        try:
+            return save_upload_to_storage(
+                uploaded_file,
+                "walkthrough_frames",
+                "walkthrough_frame",
+                job_id=job_id,
+                compress_images=True,
+            )
+        except Exception as exc:
+            app.logger.warning("Supabase snapshot upload failed; saving locally instead: %s", safe_error_detail(exc))
+            try:
+                uploaded_file.stream.seek(0)
+            except Exception:
+                pass
+
+    content, extension, _content_type = compress_image_upload(uploaded_file, max_size=(1400, 1400), quality=84)
+    frames_dir = UPLOAD_FOLDER / "walkthroughs" / "frames"
+    frames_dir.mkdir(parents=True, exist_ok=True)
+    filename = f"walkthrough-{walkthrough_id}-photo-{index}-{uuid.uuid4().hex[:8]}.{extension}"
+    path = frames_dir / filename
+    path.write_bytes(content)
+    relative_path = f"frames/{filename}"
+    return {"path": str(path), "url": f"/walkthroughs/media/{quote(relative_path)}"}
 
 
 def is_public_url(value):
@@ -1462,6 +1648,17 @@ def parse_date(value):
 
 def parse_checkbox(value):
     return str(value or "").strip().lower() in {"1", "on", "true", "yes"}
+
+
+def is_safe_redirect_target(target):
+    if not target:
+        return False
+    parsed = urlparse(target)
+    return parsed.scheme == "" and parsed.netloc == "" and target.startswith("/") and not target.startswith("//")
+
+
+def safe_redirect(target, fallback_endpoint="index"):
+    return redirect(target if is_safe_redirect_target(target) else url_for(fallback_endpoint))
 
 
 def normalize_bool(value, default=False):
@@ -1918,10 +2115,17 @@ def ensure_database():
 
 @app.context_processor
 def inject_workspace_context():
+    if not has_request_context():
+        return {
+            "workspace_settings": DEFAULT_WORKSPACE_SETTINGS.copy(),
+            "notifications": [],
+            "notification_count": 0,
+        }
     with get_db_connection() as conn:
         workspace_settings = load_workspace_settings(conn)
 
-    notifications = build_notifications_for_user(g.user, workspace_settings) if g.user is not None else []
+    current_user = getattr(g, "user", None)
+    notifications = build_notifications_for_user(current_user, workspace_settings) if current_user is not None else []
     return {
         "workspace_settings": workspace_settings,
         "notifications": notifications,
@@ -2002,7 +2206,7 @@ def login():
         session.clear()
         session["user_id"] = user["id"]
         flash("Signed in.", "success")
-        return redirect(request.args.get("next") or url_for("index"))
+        return safe_redirect(request.args.get("next"))
 
     return render_template("login.html")
 
@@ -2817,6 +3021,16 @@ def update_job(job_id):
         if not tasks and job.get("service_type"):
             sync_job_tasks(conn, job_id, split_services(job.get("service_type")))
             tasks = fetch_job_tasks(conn, job_id)
+        # Fetch uploaded walkthrough reports for this job (public URLs)
+        reports = conn.execute(
+            """
+            SELECT wr.* FROM walkthrough_reports wr
+            JOIN walkthroughs w ON wr.walkthrough_id = w.id
+            WHERE w.job_id = ? AND wr.pdf_url LIKE 'http%%'
+            ORDER BY wr.created_at DESC
+            """,
+            (job_id,),
+        ).fetchall()
     updates = group_updates(update_rows)
     update_days = group_updates_by_day(updates)
 
@@ -2842,6 +3056,7 @@ def update_job(job_id):
         tasks=tasks,
         task_statuses=TASK_STATUSES,
         task_summary=task_progress_summary(tasks),
+        reports=reports,
     )
 
 
@@ -3217,7 +3432,7 @@ def update_photo_visibility(update_id):
         )
 
     flash("Photo visibility updated.", "success")
-    if next_url.startswith("/"):
+    if is_safe_redirect_target(next_url):
         return redirect(next_url)
     return redirect(url_for("update_job", job_id=photo["job_id"]))
 
@@ -3249,7 +3464,7 @@ def delete_update_media(update_id, media_kind):
         ).fetchone()
         if media is None:
             flash(missing_message, "error")
-            return redirect(next_url if next_url.startswith("/") else url_for("index"))
+            return safe_redirect(next_url)
 
         try:
             delete_storage_object(bucket_key, media[path_column], media[url_column])
@@ -3272,7 +3487,7 @@ def delete_update_media(update_id, media_kind):
     else:
         flash(success_message, "success")
 
-    if next_url.startswith("/"):
+    if is_safe_redirect_target(next_url):
         return redirect(next_url)
     return redirect(url_for("update_job", job_id=media["job_id"]))
 
@@ -3327,7 +3542,7 @@ def bulk_delete_media():
     total_selected = len(photo_ids) + len(receipt_ids)
     if total_selected == 0:
         flash("Select photos or receipts to delete.", "error")
-        return redirect(next_url if next_url.startswith("/") else url_for("index"))
+        return safe_redirect(next_url)
 
     deleted_count = 0
     storage_delete_failed = False
@@ -3361,7 +3576,7 @@ def bulk_delete_media():
     else:
         flash("Selected media was not found.", "error")
 
-    return redirect(next_url if next_url.startswith("/") else url_for("index"))
+    return safe_redirect(next_url)
 
 
 @app.route("/photo/<int:update_id>/delete", methods=("POST",))
@@ -4279,8 +4494,21 @@ def walkthrough_media(filename):
 @login_required
 def api_walkthrough_upload():
     video = request.files.get("video")
-    job_id = request.form.get("job_id")
+    job_id = request.form.get("job_id", type=int)
     notes = request.form.get("notes", "")
+    browser_transcript = request.form.get("browser_transcript", "").strip()
+    snapshot_files = [file for file in request.files.getlist("snapshots") if file and file.filename]
+    try:
+        snapshot_times = json.loads(request.form.get("snapshot_times") or "[]")
+    except ValueError:
+        snapshot_times = []
+    if not job_id:
+        return jsonify({"error": "A valid job_id is required"}), 400
+    job = get_job_or_404(job_id)
+    if job is None:
+        return jsonify({"error": "Job not found"}), 404
+    if not can_update_job(job):
+        return jsonify({"error": "You do not have permission to update this job"}), 403
     if video is None or video.filename == "":
         return jsonify({"error": "No video file provided"}), 400
     if not allowed_video_file(video.filename):
@@ -4294,6 +4522,8 @@ def api_walkthrough_upload():
     video.save(str(save_path))
 
     now = datetime.now().isoformat(timespec="seconds")
+    created_by = g.user["id"] if g.user else None
+
     with get_db_connection() as conn:
         cur = conn.execute(
             """
@@ -4301,10 +4531,33 @@ def api_walkthrough_upload():
             VALUES (?, ?, ?, ?, ?)
             RETURNING id
             """,
-            (job_id, str(save_path), url_for("walkthrough_media", filename=unique_name), g.user_id if hasattr(g, "user_id") else None, now),
+            (job_id, str(save_path), url_for("walkthrough_media", filename=unique_name), created_by, now),
         )
         row = cur.fetchone()
         walkthrough_id = row["id"] if row else None
+
+        if walkthrough_id:
+            for index, snapshot in enumerate(snapshot_files, start=1):
+                try:
+                    saved_snapshot = save_walkthrough_snapshot(snapshot, walkthrough_id, job_id, index)
+                except Exception as exc:
+                    app.logger.exception("Failed to save walkthrough snapshot %s: %s", index, exc)
+                    continue
+                if not saved_snapshot:
+                    continue
+                timestamp_seconds = 0
+                if index - 1 < len(snapshot_times):
+                    try:
+                        timestamp_seconds = float(snapshot_times[index - 1])
+                    except (TypeError, ValueError):
+                        timestamp_seconds = 0
+                conn.execute(
+                    """
+                    INSERT INTO walkthrough_frames (walkthrough_id, frame_path, frame_url, timestamp_seconds, created_at)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (walkthrough_id, saved_snapshot["path"], saved_snapshot["url"], timestamp_seconds, now),
+                )
 
     # Store user notes in an update if provided
     if notes and walkthrough_id:
@@ -4315,7 +4568,7 @@ def api_walkthrough_upload():
                     INSERT INTO updates (job_id, notes, user_id, timestamp, client_visible)
                     VALUES (?, ?, ?, ?, ?)
                     """,
-                    (job_id, f"[Walkthrough #{walkthrough_id}]\n{notes}", g.user_id if hasattr(g, "user_id") else None, now, False),
+                    (job_id, f"[Walkthrough #{walkthrough_id}]\n{notes}", created_by, now, False),
                 )
         except Exception:
             app.logger.exception("Failed to store walkthrough notes")
@@ -4323,7 +4576,7 @@ def api_walkthrough_upload():
     # Start background processing so upload returns quickly on mobile
     try:
         if walkthrough_id:
-            t = threading.Thread(target=process_walkthrough, args=(walkthrough_id, save_path), daemon=True)
+            t = threading.Thread(target=process_walkthrough_in_context, args=(walkthrough_id, save_path, notes, browser_transcript), daemon=True)
             t.start()
     except Exception as exc:
         app.logger.exception("Failed to start background walkthrough processing: %s", exc)
@@ -4331,33 +4584,42 @@ def api_walkthrough_upload():
     return jsonify({"id": walkthrough_id, "video_url": url_for("walkthrough_media", filename=unique_name)}), 201
 
 
+def process_walkthrough_in_context(walkthrough_id: int, video_path: Path, field_notes: str = "", browser_transcript: str = "") -> None:
+    with app.test_request_context():
+        process_walkthrough(walkthrough_id, video_path, field_notes=field_notes, browser_transcript=browser_transcript)
+
+
 @app.route("/api/walkthroughs/<int:walkthrough_id>/status")
 @login_required
 def api_walkthrough_status(walkthrough_id: int):
     """Return basic status for a walkthrough: whether transcript and pdf are available."""
     with get_db_connection() as conn:
-        row = conn.execute("SELECT id, transcript, pdf_url, created_at FROM walkthroughs WHERE id = ?", (walkthrough_id,)).fetchone()
+        row = conn.execute("SELECT id, transcript, ai_summary, pdf_url, created_at FROM walkthroughs WHERE id = ?", (walkthrough_id,)).fetchone()
         if not row:
             return jsonify({"ok": False, "error": "not_found"}), 404
         status = {
             "ok": True,
             "id": row["id"],
             "transcript_available": bool(row.get("transcript")),
+            "report_available": bool(row.get("ai_summary")),
             "pdf_available": bool(row.get("pdf_url")),
             "created_at": row.get("created_at"),
         }
     return jsonify(status)
 
 
-def process_walkthrough(walkthrough_id: int, video_path: Path) -> None:
+def process_walkthrough(walkthrough_id: int, video_path: Path, field_notes: str = "", browser_transcript: str = "") -> None:
     # Extract audio
     tmpdir = Path(tempfile.mkdtemp())
     try:
-        # Lookup job_id
+        # Lookup job context
         job_id = None
+        job = None
         with get_db_connection() as conn:
             row = conn.execute("SELECT job_id FROM walkthroughs WHERE id = ?", (walkthrough_id,)).fetchone()
             job_id = row["job_id"] if row else None
+            if job_id:
+                job = conn.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone()
 
         # Upload original video to Supabase storage (if configured)
         if supabase_storage_configured():
@@ -4367,15 +4629,7 @@ def process_walkthrough(walkthrough_id: int, video_path: Path) -> None:
                     conn.execute("UPDATE walkthroughs SET video_path = ?, video_url = ? WHERE id = ?", (up_video["path"], up_video["url"], walkthrough_id))
             except Exception:
                 app.logger.exception("Failed to upload video to Supabase storage")
-        audio_path = tmpdir / f"{walkthrough_id}.wav"
-        extract_audio_from_video(str(video_path), str(audio_path))
-        transcript = transcribe_with_whisper(str(audio_path))
-
-        # Generate AI report
-        ai_json = generate_ai_report(transcript)
-        report_text = json.dumps(ai_json, indent=2) if isinstance(ai_json, dict) else str(ai_json)
-
-        # Extract frames every 10 seconds
+        # Extract backup frames every 15 seconds. Employee snapshots are saved separately at upload time.
         frames = []
         if cv2 is not None:
             cap = cv2.VideoCapture(str(video_path))
@@ -4394,26 +4648,33 @@ def process_walkthrough(walkthrough_id: int, video_path: Path) -> None:
                 fname = f"walk_{walkthrough_id}_{idx}.jpg"
                 fpath = frames_dir / fname
                 cv2.imwrite(str(fpath), frame)
-                frames.append({"path": str(fpath), "timestamp": timestamp, "filename": fname})
+                frames.append({"path": str(fpath), "timestamp": timestamp, "filename": f"frames/{fname}"})
                 idx += 1
-                timestamp += 10
+                timestamp += 15
             cap.release()
 
-        # Save transcript, ai_summary, report_text in DB
-        pdf_url = None
+        transcript = browser_transcript.strip()
+        transcription_error = ""
+        if not transcript:
+            try:
+                if shutil.which("ffmpeg"):
+                    audio_path = tmpdir / f"{walkthrough_id}.wav"
+                    extract_audio_from_video(str(video_path), str(audio_path))
+                    transcript = transcribe_with_whisper(str(audio_path))
+                else:
+                    # OpenAI accepts webm/mp4 media files directly, so this works on
+                    # local machines without ffmpeg when an API key is configured.
+                    transcript = transcribe_with_whisper(str(video_path))
+            except Exception as exc:
+                transcription_error = str(exc)
+                app.logger.exception("Walkthrough transcription failed for %s: %s", walkthrough_id, exc)
+
         with get_db_connection() as conn:
-            conn.execute(
-                """
-                UPDATE walkthroughs
-                SET transcript = ?, ai_summary = ?, report_text = ?
-                WHERE id = ?
-                """,
-                (transcript, json.dumps(ai_json), report_text, walkthrough_id),
-            )
-            # Insert frames (and upload to Supabase storage when available)
+            # Insert backup video frames before AI generation so reports still have photos
+            # when the employee did not press Snap.
             for f in frames:
                 now = datetime.now().isoformat(timespec="seconds")
-                frame_url = url_for("walkthrough_media", filename=f["filename"])
+                frame_url = f"/walkthroughs/media/{quote(f['filename'])}"
                 if supabase_storage_configured():
                     try:
                         up = upload_local_file_to_storage(Path(f["path"]), "walkthrough_frames", "walkthrough_frame", job_id=job_id)
@@ -4428,9 +4689,55 @@ def process_walkthrough(walkthrough_id: int, video_path: Path) -> None:
                     (walkthrough_id, f["path"], frame_url, f["timestamp"], now),
                 )
 
+            existing_frames = conn.execute(
+                "SELECT frame_url, timestamp_seconds FROM walkthrough_frames WHERE walkthrough_id = ? ORDER BY timestamp_seconds, id",
+                (walkthrough_id,),
+            ).fetchall()
+        photo_timeline = [
+            {
+                "photo_ref": f"Photo {index}",
+                "timestamp_seconds": row["timestamp_seconds"],
+                "url": row["frame_url"],
+            }
+            for index, row in enumerate(existing_frames, start=1)
+        ]
+
+        # Generate AI report after transcript and photo timeline are available.
+        try:
+            ai_json = generate_ai_report(transcript, job=job, photo_timeline=photo_timeline, field_notes=field_notes)
+        except Exception as exc:
+            app.logger.exception("AI report generation failed for walkthrough %s: %s", walkthrough_id, exc)
+            fallback_error = str(exc)
+            if transcription_error:
+                fallback_error = f"{transcription_error}; {fallback_error}"
+            ai_json = generate_fallback_walkthrough_report(
+                transcript,
+                job=job,
+                photo_timeline=photo_timeline,
+                field_notes=field_notes,
+                error=fallback_error,
+            )
+        report_text = json.dumps(ai_json, indent=2) if isinstance(ai_json, dict) else str(ai_json)
+
+        # Save transcript, ai_summary, report_text in DB
+        pdf_url = None
+        with get_db_connection() as conn:
+            conn.execute(
+                """
+                UPDATE walkthroughs
+                SET transcript = ?, ai_summary = ?, report_text = ?
+                WHERE id = ?
+                """,
+                (transcript, json.dumps(ai_json), report_text, walkthrough_id),
+            )
+
         # Render PDF report
         with get_db_connection() as conn:
             wt_row = conn.execute("SELECT created_by, created_at FROM walkthroughs WHERE id = ?", (walkthrough_id,)).fetchone()
+            report_frames = conn.execute(
+                "SELECT * FROM walkthrough_frames WHERE walkthrough_id = ? ORDER BY timestamp_seconds, id",
+                (walkthrough_id,),
+            ).fetchall()
         created_by_id = wt_row.get("created_by") if wt_row else None
         created_at_str = wt_row.get("created_at") if wt_row else datetime.now().isoformat(timespec="seconds")
         created_by_name = "Crew Member"
@@ -4443,7 +4750,7 @@ def process_walkthrough(walkthrough_id: int, video_path: Path) -> None:
             "walkthrough_report.html",
             transcript=transcript,
             ai=ai_json,
-            frames=frames,
+            frames=report_frames,
             created_at=created_at_str,
             created_by=created_by_name,
         )
@@ -4451,8 +4758,6 @@ def process_walkthrough(walkthrough_id: int, video_path: Path) -> None:
         reports_dir.mkdir(parents=True, exist_ok=True)
         out_pdf = reports_dir / f"walkthrough_{walkthrough_id}.pdf"
         try:
-            if HTML is None:
-                raise RuntimeError("WeasyPrint (HTML) not installed. Cannot generate PDF. Install via: pip install weasyprint")
             app.logger.info("Generating PDF for walkthrough %s...", walkthrough_id)
             generate_pdf_from_report(html, str(out_pdf))
             app.logger.info("PDF generated successfully: %s", out_pdf)
@@ -4477,6 +4782,22 @@ def process_walkthrough(walkthrough_id: int, video_path: Path) -> None:
             app.logger.info("Walkthrough %s completed successfully", walkthrough_id)
         except Exception as e:
             app.logger.exception("PDF generation failed for walkthrough %s: %s", walkthrough_id, e)
+    except Exception as exc:
+        app.logger.exception("Walkthrough processing failed for %s: %s", walkthrough_id, exc)
+        fallback = generate_fallback_walkthrough_report(
+            "",
+            field_notes=field_notes,
+            error=str(exc),
+        )
+        with get_db_connection() as conn:
+            conn.execute(
+                """
+                UPDATE walkthroughs
+                SET transcript = ?, ai_summary = ?, report_text = ?
+                WHERE id = ?
+                """,
+                ("", json.dumps(fallback), json.dumps(fallback, indent=2), walkthrough_id),
+            )
     finally:
         shutil.rmtree(str(tmpdir), ignore_errors=True)
 
@@ -4505,11 +4826,61 @@ def download_walkthrough_pdf(walkthrough_id: int):
         if not row or not row.get("pdf_url"):
             flash("PDF not available.", "error")
             return redirect(url_for("view_walkthrough", walkthrough_id=walkthrough_id))
+        inline = request.args.get("inline")
+        if is_public_url(row["pdf_url"]):
+            # Redirect to public URL — browser will decide inline vs attachment
+            return redirect(row["pdf_url"])
         pdf_path = Path(row["pdf_url"])
         if not pdf_path.exists():
             flash("PDF file missing.", "error")
             return redirect(url_for("view_walkthrough", walkthrough_id=walkthrough_id))
-        return send_file(str(pdf_path), as_attachment=True, download_name=pdf_path.name)
+        as_attachment = False if inline in ("1", "true", "yes") else True
+        return send_file(str(pdf_path), as_attachment=as_attachment, download_name=pdf_path.name)
+
+
+@app.route("/walkthroughs/<int:walkthrough_id>/upload_pdf", methods=("POST",))
+@login_required
+def upload_walkthrough_pdf(walkthrough_id: int):
+    """Upload the generated local PDF to Supabase storage and update DB with public URL."""
+    with get_db_connection() as conn:
+        row = conn.execute("SELECT pdf_url, job_id, report_text FROM walkthroughs WHERE id = ?", (walkthrough_id,)).fetchone()
+        if not row:
+            flash("Walkthrough not found.", "error")
+            return redirect(url_for("view_walkthrough", walkthrough_id=walkthrough_id))
+        local_pdf = row.get("pdf_url")
+        job_id = row.get("job_id")
+        report_text = row.get("report_text")
+    if not local_pdf:
+        flash("No PDF available to upload.", "error")
+        return redirect(url_for("view_walkthrough", walkthrough_id=walkthrough_id))
+    if is_public_url(local_pdf):
+        flash("PDF already uploaded.", "info")
+        return redirect(url_for("view_walkthrough", walkthrough_id=walkthrough_id))
+
+    pdf_path = Path(local_pdf)
+    if not pdf_path.exists():
+        flash("Local PDF file missing.", "error")
+        return redirect(url_for("view_walkthrough", walkthrough_id=walkthrough_id))
+
+    if not supabase_storage_configured():
+        flash("Supabase storage is not configured. Cannot upload.", "error")
+        return redirect(url_for("view_walkthrough", walkthrough_id=walkthrough_id))
+
+    try:
+        up = upload_local_file_to_storage(pdf_path, "reports", "report", job_id=job_id)
+        public_url = up.get("url")
+        with get_db_connection() as conn:
+            conn.execute("UPDATE walkthroughs SET pdf_url = ? WHERE id = ?", (public_url, walkthrough_id))
+            now = datetime.now().isoformat(timespec="seconds")
+            conn.execute(
+                "INSERT INTO walkthrough_reports (walkthrough_id, report_text, pdf_url, created_by, created_at) VALUES (?, ?, ?, ?, ?)",
+                (walkthrough_id, report_text, public_url, g.user.id if g.user else None, now),
+            )
+        flash("PDF uploaded and attached to job.", "success")
+    except Exception as e:
+        app.logger.exception("Failed to upload PDF for walkthrough %s: %s", walkthrough_id, e)
+        flash(f"Failed to upload PDF: {e}", "error")
+    return redirect(url_for("view_walkthrough", walkthrough_id=walkthrough_id))
 
 
 # ============================================================================
@@ -4838,7 +5209,7 @@ def update_client_visibility(job_id):
 @app.errorhandler(413)
 def file_too_large(_error):
     flash("Upload is too large. Please upload fewer or smaller photos.", "error")
-    return redirect(request.referrer or url_for("index"))
+    return safe_redirect(request.referrer)
 
 
 @app.errorhandler(404)
