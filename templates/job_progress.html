@@ -16,16 +16,30 @@
 </section>
 
 <section class="progress-hero">
-    <div>
-        <span class="status status-{{ job.status|lower|replace(' ', '-') }}">{{ job.status }}</span>
-        <h2>{{ job.name }}</h2>
-        {% if g.user.role != "employee" %}
-            <p class="client">{{ job.client_name or "Client not set" }}</p>
-        {% endif %}
-        <p class="location">{{ job.location }}</p>
-        {% if g.user.role != "employee" %}
-            <p>{{ job.description }}</p>
-        {% endif %}
+    <div class="progress-hero-grid">
+        <div class="progress-hero-copy">
+            <span class="status status-{{ job.status|lower|replace(' ', '-') }}">{{ job.status }}</span>
+            <h2>{{ job.name }}</h2>
+            {% if g.user.role != "employee" %}
+                <p class="client">{{ job.client_name or "Client not set" }}</p>
+            {% endif %}
+            <p class="location">{{ job.location }}</p>
+            {% if g.user.role != "employee" %}
+                <p>{{ job.description }}</p>
+            {% endif %}
+        </div>
+        <aside class="progress-hero-aside" aria-label="Job summary">
+            <div class="progress-hero-card">
+                <p class="eyebrow">Current Snapshot</p>
+                <strong>{{ task_summary.done }} / {{ task_summary.total }} tasks complete</strong>
+                <p class="muted">{{ progress.update_count or 0 }} updates and {{ progress.photo_count or 0 }} photos logged so far.</p>
+            </div>
+            <div class="progress-hero-meta">
+                <span><strong>Service</strong><small>{{ job.service_type or "General work" }}</small></span>
+                <span><strong>Status</strong><small>{{ job.status }}</small></span>
+                <span><strong>Location</strong><small>{{ job.location }}</small></span>
+            </div>
+        </aside>
     </div>
 </section>
 
@@ -46,14 +60,17 @@
         <p>Photos</p>
     </div>
     <div class="stat-card glass-panel">
-        <span data-lucide="calendar" style="color:#0f6a47;width:20px;height:20px;"></span>
-        <span class="kpi-value">{{ progress.first_update | fmtdate }}</span>
-        <p>First Update</p>
-    </div>
-    <div class="stat-card glass-panel">
-        <span data-lucide="clock" style="color:#0f6a47;width:20px;height:20px;"></span>
-        <span class="kpi-value">{{ progress.last_update | fmtdate }}</span>
-        <p>Latest Update</p>
+        <span data-lucide="calendar-clock" style="color:#0f6a47;width:20px;height:20px;"></span>
+        <div class="timeline-stat">
+            <span>
+                <strong>{{ progress.first_update | fmtdate }}</strong>
+                <small>First Update</small>
+            </span>
+            <span>
+                <strong>{{ progress.last_update | fmtdate }}</strong>
+                <small>Latest Update</small>
+            </span>
+        </div>
     </div>
 </section>
 
@@ -116,19 +133,7 @@
     {% endfor %}
 {% endif %}
 
-{% if media.before and media.after and media.before.url and media.after.url %}
-<section class="before-after" aria-label="Before and after slider">
-    <h3>Before / After View</h3>
-    <div class="before-after-stage" id="before-after-stage">
-        <img src="{{ media.before.url }}" alt="Before progress image" loading="lazy" decoding="async">
-        <div class="after-layer" id="after-layer">
-            <img src="{{ media.after.url }}" alt="After progress image" loading="lazy" decoding="async">
-        </div>
-    </div>
-    <label for="before-after-slider">Slide to compare</label>
-    <input id="before-after-slider" type="range" min="1" max="99" value="50" oninput="document.getElementById('after-layer').style.width = this.value + '%'">
-</section>
-{% endif %}
+{# Before/After removed per user request #}
 
 <section class="updates progress-timeline">
     <h2>Progress Timeline</h2>

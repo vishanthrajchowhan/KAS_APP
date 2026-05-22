@@ -18,35 +18,103 @@
             <p>Track your project progress, updates, and completion milestones from your client portal view.</p>
         {% endif %}
 
-        <div class="dashboard-tags" aria-label="Workspace context">
-            <span class="dashboard-tag">KAS Waterproofing &amp; Building Services</span>
-            <span class="dashboard-tag">Fort Lauderdale, Florida</span>
-            <span class="dashboard-tag">{{ dashboard_role|title }} View</span>
-        </div>
+        <!-- dashboard tags removed -->
     </div>
 
     {% if can_manage_jobs %}
         <div class="dashboard-hero-actions" aria-label="Quick actions">
-            <a class="button button-primary" href="{{ url_for('add_job') }}">+ Add Lead</a>
-            <a class="button" href="{{ url_for('create_estimate') }}">Create Estimate</a>
-            <a class="button" href="{{ url_for('clients') }}">Clients</a>
-            <a class="button" href="{{ url_for('employees') }}">Employees</a>
+            <a class="hero-action-card hero-action-primary" href="{{ url_for('add_job') }}">
+                <span class="hero-action-icon" data-lucide="plus-circle"></span>
+                <span class="hero-action-copy">
+                    <strong>+ Add Lead</strong>
+                    <small>Capture a new job opportunity</small>
+                </span>
+            </a>
+            <a class="hero-action-card" href="{{ url_for('create_estimate') }}">
+                <span class="hero-action-icon" data-lucide="file-plus-2"></span>
+                <span class="hero-action-copy">
+                    <strong>Create Estimate</strong>
+                    <small>Build a professional quote</small>
+                </span>
+            </a>
+            <a class="hero-action-card" href="{{ url_for('clients') }}">
+                <span class="hero-action-icon" data-lucide="users"></span>
+                <span class="hero-action-copy">
+                    <strong>Manage Clients</strong>
+                    <small>Review customer accounts</small>
+                </span>
+            </a>
+            <a class="hero-action-card" href="{{ url_for('employees') }}">
+                <span class="hero-action-icon" data-lucide="user-round-cog"></span>
+                <span class="hero-action-copy">
+                    <strong>Team Dashboard</strong>
+                    <small>Track crew activity and staffing</small>
+                </span>
+            </a>
             {% if latest_job_id %}
-                <button id="open-quick-update" type="button" class="button">Add Update</button>
+                <button id="open-quick-update" type="button" class="hero-action-card hero-action-button">
+                    <span class="hero-action-icon" data-lucide="camera-plus"></span>
+                    <span class="hero-action-copy">
+                        <strong>Add Site Update</strong>
+                        <small>Post notes and progress photos</small>
+                    </span>
+                </button>
             {% else %}
-                <span class="button button-disabled" aria-disabled="true">Add Update</span>
+                <span class="hero-action-card hero-action-button hero-action-disabled" aria-disabled="true">
+                    <span class="hero-action-icon" data-lucide="camera-plus"></span>
+                    <span class="hero-action-copy">
+                        <strong>Add Site Update</strong>
+                        <small>No active job available</small>
+                    </span>
+                </span>
             {% endif %}
         </div>
     {% endif %}
 </section>
 
-<section class="dashboard-kpis stagger-grid" aria-label="Business summary">
+<section class="dashboard-activity-strip glass-panel reveal" aria-label="Live workspace activity">
+    <div class="activity-strip-label">
+        <span class="eyebrow">Live workspace</span>
+        <strong>Current operational pulse</strong>
+    </div>
+    <div class="activity-strip-items">
+        <div class="activity-strip-item">
+            <span class="activity-strip-icon" data-lucide="briefcase-business"></span>
+            <div>
+                <strong>{{ ops_metrics.open_jobs }}</strong>
+                <small>Open jobs in motion</small>
+            </div>
+        </div>
+        <div class="activity-strip-item">
+            <span class="activity-strip-icon" data-lucide="file-text"></span>
+            <div>
+                <strong>{{ ops_metrics.pending_estimates }}</strong>
+                <small>Pending estimates</small>
+            </div>
+        </div>
+        <div class="activity-strip-item">
+            <span class="activity-strip-icon" data-lucide="edit-3"></span>
+            <div>
+                <strong>{{ ops_metrics.field_updates_today }}</strong>
+                <small>Field updates today</small>
+            </div>
+        </div>
+        <div class="activity-strip-item">
+            <span class="activity-strip-icon" data-lucide="shield-check"></span>
+            <div>
+                <strong>{{ completed_jobs }}</strong>
+                <small>Completed and paid jobs</small>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="dashboard-kpis premium-kpis stagger-grid" aria-label="Business summary">
     <article class="kpi-card kpi-primary glass-panel reveal">
         <div class="kpi-icon"><span data-lucide="briefcase"></span></div>
         <div class="kpi-copy">
             <span class="kpi-value" data-count="{{ ops_metrics.open_jobs }}">{{ ops_metrics.open_jobs }}</span>
             <p>Open Jobs</p>
-            <small>Projects currently active in operations</small>
         </div>
     </article>
     <article class="kpi-card glass-panel reveal">
@@ -54,7 +122,6 @@
         <div class="kpi-copy">
             <span class="kpi-value" data-count="{{ ops_metrics.pending_estimates }}">{{ ops_metrics.pending_estimates }}</span>
             <p>Pending Estimates</p>
-            <small>Draft, sent, and viewed estimates</small>
         </div>
     </article>
     <article class="kpi-card glass-panel reveal">
@@ -62,15 +129,6 @@
         <div class="kpi-copy">
             <span class="kpi-value" data-count="{{ ops_metrics.scheduled_this_week }}">{{ ops_metrics.scheduled_this_week }}</span>
             <p>Scheduled This Week</p>
-            <small>Jobs scheduled in the current week</small>
-        </div>
-    </article>
-    <article class="kpi-card glass-panel reveal">
-        <div class="kpi-icon"><span data-lucide="clock"></span></div>
-        <div class="kpi-copy">
-            <span class="kpi-value" data-count="{{ ops_metrics.jobs_waiting_approval }}">{{ ops_metrics.jobs_waiting_approval }}</span>
-            <p>Jobs Waiting Approval</p>
-            <small>Quotes pending client sign-off</small>
         </div>
     </article>
     <article class="kpi-card glass-panel reveal">
@@ -78,23 +136,6 @@
         <div class="kpi-copy">
             <span class="kpi-value" data-count="{{ ops_metrics.field_updates_today }}">{{ ops_metrics.field_updates_today }}</span>
             <p>Field Updates Today</p>
-            <small>Update entries submitted today</small>
-        </div>
-    </article>
-    <article class="kpi-card glass-panel reveal">
-        <div class="kpi-icon"><span data-lucide="alert-triangle"></span></div>
-        <div class="kpi-copy">
-            <span class="kpi-value" data-count="{{ ops_metrics.overdue_jobs }}">{{ ops_metrics.overdue_jobs }}</span>
-            <p>Overdue Jobs</p>
-            <small>Work items past due date</small>
-        </div>
-    </article>
-    <article class="kpi-card glass-panel reveal">
-        <div class="kpi-icon"><span data-lucide="hard-hat"></span></div>
-        <div class="kpi-copy">
-            <span class="kpi-value" data-count="{{ ops_metrics.team_assigned_today }}">{{ ops_metrics.team_assigned_today }}</span>
-            <p>Team Assigned Today</p>
-            <small>Distinct crew members on today&apos;s work</small>
         </div>
     </article>
 </section>
@@ -379,13 +420,15 @@ document.addEventListener('DOMContentLoaded', function() {
         } %}
         <article class="job-card">
             <div class="job-card-top">
-                <div>
+                <div class="job-card-copy">
                     <div class="job-card-eyebrow">Project Spotlight</div>
                     <h2>{{ job.name }}</h2>
-                    {% if dashboard_role != "employee" %}
-                        <p class="client">{{ job.client_name or "Client not set" }}</p>
-                    {% endif %}
-                    <p class="location">{{ job.location }}</p>
+                    <p class="job-subtitle">
+                        {% if dashboard_role != "employee" %}
+                            {{ job.client_name or "Client not set" }}{% if job.location %} · {% endif %}
+                        {% endif %}
+                        {{ job.location }}
+                    </p>
                 </div>
                 <div class="job-card-side">
                     <span class="status status-{{ job.status|lower|replace(' ', '-') }}">{{ job.status }}</span>
@@ -394,11 +437,10 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
 
             <div class="job-meta">
-                <span>Service: {{ job.service_type or 'General Service' }}</span>
-                {% if job.other_service_details %}<span>{{ job.other_service_details }}</span>{% endif %}
-                {% if job.assigned_employee %}<span>Assigned: {{ job.assigned_employee }}</span>{% endif %}
-                <span>Updates: {{ job.update_count }}</span>
-                <span>Last update: {{ job.last_update|replace('T', ' ') if job.last_update else 'No updates yet' }}</span>
+                <span><strong>Service</strong>{{ job.service_type or 'General Service' }}</span>
+                {% if job.assigned_employee %}<span><strong>Owner</strong>{{ job.assigned_employee }}</span>{% endif %}
+                <span><strong>Updates</strong>{{ job.update_count }}</span>
+                <span><strong>Last update</strong>{{ job.last_update|replace('T', ' ') if job.last_update else 'No updates yet' }}</span>
             </div>
 
             <div class="job-progress" style="--progress: {{ progress_map.get(job.status, 0) }}%;">
@@ -410,12 +452,12 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
 
             <div class="job-actions">
-                <a class="button button-primary" href="{{ url_for('job_progress', job_id=job.id) }}">View</a>
-                <a class="button" href="{{ url_for('update_job', job_id=job.id) }}">Edit</a>
+                <a class="button button-primary button-compact" href="{{ url_for('job_progress', job_id=job.id) }}">View</a>
+                <a class="button button-compact" href="{{ url_for('update_job', job_id=job.id) }}">Edit</a>
                 <a class="button" href="{{ url_for('job_progress', job_id=job.id) }}">Timeline</a>
                 {% if can_manage_jobs %}
                     <form method="post" action="{{ url_for('delete_job', job_id=job.id) }}" onsubmit="return confirm('Delete this job?');">
-                        <button class="button button-danger button-full" type="submit">Delete</button>
+                        <button class="button button-danger button-compact button-full button-subtle-danger" type="submit">Delete</button>
                     </form>
                 {% endif %}
             </div>

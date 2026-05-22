@@ -1,4 +1,4 @@
-const CACHE_NAME = "kas-app-v2";
+const CACHE_NAME = "kas-app-v3";
 const APP_SHELL = [
   "/",
   "/login",
@@ -37,6 +37,20 @@ self.addEventListener("fetch", (event) => {
   }
 
   const requestUrl = new URL(event.request.url);
+
+  // Force network-first for the main stylesheet so CSS updates appear immediately
+  if (requestUrl.pathname.endsWith('styles.css')) {
+    event.respondWith(
+      fetch(event.request)
+        .then((networkResponse) => {
+          const responseCopy = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseCopy));
+          return networkResponse;
+        })
+        .catch(() => caches.match(event.request))
+    );
+    return;
+  }
 
   if (event.request.mode === "navigate") {
     event.respondWith(

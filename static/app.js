@@ -165,5 +165,48 @@
         setupServiceChipSelectors();
         setupUploadForms();
         setupIcons();
+        setupPWAInstall();
     });
+
+    function setupPWAInstall() {
+        let deferredPrompt = null;
+        const installBtn = document.getElementById('install-button');
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            // Prevent the mini-infobar from appearing on mobile
+            e.preventDefault();
+            deferredPrompt = e;
+            if (installBtn) {
+                installBtn.removeAttribute('hidden');
+                installBtn.setAttribute('aria-hidden', 'false');
+            }
+        });
+
+        if (installBtn) {
+            installBtn.addEventListener('click', async () => {
+                if (!deferredPrompt) {
+                    return;
+                }
+                deferredPrompt.prompt();
+                const choiceResult = await deferredPrompt.userChoice;
+                deferredPrompt = null;
+                installBtn.setAttribute('hidden', '');
+                installBtn.setAttribute('aria-hidden', 'true');
+                if (choiceResult && choiceResult.outcome === 'accepted') {
+                    console.log('User accepted the install prompt');
+                } else {
+                    console.log('User dismissed the install prompt');
+                }
+            });
+        }
+
+        window.addEventListener('appinstalled', () => {
+            // Hide the button after install
+            if (installBtn) {
+                installBtn.setAttribute('hidden', '');
+                installBtn.setAttribute('aria-hidden', 'true');
+            }
+            console.log('PWA was installed');
+        });
+    }
 })();

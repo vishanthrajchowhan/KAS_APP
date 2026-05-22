@@ -22,7 +22,16 @@
     <link rel="icon" href="{{ dynamic_favicon }}" type="{{ workspace_settings.favicon_mimetype if workspace_settings is defined and workspace_settings.favicon_mimetype else 'image/svg+xml' }}">
     <link rel="apple-touch-icon" href="{{ company_logo_url if company_logo_url else dynamic_favicon }}">
     <link rel="apple-touch-startup-image" href="{{ url_for('static', filename='icons/apple-splash.svg') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v=5">
+    <!-- Dev override: temporary spacing/typography tweaks to verify changes immediately -->
+    <style id="dev-override">
+        .page { padding: 36px !important; }
+        .panel { padding: 36px !important; border-radius: 18px !important; }
+        .dashboard-stats > div { padding: 28px !important; }
+        .hero-action-card { min-height: 120px !important; padding: 24px !important; }
+        .task-row { padding: 20px !important; border-radius: 18px !important; }
+        .job-card-top { margin-bottom: 22px !important; }
+    </style>
     <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
@@ -91,7 +100,10 @@
                             {% if request.args.get('view_as') %}
                                 <input type="hidden" name="view_as" value="{{ request.args.get('view_as') }}">
                             {% endif %}
-                            <input type="search" name="q" placeholder="Search jobs, clients, addresses" value="{{ request.args.get('q', '') }}" aria-label="Search">
+                            <div class="search-input-shell">
+                                <span class="search-input-icon" aria-hidden="true" data-lucide="search"></span>
+                                <input type="search" name="q" placeholder="Search jobs, clients, addresses" value="{{ request.args.get('q', '') }}" aria-label="Search">
+                            </div>
                         </form>
                     </div>
 
@@ -183,19 +195,6 @@
         </div>
     {% else %}
         <main class="page auth-page fade-in">
-            <div class="auth-brand">
-                <span class="brand-mark{% if uploaded_logo_url %} has-logo{% endif %}">
-                    {% if uploaded_logo_url %}
-                        <img class="brand-logo" src="{{ uploaded_logo_url }}" alt="{{ workspace_settings.company_name or 'KAS' }} logo" loading="lazy" decoding="async">
-                    {% else %}
-                        KAS
-                    {% endif %}
-                </span>
-                <div>
-                    <strong>{{ workspace_settings.company_name or 'KAS Waterproofing & Building Services' }}</strong>
-                    <small>{{ workspace_settings.company_city or 'Fort Lauderdale, Florida' }}</small>
-                </div>
-            </div>
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
                     <div class="messages" role="status" aria-live="polite">
@@ -214,23 +213,7 @@
         <p>Loading workspace...</p>
     </div>
 
-    <div class="install-cta" id="install-cta" hidden>
-        <div>
-            <strong>Install KAS App</strong>
-            <p>Get a full-screen app experience on your phone.</p>
-        </div>
-        <button class="button button-primary" type="button" id="install-btn">Install</button>
-        <button class="button" type="button" id="install-dismiss">Later</button>
-    </div>
-
-    <div class="ios-install-tip" id="ios-install-tip" hidden>
-        <strong>Install on iPhone</strong>
-        <p>Tap Share, then choose <em>Add to Home Screen</em>.</p>
-        <button class="button" type="button" id="ios-tip-dismiss">Got it</button>
-    </div>
-
-    <!-- Floating Install FAB (visible on mobile) -->
-    <button id="install-fab" class="install-fab" hidden title="Install app">⬇️</button>
+    <!-- Install CTA removed: using inline Install button inside auth/login left panel -->
 
     <!-- PWA Diagnostics Modal -->
     <div id="pwa-diagnostics-modal" class="pwa-modal" hidden aria-hidden="true">
@@ -433,7 +416,29 @@
             return outputArray;
         }
 
+        // During active UI debugging, automatically unregister any service workers
+        // and clear caches so the browser loads the latest templates and CSS.
+        // This is temporary — remove when you're done testing.
+        window.__sw_disabled = true;
+        (function unregisterExistingServiceWorkers() {
+            try {
+                if ('serviceWorker' in navigator) {
+                    navigator.serviceWorker.getRegistrations().then(function (regs) {
+                        regs.forEach(function (r) { try { r.unregister(); } catch (e) {} });
+                    });
+                }
+                if ('caches' in window) {
+                    caches.keys().then(function (keys) {
+                        return Promise.all(keys.map(function (k) { return caches.delete(k); }));
+                    }).catch(function () {});
+                }
+            } catch (e) {
+                console.warn('SW cleanup skipped', e);
+            }
+        })();
+
         async function registerServiceWorker() {
+            if (window.__sw_disabled) return null;
             if (!("serviceWorker" in navigator)) {
                 return null;
             }
