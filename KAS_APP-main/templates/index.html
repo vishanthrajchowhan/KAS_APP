@@ -1,0 +1,476 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard | KAS{% endblock %}
+
+{% block content %}
+{% set active_jobs = status_counts.get('Scheduled', 0) + status_counts.get('Started', 0) + status_counts.get('In Progress', 0) %}
+{% set completed_jobs = status_counts.get('Completed', 0) + status_counts.get('Paid', 0) %}
+
+<section class="dashboard-hero glass-panel reveal">
+    <div class="dashboard-hero-copy">
+        <p class="eyebrow">Operations Workspace</p>
+        <h1>Manage Jobs. Close Faster. Build Smarter.</h1>
+        {% if dashboard_role == "admin" %}
+            <p>Operations dashboard for KAS Waterproofing &amp; Building Services.</p>
+        {% elif dashboard_role == "employee" %}
+            <p>Your assigned field jobs, updates, and timeline visibility in a mobile-ready workspace.</p>
+        {% else %}
+            <p>Track your project progress, updates, and completion milestones from your client portal view.</p>
+        {% endif %}
+
+        <!-- dashboard tags removed -->
+    </div>
+
+    {% if can_manage_jobs %}
+        <div class="dashboard-hero-actions" aria-label="Quick actions">
+            <a class="hero-action-card hero-action-primary" href="{{ url_for('add_job') }}">
+                <span class="hero-action-icon" data-lucide="plus-circle"></span>
+                <span class="hero-action-copy">
+                    <strong>+ Add Lead</strong>
+                    <small>Capture a new job opportunity</small>
+                </span>
+            </a>
+            <a class="hero-action-card" href="{{ url_for('create_estimate') }}">
+                <span class="hero-action-icon" data-lucide="file-plus-2"></span>
+                <span class="hero-action-copy">
+                    <strong>Create Estimate</strong>
+                    <small>Build a professional quote</small>
+                </span>
+            </a>
+            <a class="hero-action-card" href="{{ url_for('clients') }}">
+                <span class="hero-action-icon" data-lucide="users"></span>
+                <span class="hero-action-copy">
+                    <strong>Manage Clients</strong>
+                    <small>Review customer accounts</small>
+                </span>
+            </a>
+            <a class="hero-action-card" href="{{ url_for('employees') }}">
+                <span class="hero-action-icon" data-lucide="user-round-cog"></span>
+                <span class="hero-action-copy">
+                    <strong>Team Dashboard</strong>
+                    <small>Track crew activity and staffing</small>
+                </span>
+            </a>
+            {% if latest_job_id %}
+                <button id="open-quick-update" type="button" class="hero-action-card hero-action-button">
+                    <span class="hero-action-icon" data-lucide="camera-plus"></span>
+                    <span class="hero-action-copy">
+                        <strong>Add Site Update</strong>
+                        <small>Post notes and progress photos</small>
+                    </span>
+                </button>
+            {% else %}
+                <span class="hero-action-card hero-action-button hero-action-disabled" aria-disabled="true">
+                    <span class="hero-action-icon" data-lucide="camera-plus"></span>
+                    <span class="hero-action-copy">
+                        <strong>Add Site Update</strong>
+                        <small>No active job available</small>
+                    </span>
+                </span>
+            {% endif %}
+        </div>
+    {% endif %}
+</section>
+
+<section class="dashboard-activity-strip glass-panel reveal" aria-label="Live workspace activity">
+    <div class="activity-strip-label">
+        <span class="eyebrow">Live workspace</span>
+        <strong>Current operational pulse</strong>
+    </div>
+    <div class="activity-strip-items">
+        <div class="activity-strip-item">
+            <span class="activity-strip-icon" data-lucide="briefcase-business"></span>
+            <div>
+                <strong>{{ ops_metrics.open_jobs }}</strong>
+                <small>Open jobs in motion</small>
+            </div>
+        </div>
+        <div class="activity-strip-item">
+            <span class="activity-strip-icon" data-lucide="file-text"></span>
+            <div>
+                <strong>{{ ops_metrics.pending_estimates }}</strong>
+                <small>Pending estimates</small>
+            </div>
+        </div>
+        <div class="activity-strip-item">
+            <span class="activity-strip-icon" data-lucide="edit-3"></span>
+            <div>
+                <strong>{{ ops_metrics.field_updates_today }}</strong>
+                <small>Field updates today</small>
+            </div>
+        </div>
+        <div class="activity-strip-item">
+            <span class="activity-strip-icon" data-lucide="shield-check"></span>
+            <div>
+                <strong>{{ completed_jobs }}</strong>
+                <small>Completed and paid jobs</small>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="dashboard-kpis premium-kpis stagger-grid" aria-label="Business summary">
+    <article class="kpi-card kpi-primary glass-panel reveal">
+        <div class="kpi-icon"><span data-lucide="briefcase"></span></div>
+        <div class="kpi-copy">
+            <span class="kpi-value" data-count="{{ ops_metrics.open_jobs }}">{{ ops_metrics.open_jobs }}</span>
+            <p>Open Jobs</p>
+        </div>
+    </article>
+    <article class="kpi-card glass-panel reveal">
+        <div class="kpi-icon"><span data-lucide="file-text"></span></div>
+        <div class="kpi-copy">
+            <span class="kpi-value" data-count="{{ ops_metrics.pending_estimates }}">{{ ops_metrics.pending_estimates }}</span>
+            <p>Pending Estimates</p>
+        </div>
+    </article>
+    <article class="kpi-card glass-panel reveal">
+        <div class="kpi-icon"><span data-lucide="calendar"></span></div>
+        <div class="kpi-copy">
+            <span class="kpi-value" data-count="{{ ops_metrics.scheduled_this_week }}">{{ ops_metrics.scheduled_this_week }}</span>
+            <p>Scheduled This Week</p>
+        </div>
+    </article>
+    <article class="kpi-card glass-panel reveal">
+        <div class="kpi-icon"><span data-lucide="edit-3"></span></div>
+        <div class="kpi-copy">
+            <span class="kpi-value" data-count="{{ ops_metrics.field_updates_today }}">{{ ops_metrics.field_updates_today }}</span>
+            <p>Field Updates Today</p>
+        </div>
+    </article>
+</section>
+
+<!-- Quick Add Update Modal -->
+<div id="quick-update-modal" class="modal" aria-hidden="true" style="display:none;">
+    <div class="modal-backdrop"></div>
+    <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="quick-update-title" style="max-width:800px;">
+        <header class="modal-header">
+            <h3 id="quick-update-title">Add field update</h3>
+            <button class="modal-close" type="button">✕</button>
+        </header>
+        <form id="quick-update-form" class="form-card" method="post" action="{{ url_for('submit_update') }}" enctype="multipart/form-data">
+            <section class="form-section">
+                <label for="quick_job_select">Job</label>
+                <select id="quick_job_select" name="job_id">
+                    {% for j in jobs %}
+                        <option value="{{ j.id }}" {% if j.id == latest_job_id %}selected{% endif %}>Job #{{ j.id }} — {{ j.title or j.address or j.client_name }}</option>
+                    {% endfor %}
+                </select>
+
+                <label for="quick_notes">What happened on site today?</label>
+                <textarea id="quick_notes" name="notes" rows="4" placeholder="Describe the work completed, observations, or issues found."></textarea>
+
+                {% if can_manage_jobs %}
+                <label for="quick_status">Job Status</label>
+                <select id="quick_status" name="status">
+                    <option value="">-- Select Status --</option>
+                    {% for status in statuses %}
+                        <option value="{{ status }}" {% if status == latest_job_status %}selected{% endif %}>{{ status }}</option>
+                    {% endfor %}
+                </select>
+                {% endif %}
+
+                <div class="quick-buttons">
+                    <label>Update type</label>
+                    <div class="button-group" id="update-type-group">
+                        <button type="button" data-value="Work done" class="type-btn active">Work done</button>
+                        <button type="button" data-value="Issue found" class="type-btn">Issue found</button>
+                        <button type="button" data-value="Inspection" class="type-btn">Inspection</button>
+                        <button type="button" data-value="Materials" class="type-btn">Materials</button>
+                        <button type="button" data-value="Weather delay" class="type-btn">Weather delay</button>
+                        <button type="button" data-value="Phase complete" class="type-btn">Phase complete</button>
+                    </div>
+                    <input type="hidden" name="update_type" id="quick_update_type" value="Work done">
+                </div>
+
+                                <div style="margin-top:0.75rem;">
+                                    <label>Priority</label>
+                                    <div class="priority-btn-group" id="priority-group">
+                                        <button type="button" class="priority-option priority-normal active" data-value="Normal" onclick="setPriority(this)">Normal</button>
+                                        <button type="button" class="priority-option priority-attention" data-value="Needs attention" onclick="setPriority(this)">Needs attention</button>
+                                        <button type="button" class="priority-option priority-urgent" data-value="Urgent" onclick="setPriority(this)">Urgent</button>
+                                    </div>
+                                    <input type="hidden" name="priority" id="quick_priority" value="Normal">
+                </div>
+
+                <label for="quick_images">Site photos</label>
+                <input id="quick_images" name="images" type="file" accept="image/*" multiple>
+
+                <fieldset>
+                    <legend>Quick checklist</legend>
+                    <label><input type="checkbox" name="checklist" value="Surface preparation done"> Surface preparation done</label>
+                    <label><input type="checkbox" name="checklist" value="Sealant / materials applied"> Sealant / materials applied</label>
+                    <label><input type="checkbox" name="checklist" value="Area cleaned up after work"> Area cleaned up after work</label>
+                    <label><input type="checkbox" name="checklist" value="Client or building contact notified"> Client or building contact notified</label>
+                    <label><input type="checkbox" name="checklist" value="Ready for next phase / inspection"> Ready for next phase / inspection</label>
+                </fieldset>
+
+                <div style="margin-top:1rem;">
+                    <label>Visibility</label>
+                    <label><input type="checkbox" name="photos_client_visible" value="1" checked> Share with client</label>
+                    <label><input type="checkbox" name="notify_client_email" value="1"> Notify client by email</label>
+                    <label><input type="checkbox" name="internal_only" value="1"> Internal note only</label>
+                </div>
+            </section>
+
+            <div style="display:flex; gap:0.5rem; justify-content:flex-end; margin-top:1rem;">
+                <button type="button" class="button cancel-quick-update">Cancel</button>
+                <button type="submit" class="button button-primary">Post update ⇢</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function setPriority(btn) {
+    document.querySelectorAll('.priority-option').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('quick_priority').value = btn.dataset.value;
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const modal = document.getElementById('quick-update-modal');
+    const openBtn = document.getElementById('open-quick-update');
+    const closeBtn = document.querySelector('.modal-close');
+    const cancelBtn = document.querySelector('.cancel-quick-update');
+    const backdrop = document.querySelector('.modal-backdrop');
+
+    function openQuickUpdate() {
+        if (modal) {
+            modal.style.display = 'flex';
+            modal.classList.add('show');
+            modal.setAttribute('aria-hidden', 'false');
+        }
+    }
+
+    function closeQuickUpdate() {
+        if (modal) {
+            modal.style.display = 'none';
+            modal.classList.remove('show');
+            modal.setAttribute('aria-hidden', 'true');
+        }
+    }
+
+    if (openBtn) {
+        openBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            openQuickUpdate();
+        });
+    }
+
+    if (closeBtn) {
+        closeBtn.addEventListener('click', closeQuickUpdate);
+    }
+
+    if (backdrop) {
+        backdrop.addEventListener('click', closeQuickUpdate);
+    }
+
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', closeQuickUpdate);
+    }
+
+    // update type buttons
+    document.querySelectorAll('#update-type-group .type-btn').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            document.querySelectorAll('#update-type-group .type-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            const updateTypeInput = document.getElementById('quick_update_type');
+            if (updateTypeInput) {
+                updateTypeInput.value = btn.getAttribute('data-value');
+            }
+        });
+    });
+});
+</script>
+
+<section class="dashboard-workspace">
+    <div class="dashboard-panels">
+        <section class="panel panel-status premium-panel glass-panel reveal">
+            <div class="panel-header">
+                <div>
+                    <p class="eyebrow">Pipeline Health</p>
+                    <h3>Jobs by Status</h3>
+                </div>
+                <span class="panel-chip">Live</span>
+            </div>
+            <div class="bar-list">
+                {% set total_jobs = jobs|length if jobs else 1 %}
+                {% for status_name, count in status_counts.items() %}
+                    {% set ratio = (count / total_jobs * 100) if total_jobs else 0 %}
+                    <div class="bar-row">
+                        <div class="bar-label-row">
+                            <strong>{{ status_name }}</strong>
+                            <span class="muted">{{ count }}</span>
+                        </div>
+                        <div class="bar-track">
+                            <div class="bar-fill" style="--bar-width: {{ '%.1f'|format(ratio) }}%;"></div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </section>
+    </div>
+
+    <section class="panel panel-activity premium-panel glass-panel reveal">
+        <div class="panel-header">
+            <div>
+                <p class="eyebrow">Field Activity</p>
+                <h3>Recent Activity</h3>
+            </div>
+            <span class="panel-chip">{{ recent_activity|length }} updates</span>
+        </div>
+        <div class="activity-feed timeline-feed">
+            {% if recent_activity %}
+                {% for event in recent_activity[:6] %}
+                    <div class="activity-item premium-activity-item">
+                        <strong>{{ event.job_name }}</strong>
+                        <p class="muted">{{ event.notes or "Update logged by team" }}</p>
+                        <small>{{ event.timestamp|replace('T', ' ') }} · {{ (event.author_role or 'staff')|title }}</small>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <div class="activity-item premium-activity-item">
+                    <strong>No activity yet</strong>
+                    <p class="muted">New updates from jobs and estimates will appear here.</p>
+                </div>
+            {% endif %}
+        </div>
+    </section>
+</section>
+
+{% if dashboard_role != "client" %}
+<section class="quick-filters premium-filters" aria-label="Quick filters">
+    <a class="quick-filter {% if not filters.quick %}active{% endif %}" href="{{ url_for('index', view_as=filters.view_as) }}">All</a>
+    {% if dashboard_role == "employee" %}
+        <a class="quick-filter {% if filters.quick == 'assigned_work' %}active{% endif %}" href="{{ url_for('index', quick='assigned_work', view_as=filters.view_as) }}">Assigned Work</a>
+        <a class="quick-filter {% if filters.quick == 'in_progress' %}active{% endif %}" href="{{ url_for('index', quick='in_progress', view_as=filters.view_as) }}">In Progress</a>
+        <a class="quick-filter {% if filters.quick == 'completed' %}active{% endif %}" href="{{ url_for('index', quick='completed', view_as=filters.view_as) }}">Completed</a>
+    {% else %}
+        <a class="quick-filter {% if filters.quick == 'leads' %}active{% endif %}" href="{{ url_for('index', quick='leads', view_as=filters.view_as) }}">Only Leads</a>
+        <a class="quick-filter {% if filters.quick == 'proposals' %}active{% endif %}" href="{{ url_for('index', quick='proposals', view_as=filters.view_as) }}">Only Proposals</a>
+        <a class="quick-filter {% if filters.quick == 'approved' %}active{% endif %}" href="{{ url_for('index', quick='approved', view_as=filters.view_as) }}">Approved Jobs</a>
+        <a class="quick-filter {% if filters.quick == 'lost' %}active{% endif %}" href="{{ url_for('index', quick='lost', view_as=filters.view_as) }}">Lost Jobs</a>
+    {% endif %}
+</section>
+{% endif %}
+
+<form class="filters premium-filters-bar" method="get" action="{{ url_for('index') }}">
+    <input type="hidden" name="view_as" value="{{ filters.view_as }}">
+    <input type="hidden" name="quick" value="{{ filters.quick }}">
+
+    <div>
+        <label for="q">Search</label>
+        <input id="q" name="q" type="search" value="{{ filters.q }}" placeholder="Client, job, location">
+    </div>
+
+    <div>
+        <label for="status">Status</label>
+        <select id="status" name="status">
+            <option value="">All statuses</option>
+            <optgroup label="Pre-Construction">
+                {% for status in pre_construction_statuses %}
+                    <option value="{{ status }}" {% if filters.status == status %}selected{% endif %}>{{ status }}</option>
+                {% endfor %}
+            </optgroup>
+            <optgroup label="Execution">
+                {% for status in execution_statuses %}
+                    <option value="{{ status }}" {% if filters.status == status %}selected{% endif %}>{{ status }}</option>
+                {% endfor %}
+            </optgroup>
+            <optgroup label="Financial">
+                {% for status in financial_statuses %}
+                    <option value="{{ status }}" {% if filters.status == status %}selected{% endif %}>{{ status }}</option>
+                {% endfor %}
+            </optgroup>
+        </select>
+    </div>
+
+    <div>
+        <label for="sort">Sort</label>
+        <select id="sort" name="sort">
+            <option value="newest" {% if filters.sort == "newest" %}selected{% endif %}>Newest first</option>
+            <option value="updated" {% if filters.sort == "updated" %}selected{% endif %}>Recently updated</option>
+            <option value="oldest" {% if filters.sort == "oldest" %}selected{% endif %}>Oldest first</option>
+            <option value="status" {% if filters.sort == "status" %}selected{% endif %}>Status</option>
+        </select>
+    </div>
+
+    <button class="button button-primary" type="submit">Apply</button>
+    <a class="button" href="{{ url_for('index', view_as=filters.view_as) }}">Reset</a>
+</form>
+
+{% if jobs %}
+<section class="job-list premium-job-list" aria-label="Job list">
+    {% for job in jobs %}
+        {% set progress_map = {
+            'Lead': 10,
+            'Estimating': 20,
+            'Proposal Sent': 35,
+            'Negotiation': 45,
+            'Approved': 55,
+            'Scheduled': 62,
+            'Started': 70,
+            'In Progress': 82,
+            'Completed': 92,
+            'Invoiced': 96,
+            'Paid': 100,
+            'Rejected': 0
+        } %}
+        <article class="job-card">
+            <div class="job-card-top">
+                <div class="job-card-copy">
+                    <div class="job-card-eyebrow">Project Spotlight</div>
+                    <h2>{{ job.name }}</h2>
+                    <p class="job-subtitle">
+                        {% if dashboard_role != "employee" %}
+                            {{ job.client_name or "Client not set" }}{% if job.location %} · {% endif %}
+                        {% endif %}
+                        {{ job.location }}
+                    </p>
+                </div>
+                <div class="job-card-side">
+                    <span class="status status-{{ job.status|lower|replace(' ', '-') }}">{{ job.status }}</span>
+                    <span class="job-progress-badge">{{ progress_map.get(job.status, 0) }}% progress</span>
+                </div>
+            </div>
+
+            <div class="job-meta">
+                <span><strong>Service</strong>{{ job.service_type or 'General Service' }}</span>
+                {% if job.assigned_employee %}<span><strong>Owner</strong>{{ job.assigned_employee }}</span>{% endif %}
+                <span><strong>Updates</strong>{{ job.update_count }}</span>
+                <span><strong>Last update</strong>{{ job.last_update|replace('T', ' ') if job.last_update else 'No updates yet' }}</span>
+            </div>
+
+            <div class="job-progress" style="--progress: {{ progress_map.get(job.status, 0) }}%;">
+                <div style="display:flex; justify-content:space-between; gap:8px;">
+                    <small class="muted">Progress</small>
+                    <small class="muted">{{ progress_map.get(job.status, 0) }}%</small>
+                </div>
+                <div class="track"><div class="fill"></div></div>
+            </div>
+
+            <div class="job-actions">
+                <a class="button button-primary button-compact" href="{{ url_for('job_progress', job_id=job.id) }}">View</a>
+                <a class="button button-compact" href="{{ url_for('update_job', job_id=job.id) }}">Edit</a>
+                <a class="button" href="{{ url_for('job_progress', job_id=job.id) }}">Timeline</a>
+                {% if can_manage_jobs %}
+                    <form method="post" action="{{ url_for('delete_job', job_id=job.id) }}" onsubmit="return confirm('Delete this job?');">
+                        <button class="button button-danger button-compact button-full button-subtle-danger" type="submit">Delete</button>
+                    </form>
+                {% endif %}
+            </div>
+        </article>
+    {% endfor %}
+</section>
+{% else %}
+<section class="empty-state">
+    <h2>No matching jobs</h2>
+    <p>Adjust filters or add a new lead to start your premium workflow.</p>
+    {% if can_manage_jobs %}
+        <a class="button button-primary" href="{{ url_for('add_job') }}">Add Lead</a>
+    {% endif %}
+</section>
+{% endif %}
+{% endblock %}

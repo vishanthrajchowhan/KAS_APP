@@ -1,0 +1,28 @@
+{% extends "portal/base.html" %}
+{% block title %}Sign Document | KAS{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="section-label">DOCUMENT APPROVAL</div>
+  <h2 style="font-size:18px;font-weight:600;margin-bottom:4px;">{{ document.name }}</h2>
+  <p style="font-size:13px;color:#6b7280;margin-bottom:20px;">{{ document.document_type or 'Project document' }} · Please review and provide your digital signature below.</p>
+
+  {% if document.file_url %}
+    <a href="{{ document.file_url }}" class="btn" target="_blank" rel="noopener" style="margin-bottom:16px;display:inline-block;">View document</a>
+  {% endif %}
+
+  <form method="post" action="{{ url_for('portal_sign', token=token, doc_id=document.id) }}">
+    <div style="margin-bottom:14px;">
+      <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:6px;">Full name (as signature) *</label>
+      <input type="text" name="signed_by_name" required placeholder="Type your full name" style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;">
+    </div>
+    <label style="display:flex;align-items:center;gap:10px;font-size:13px;margin-bottom:20px;cursor:pointer;">
+      <input type="checkbox" name="confirmed" required style="width:16px;height:16px;">
+      I confirm I have reviewed this document and approve the work described.
+    </label>
+    <button type="submit" class="btn btn-primary" style="width:100%;padding:12px;font-size:14px;">Sign & confirm</button>
+  </form>
+</div>
+<div style="text-align:center;margin-top:12px;">
+  <a href="{{ url_for('client_portal', token=token) }}" style="font-size:13px;color:#6b7280;">← Back to project</a>
+</div>
+{% endblock %}

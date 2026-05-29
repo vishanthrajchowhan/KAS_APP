@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+
+{% block title %}Employees | KAS{% endblock %}
+
+{% block content %}
+{% set busy_count = employees|selectattr('status', 'equalto', 'Busy')|list|length %}
+{% set available_count = employees|selectattr('status', 'equalto', 'Available')|list|length %}
+{% set off_duty_count = employees|selectattr('status', 'equalto', 'Off Duty')|list|length %}
+
+<section class="employees-page workforce-page">
+    <section class="workforce-hero glass-panel reveal">
+        <div class="workforce-hero-copy">
+            <p class="eyebrow">Workforce Management</p>
+            <h1>Employee Roster</h1>
+            <p>Track field availability, assignment load, and crew coverage from one operations view.</p>
+        </div>
+        <div class="workforce-hero-actions">
+            <a class="button" href="{{ url_for('users') }}"><span data-lucide="shield-check"></span>Access</a>
+            <a class="button button-primary" href="{{ url_for('add_job') }}"><span data-lucide="briefcase-business"></span>Assign Job</a>
+        </div>
+    </section>
+
+    <section class="workforce-summary" aria-label="Employee summary">
+        <article class="workforce-metric glass-panel reveal">
+            <span class="metric-icon" data-lucide="users"></span>
+            <div>
+                <strong data-count="{{ total_employees }}">{{ total_employees }}</strong>
+                <p>Total Employees</p>
+                <small>All employee accounts</small>
+            </div>
+        </article>
+        <article class="workforce-metric glass-panel reveal">
+            <span class="metric-icon" data-lucide="activity"></span>
+            <div>
+                <strong data-count="{{ active_today }}">{{ active_today }}</strong>
+                <p>Active Today</p>
+                <small>Assigned to work created today</small>
+            </div>
+        </article>
+        <article class="workforce-metric glass-panel reveal">
+            <span class="metric-icon" data-lucide="hard-hat"></span>
+            <div>
+                <strong data-count="{{ field_crew }}">{{ field_crew }}</strong>
+                <p>Field Crew</p>
+                <small>Employees with assigned jobs</small>
+            </div>
+        </article>
+        <article class="workforce-metric glass-panel reveal">
+            <span class="metric-icon" data-lucide="clock-3"></span>
+            <div>
+                <strong data-count="{{ busy_count }}">{{ busy_count }}</strong>
+                <p>Busy Now</p>
+                <small>On scheduled or active jobs</small>
+            </div>
+        </article>
+    </section>
+
+    <section class="workforce-board glass-panel reveal">
+        <div class="workforce-board-header">
+            <div>
+                <p class="eyebrow">Crew Status</p>
+                <h2>Availability Board</h2>
+            </div>
+            <div class="workforce-status-strip" aria-label="Availability counts">
+                <span class="person-status busy">{{ busy_count }} Busy</span>
+                <span class="person-status available">{{ available_count }} Available</span>
+                <span class="person-status off-duty">{{ off_duty_count }} Off Duty</span>
+            </div>
+        </div>
+
+        {% if employees %}
+            <div class="workforce-roster" role="table" aria-label="Employee roster">
+                <div class="workforce-roster-head" role="row">
+                    <span>Employee</span>
+                    <span>Status</span>
+                    <span>Assignments</span>
+                    <span>Last Job</span>
+                    <span>Actions</span>
+                </div>
+
+                {% for employee in employees %}
+                    <article id="employee-{{ employee.id }}" class="workforce-row" role="row">
+                        <div class="workforce-person" role="cell">
+                            <div class="person-avatar" aria-hidden="true">{{ employee.name[:1]|upper }}</div>
+                            <div>
+                                <h3>{{ employee.name }}</h3>
+                                <p>{{ employee.email }}</p>
+                                <small>{{ employee.phone or 'Phone not on file' }}</small>
+                            </div>
+                        </div>
+
+                        <div role="cell">
+                            <span class="person-status {{ employee.status|lower|replace(' ', '-') }}">{{ employee.status }}</span>
+                        </div>
+
+                        <div class="workforce-load" role="cell">
+                            <strong>{{ employee.active_jobs or 0 }} active</strong>
+                            <span>{{ employee.assigned_jobs or 0 }} total assigned</span>
+                        </div>
+
+                        <div class="workforce-last-job" role="cell">
+                            {{ employee.last_assigned_job[:10] if employee.last_assigned_job else 'No job history' }}
+                        </div>
+
+                        <div class="workforce-actions" role="cell">
+                            <a class="icon-button" href="#employee-{{ employee.id }}" title="View employee"><span data-lucide="eye"></span></a>
+                            <a class="icon-button" href="{{ url_for('users') }}" title="Edit access"><span data-lucide="square-pen"></span></a>
+                            <a class="button button-primary" href="{{ url_for('add_job') }}">Assign</a>
+                        </div>
+                    </article>
+                {% endfor %}
+            </div>
+        {% else %}
+            <section class="empty-state reveal">
+                <h2>No Employees Yet</h2>
+                <p>Create employee accounts in access management to build your workforce roster.</p>
+                <a class="button button-primary" href="{{ url_for('users') }}">Open Access Management</a>
+            </section>
+        {% endif %}
+    </section>
+</section>
+{% endblock %}

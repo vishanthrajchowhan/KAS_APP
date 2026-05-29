@@ -1,0 +1,51 @@
+{% extends "portal/base.html" %}
+{% block title %}Project Report | KAS{% endblock %}
+{% block content %}
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+  <div>
+    <div class="section-label">AI PROJECT REPORT</div>
+    <h1 style="font-size:20px;font-weight:600;">Walkthrough Report</h1>
+    <p style="font-size:13px;color:#6b7280;">Generated {{ report.created_at[:10] if report.created_at else '' }}</p>
+  </div>
+  <button onclick="window.print()" class="btn">Print / Save PDF</button>
+</div>
+
+{% if report.report_text %}
+  {% set parsed = report.report_text | tojson %}
+  <div id="report-content">
+    {% set sections = [
+      ('project_summary',  'Project Summary'),
+      ('completed_work',   'Work Completed'),
+      ('materials_used',   'Materials Used'),
+      ('issues_found',     'Issues Found'),
+      ('safety_notes',     'Safety Notes'),
+      ('next_steps',       'Next Steps')
+    ] %}
+    {% for key, label in sections %}
+      <div class="card" style="margin-bottom:12px;">
+        <div class="section-label">{{ label | upper }}</div>
+        <p style="font-size:14px;line-height:1.7;color:#374151;" id="section-{{ key }}">Loading...</p>
+      </div>
+    {% endfor %}
+  </div>
+  <script>
+    try {
+      const raw = {{ report.report_text | tojson }};
+      const data = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      const keys = ['project_summary','completed_work','materials_used','issues_found','safety_notes','next_steps'];
+      keys.forEach(k => {
+        const el = document.getElementById('section-' + k);
+        if (el) el.textContent = data[k] || 'No information recorded.';
+      });
+    } catch(e) {
+      document.getElementById('report-content').innerHTML = '<div class="card"><p style="font-size:14px;line-height:1.7;">{{ report.report_text | e }}</p></div>';
+    }
+  </script>
+{% else %}
+  <div class="card"><p style="color:#6b7280;">Report content is not available yet.</p></div>
+{% endif %}
+
+<div style="text-align:center;margin-top:20px;">
+  <a href="{{ url_for('client_portal', token=token) }}" style="font-size:13px;color:#6b7280;">← Back to project</a>
+</div>
+{% endblock %}

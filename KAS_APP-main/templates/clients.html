@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block title %}Clients | KAS{% endblock %}
+
+{% block content %}
+<section class="clients-page management-page">
+    <section class="page-hero glass-panel reveal">
+        <div class="hero-copy shell-copy">
+            <p class="eyebrow">Client Relationship Management</p>
+            <h1>Clients</h1>
+            <p>Keep every customer account, project history, and invoice balance visible from one premium CRM surface.</p>
+            <div class="dashboard-tags">
+                <span class="dashboard-tag">Total clients: {{ total_clients }}</span>
+                <span class="dashboard-tag">Active clients: {{ active_clients }}</span>
+                <span class="dashboard-tag">Outstanding balance: {{ money(outstanding_balance or 0) }}</span>
+            </div>
+        </div>
+        <div class="hero-actions">
+            <a class="button" href="{{ url_for('users') }}">Access Management</a>
+            <a class="button button-primary" href="{{ url_for('create_estimate') }}">Create Quote</a>
+        </div>
+    </section>
+
+    <section class="management-stats stagger-grid" aria-label="Client summary">
+        <div class="stat-card glass-panel reveal">
+            <span class="kpi-value" data-count="{{ total_clients }}">{{ total_clients }}</span>
+            <p>Total Clients</p>
+            <small>All client accounts in the workspace</small>
+        </div>
+        <div class="stat-card glass-panel reveal">
+            <span class="kpi-value" data-count="{{ active_clients }}">{{ active_clients }}</span>
+            <p>Active Clients</p>
+            <small>Clients with at least one project</small>
+        </div>
+        <div class="stat-card glass-panel reveal">
+            <span class="kpi-value" data-count="{{ repeat_clients }}">{{ repeat_clients }}</span>
+            <p>Repeat Clients</p>
+            <small>Accounts with multiple projects</small>
+        </div>
+        <div class="stat-card glass-panel reveal">
+            <span class="kpi-value" data-count="{{ total_spent|int }}">{{ money(total_spent or 0) }}</span>
+            <p>Total Spent</p>
+            <small>Paid project value on file</small>
+        </div>
+        <div class="stat-card glass-panel reveal">
+            <span class="kpi-value" data-count="{{ outstanding_balance|int }}">{{ money(outstanding_balance or 0) }}</span>
+            <p>Outstanding Balance</p>
+            <small>Open invoice value</small>
+        </div>
+    </section>
+
+    <section class="person-grid stagger-grid" aria-label="Client cards">
+        {% for client in clients %}
+            <article id="client-{{ client.id }}" class="person-card client glass-panel reveal">
+                <div class="person-header">
+                    <div class="person-avatar" aria-hidden="true">{{ client.name[:1]|upper }}</div>
+                    <div>
+                        <p class="eyebrow">Client Account</p>
+                        <h3>{{ client.name }}</h3>
+                        <div class="client-meta">
+                            <small>{{ client.email }}</small>
+                            <small>{{ client.phone or 'Phone not on file' }}</small>
+                        </div>
+                    </div>
+                    <span class="person-status {% if (client.outstanding_balance or 0) > 0 %}busy{% elif (client.total_projects or 0) > 0 %}available{% else %}off-duty{% endif %}">
+                        {% if (client.outstanding_balance or 0) > 0 %}
+                            Balance Due
+                        {% elif (client.total_projects or 0) > 0 %}
+                            Active
+                        {% else %}
+                            New
+                        {% endif %}
+                    </span>
+                </div>
+
+                <div class="summary-grid">
+                    <div class="metric-pill">Projects: {{ client.total_projects or 0 }}</div>
+                    <div class="metric-pill">Completed: {{ client.completed_projects or 0 }}</div>
+                    <div class="metric-pill">Spent: {{ money(client.total_spent or 0) }}</div>
+                    <div class="metric-pill {% if (client.outstanding_balance or 0) > 0 %}busy{% endif %}">Open: {{ money(client.outstanding_balance or 0) }}</div>
+                    <div class="metric-pill">Last Job: {{ client.last_job_date[:10] if client.last_job_date else 'No jobs yet' }}</div>
+                </div>
+
+                <div class="card-actions">
+                    <a class="button" href="#client-{{ client.id }}">View</a>
+                    <a class="button" href="{{ url_for('users') }}">Edit</a>
+                    <a class="button button-primary" href="{{ url_for('create_estimate') }}">Create Quote</a>
+                </div>
+            </article>
+        {% else %}
+            <section class="empty-state reveal">
+                <h2>No clients yet</h2>
+                <p>Clients will appear here once customer accounts are added.</p>
+            </section>
+        {% endfor %}
+    </section>
+</section>
+{% endblock %}

@@ -1,0 +1,669 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0f6a47">
+    <meta name="application-name" content="KAS App">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="KAS App">
+    <meta name="description" content="KAS App - Waterproofing &amp; Building Services">
+    {% set uploaded_logo_url = (workspace_settings.uploaded_logo_url if workspace_settings is defined and workspace_settings.uploaded_logo_url else '') %}
+    {% set company_logo_url = uploaded_logo_url %}
+    {% set dynamic_favicon = (company_logo_url if company_logo_url else url_for('static', filename='icons/favicon.svg')) %}
+    <title>{% block title %}KAS{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="manifest" href="{{ url_for('pwa_manifest') }}">
+    <link rel="icon" type="image/png" href="{{ company_logo_url if company_logo_url else url_for('static', filename='icons/icon-192.png') }}">
+    <link rel="icon" href="{{ dynamic_favicon }}" type="{{ workspace_settings.favicon_mimetype if workspace_settings is defined and workspace_settings.favicon_mimetype else 'image/svg+xml' }}">
+    <link rel="apple-touch-icon" href="{{ company_logo_url if company_logo_url else dynamic_favicon }}">
+    <link rel="apple-touch-startup-image" href="{{ url_for('static', filename='icons/apple-splash.svg') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v=7">
+    <!-- Dev override: temporary spacing/typography tweaks to verify changes immediately -->
+    <style id="dev-override">
+        .page { padding: 36px !important; }
+        .panel { padding: 36px !important; border-radius: 18px !important; }
+        .dashboard-stats > div { padding: 28px !important; }
+        .hero-action-card { min-height: 120px !important; padding: 24px !important; }
+        .task-row { padding: 20px !important; border-radius: 18px !important; }
+        .job-card-top { margin-bottom: 22px !important; }
+    </style>
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+    {% set rendered_content %}{% block content %}{% endblock %}{% endset %}
+    {% if g.user %}
+        {% set selected_view = request.args.get('view_as', 'admin') %}
+        <div class="app-shell" id="app-shell">
+            <aside class="sidebar" id="sidebar" aria-label="Primary navigation">
+                <div class="sidebar-brand-row">
+                    <a class="brand" href="{{ url_for('index') }}">
+                        <span class="brand-mark{% if uploaded_logo_url %} has-logo{% endif %}">
+                            {% if uploaded_logo_url %}
+                                <img class="brand-logo" src="{{ uploaded_logo_url }}" alt="{{ workspace_settings.company_name or 'KAS' }} logo" loading="lazy" decoding="async">
+                            {% else %}
+                                KAS
+                            {% endif %}
+                        </span>
+                        <span class="brand-meta">
+                            <strong>{{ workspace_settings.company_name or 'KAS' }}</strong>
+                            <small>{{ workspace_settings.company_city or 'Fort Lauderdale, FL' }}</small>
+                        </span>
+                    </a>
+                    <button class="icon-button sidebar-close" type="button" id="sidebar-close" aria-label="Close menu">✕</button>
+                </div>
+
+                <nav class="sidebar-nav">
+                    <a class="nav-link {% if request.endpoint == 'index' %}active{% endif %}" href="{{ url_for('index') }}"><span class="nav-icon" data-lucide="layout-grid"></span><span>Dashboard</span></a>
+                    <a class="nav-link {% if request.endpoint == 'jobs' or request.endpoint in ['add_job', 'update_job', 'job_progress', 'submit_update'] %}active{% endif %}" href="{{ url_for('jobs') }}"><span class="nav-icon" data-lucide="briefcase-business"></span><span>Jobs</span></a>
+                    {% if g.user.role == 'admin' %}
+                        <a class="nav-link {% if request.endpoint == 'clients' %}active{% endif %}" href="{{ url_for('clients') }}"><span class="nav-icon" data-lucide="users"></span><span>Clients</span></a>
+                        <a class="nav-link {% if request.endpoint == 'employees' %}active{% endif %}" href="{{ url_for('employees') }}"><span class="nav-icon" data-lucide="user-check"></span><span>Employees</span></a>
+                        <a class="nav-link {% if request.endpoint in ['estimates', 'create_estimate', 'view_estimate', 'edit_estimate'] %}active{% endif %}" href="{{ url_for('estimates') }}"><span class="nav-icon" data-lucide="file-text"></span><span>Estimates</span></a>
+                        <a class="nav-link {% if request.endpoint in ['update_job', 'job_progress', 'submit_update'] %}active{% endif %}" href="{{ url_for('index', sort='updated') }}"><span class="nav-icon" data-lucide="bell"></span><span>Updates</span></a>
+                        <a class="nav-link {% if request.endpoint == 'analytics' %}active{% endif %}" href="{{ url_for('analytics') }}"><span class="nav-icon" data-lucide="bar-chart-3"></span><span>Analytics</span></a>
+                        <a class="nav-link {% if request.endpoint == 'settings' %}active{% endif %}" href="{{ url_for('settings') }}"><span class="nav-icon" data-lucide="settings-2"></span><span>Settings</span></a>
+                    {% endif %}
+                </nav>
+
+                {% if g.user.role == 'admin' %}
+                    <form class="view-as-form" method="get" action="{{ url_for('index') }}">
+                        <label for="view-as">View As</label>
+                        <select id="view-as" name="view_as" onchange="this.form.submit()">
+                            <option value="admin" {% if selected_view == 'admin' %}selected{% endif %}>Admin</option>
+                            <option value="employee" {% if selected_view == 'employee' %}selected{% endif %}>Employee</option>
+                            <option value="client" {% if selected_view == 'client' %}selected{% endif %}>Client</option>
+                        </select>
+                    </form>
+                {% endif %}
+            </aside>
+
+            <div class="workspace">
+                <header class="topbar">
+                    <div class="topbar-left">
+                        <button class="icon-button sidebar-toggle" type="button" id="sidebar-toggle" aria-label="Open menu">☰</button>
+                        <a class="topbar-brand" href="{{ url_for('index') }}">
+                            <span class="topbar-brand-mark{% if uploaded_logo_url %} has-logo{% endif %}">
+                                {% if uploaded_logo_url %}
+                                    <img class="topbar-brand-logo" src="{{ uploaded_logo_url }}" alt="{{ workspace_settings.company_name or 'KAS' }} logo" loading="lazy" decoding="async">
+                                {% else %}
+                                    KAS
+                                {% endif %}
+                            </span>
+                            <span class="topbar-brand-text">{{ workspace_settings.company_name or 'KAS' }}</span>
+                        </a>
+                        <form class="global-search" method="get" action="{{ url_for('index') }}">
+                            {% if request.args.get('view_as') %}
+                                <input type="hidden" name="view_as" value="{{ request.args.get('view_as') }}">
+                            {% endif %}
+                            <div class="search-input-shell">
+                                <span class="search-input-icon" aria-hidden="true" data-lucide="search"></span>
+                                <input type="search" name="q" placeholder="Search jobs, clients, addresses" value="{{ request.args.get('q', '') }}" aria-label="Search">
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="topbar-right">
+                        <button class="icon-button" type="button" id="theme-toggle" aria-label="Toggle dark mode">◐</button>
+                        <button class="icon-button" type="button" id="install-header-btn" title="Install app">⬇️</button>
+                        <div class="notification-menu" id="notification-menu">
+                            <button class="icon-button notification-dot{% if notification_count %} has-unread{% endif %}" type="button" id="notification-trigger" aria-expanded="false" aria-label="Open notifications">
+                                🔔
+                                {% if notification_count %}
+                                    <span class="notification-badge">{{ notification_count }}</span>
+                                {% endif %}
+                            </button>
+                            <div class="notification-dropdown" id="notification-dropdown">
+                                <div class="notification-dropdown-header">
+                                    <strong>Notifications</strong>
+                                    <small>{{ notification_count }} new</small>
+                                </div>
+                                <div class="notification-list">
+                                    {% if notifications %}
+                                        {% for item in notifications %}
+                                            <a class="notification-item" href="{{ item.href }}">
+                                                <strong>{{ item.title }}</strong>
+                                                <p>{{ item.message }}</p>
+                                                <small>{{ item.timestamp|replace('T', ' ') }}</small>
+                                            </a>
+                                        {% endfor %}
+                                    {% else %}
+                                        <div class="notification-item empty">
+                                            <strong>No notifications</strong>
+                                            <p>New leads, estimates, and field activity will appear here.</p>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="profile-menu" id="profile-menu">
+                            <button class="profile-trigger" type="button" id="profile-trigger" aria-expanded="false">
+                                <span class="avatar">{{ g.user.name[:1]|upper }}</span>
+                                <span class="profile-meta">
+                                    <strong>{{ g.user.name }}</strong>
+                                    <small>{{ g.user.role|title }}</small>
+                                </span>
+                            </button>
+                            <div class="profile-dropdown" id="profile-dropdown">
+                                <a href="{{ url_for('index') }}">My Dashboard</a>
+                                {% if g.user.role == 'admin' %}
+                                    <a href="{{ url_for('users') }}">Access Management</a>
+                                    <a href="{{ url_for('settings') }}">Settings</a>
+                                {% endif %}
+                                <form method="post" action="{{ url_for('logout') }}">
+                                    <button class="button button-danger button-full" type="submit">Sign Out</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </header>
+
+                <main class="page fade-in">
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                        {% if messages %}
+                            <div class="messages" role="status" aria-live="polite">
+                                {% for category, message in messages %}
+                                    <p class="message {{ category }}" data-auto-dismiss="5000">{{ message }}</p>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    {% endwith %}
+
+                    {{ rendered_content }}
+                </main>
+            </div>
+
+            <nav class="mobile-bottom-nav" aria-label="Mobile navigation">
+                <a href="{{ url_for('index') }}" class="{% if request.endpoint == 'index' %}active{% endif %}"><span data-lucide="layout-grid"></span><span>Dashboard</span></a>
+                <a href="{{ url_for('jobs') }}" class="{% if request.endpoint == 'jobs' or request.endpoint in ['add_job', 'update_job', 'job_progress', 'submit_update'] %}active{% endif %}"><span data-lucide="briefcase-business"></span><span>Jobs</span></a>
+                {% if g.user.role == 'admin' %}
+                    <a href="{{ url_for('clients') }}" class="{% if request.endpoint == 'clients' %}active{% endif %}"><span data-lucide="users"></span><span>Clients</span></a>
+                    <a href="{{ url_for('employees') }}" class="{% if request.endpoint == 'employees' %}active{% endif %}"><span data-lucide="user-check"></span><span>Employees</span></a>
+                    <a href="{{ url_for('settings') }}" class="{% if request.endpoint == 'settings' %}active{% endif %}"><span data-lucide="settings-2"></span><span>Settings</span></a>
+                {% else %}
+                    <a href="{{ url_for('index', sort='updated') }}"><span data-lucide="bell"></span><span>Updates</span></a>
+                    <form method="post" action="{{ url_for('logout') }}"><button type="submit">Sign Out</button></form>
+                {% endif %}
+            </nav>
+        </div>
+    {% else %}
+        <main class="page auth-page fade-in">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="messages" role="status" aria-live="polite">
+                        {% for category, message in messages %}
+                            <p class="message {{ category }}" data-auto-dismiss="5000">{{ message }}</p>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+            {{ rendered_content }}
+        </main>
+    {% endif %}
+
+    <div class="loading-overlay" id="loading-overlay" aria-hidden="true">
+        <div class="skeleton-loader"></div>
+        <p>Loading workspace...</p>
+    </div>
+
+    <!-- Install CTA removed: using inline Install button inside auth/login left panel -->
+
+    <!-- PWA Diagnostics Modal -->
+    <div id="pwa-diagnostics-modal" class="pwa-modal" hidden aria-hidden="true">
+        <div class="pwa-modal-panel">
+            <header>
+                <strong>PWA Diagnostics</strong>
+                <button id="pwa-diagnostics-close" class="icon-button">✕</button>
+            </header>
+            <div id="pwa-diagnostics-body">
+                <p>Running checks…</p>
+                <pre id="pwa-diagnostics-output" style="white-space:pre-wrap; font-size:13px;"> </pre>
+            </div>
+            <footer>
+                <button id="pwa-diagnostics-refresh" class="button">Run checks</button>
+                <button id="pwa-diagnostics-copy" class="button">Copy JSON</button>
+                <button id="pwa-diagnostics-close-2" class="button">Close</button>
+            </footer>
+        </div>
+    </div>
+
+    <script>
+    (function () {
+        const body = document.body;
+        const shell = document.getElementById("app-shell");
+        const openBtn = document.getElementById("sidebar-toggle");
+        const closeBtn = document.getElementById("sidebar-close");
+        const profileTrigger = document.getElementById("profile-trigger");
+        const profileMenu = document.getElementById("profile-menu");
+        const notificationTrigger = document.getElementById("notification-trigger");
+        const notificationMenu = document.getElementById("notification-menu");
+        const themeToggle = document.getElementById("theme-toggle");
+        const installHeaderBtn = document.getElementById("install-header-btn");
+        const loadingOverlay = document.getElementById("loading-overlay");
+        const installCta = document.getElementById("install-cta");
+        const installBtn = document.getElementById("install-btn");
+        const installDismiss = document.getElementById("install-dismiss");
+        const iosInstallTip = document.getElementById("ios-install-tip");
+        const iosTipDismiss = document.getElementById("ios-tip-dismiss");
+        const standaloneMatch = window.matchMedia("(display-mode: standalone)").matches;
+        const launchedFromAndroidApp = document.referrer.startsWith("android-app://");
+        const supportsStandalone = standaloneMatch || window.navigator.standalone || launchedFromAndroidApp;
+        const isIos = /iphone|ipad|ipod/i.test(window.navigator.userAgent);
+        const installDismissed = localStorage.getItem("kas-install-dismissed") === "true";
+        const defaultTheme = "{{ workspace_settings.theme if workspace_settings is defined else 'light' }}";
+        let deferredInstallPrompt = null;
+
+        function hideInstallPrompts() {
+            if (installCta) {
+                installCta.hidden = true;
+            }
+            if (iosInstallTip) {
+                iosInstallTip.hidden = true;
+            }
+        }
+
+        function showInstallPrompt() {
+            if (supportsStandalone || installDismissed) {
+                hideInstallPrompts();
+                return;
+            }
+
+            if (isIos) {
+                if (iosInstallTip) {
+                    iosInstallTip.hidden = false;
+                }
+                if (installCta) {
+                    installCta.hidden = true;
+                }
+                return;
+            }
+
+            if (deferredInstallPrompt && installCta) {
+                installCta.hidden = false;
+                if (installBtn) {
+                    installBtn.disabled = false;
+                }
+                if (iosInstallTip) {
+                    iosInstallTip.hidden = true;
+                }
+                return;
+            }
+
+            hideInstallPrompts();
+        }
+
+        const savedTheme = localStorage.getItem("kas-theme");
+        if (savedTheme === "dark" || (!savedTheme && defaultTheme === "dark")) {
+            body.classList.add("theme-dark");
+        }
+
+        if (themeToggle) {
+            themeToggle.addEventListener("click", function () {
+                body.classList.toggle("theme-dark");
+                localStorage.setItem("kas-theme", body.classList.contains("theme-dark") ? "dark" : "light");
+            });
+        }
+
+        if (openBtn && shell) {
+            openBtn.addEventListener("click", function () {
+                shell.classList.add("sidebar-open");
+            });
+        }
+        if (closeBtn && shell) {
+            closeBtn.addEventListener("click", function () {
+                shell.classList.remove("sidebar-open");
+            });
+        }
+
+        if (profileTrigger && profileMenu) {
+            profileTrigger.addEventListener("click", function (event) {
+                event.stopPropagation();
+                const expanded = profileTrigger.getAttribute("aria-expanded") === "true";
+                profileTrigger.setAttribute("aria-expanded", expanded ? "false" : "true");
+                profileMenu.classList.toggle("open");
+                if (notificationMenu) {
+                    notificationMenu.classList.remove("open");
+                }
+            });
+        }
+
+        if (notificationTrigger && notificationMenu) {
+            notificationTrigger.addEventListener("click", function (event) {
+                event.stopPropagation();
+                const expanded = notificationTrigger.getAttribute("aria-expanded") === "true";
+                notificationTrigger.setAttribute("aria-expanded", expanded ? "false" : "true");
+                notificationMenu.classList.toggle("open");
+                if (profileMenu) {
+                    profileMenu.classList.remove("open");
+                }
+            });
+        }
+
+        document.addEventListener("click", function (event) {
+            if (profileMenu && !profileMenu.contains(event.target)) {
+                profileMenu.classList.remove("open");
+                if (profileTrigger) {
+                    profileTrigger.setAttribute("aria-expanded", "false");
+                }
+            }
+            if (notificationMenu && !notificationMenu.contains(event.target)) {
+                notificationMenu.classList.remove("open");
+                if (notificationTrigger) {
+                    notificationTrigger.setAttribute("aria-expanded", "false");
+                }
+            }
+        });
+
+        const actionLinks = document.querySelectorAll("a.button, .sidebar-nav a, .mobile-bottom-nav a");
+        actionLinks.forEach(function (link) {
+            link.addEventListener("click", function () {
+                if (loadingOverlay) {
+                    loadingOverlay.classList.add("visible");
+                }
+            });
+        });
+
+        const tables = document.querySelectorAll(".table-card table");
+        tables.forEach(function (table) {
+            const headers = Array.from(table.querySelectorAll("thead th")).map(function (th) {
+                return th.textContent.trim();
+            });
+            table.querySelectorAll("tbody tr").forEach(function (row) {
+                row.querySelectorAll("td").forEach(function (cell, idx) {
+                    if (headers[idx]) {
+                        cell.setAttribute("data-label", headers[idx]);
+                    }
+                });
+            });
+        });
+
+        const compare = function (a, b, dir) {
+            return a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }) * dir;
+        };
+        document.querySelectorAll(".table-card table").forEach(function (table) {
+            table.querySelectorAll("thead th").forEach(function (header, index) {
+                header.addEventListener("click", function () {
+                    const tbody = table.querySelector("tbody");
+                    const rows = Array.from(tbody.querySelectorAll("tr"));
+                    const currentDir = header.dataset.dir === "asc" ? "desc" : "asc";
+                    header.dataset.dir = currentDir;
+                    const dir = currentDir === "asc" ? 1 : -1;
+                    rows.sort(function (rowA, rowB) {
+                        const a = rowA.children[index] ? rowA.children[index].textContent.trim() : "";
+                        const b = rowB.children[index] ? rowB.children[index].textContent.trim() : "";
+                        return compare(a, b, dir);
+                    });
+                    rows.forEach(function (row) { tbody.appendChild(row); });
+                });
+            });
+        });
+
+        function urlBase64ToUint8Array(base64String) {
+            const padding = "=".repeat((4 - base64String.length % 4) % 4);
+            const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+            const rawData = window.atob(base64);
+            const outputArray = new Uint8Array(rawData.length);
+            for (let i = 0; i < rawData.length; i += 1) {
+                outputArray[i] = rawData.charCodeAt(i);
+            }
+            return outputArray;
+        }
+
+        // During active UI debugging, automatically unregister any service workers
+        // and clear caches so the browser loads the latest templates and CSS.
+        // This is temporary — remove when you're done testing.
+        window.__sw_disabled = true;
+        (function unregisterExistingServiceWorkers() {
+            try {
+                if ('serviceWorker' in navigator) {
+                    navigator.serviceWorker.getRegistrations().then(function (regs) {
+                        regs.forEach(function (r) { try { r.unregister(); } catch (e) {} });
+                    });
+                }
+                if ('caches' in window) {
+                    caches.keys().then(function (keys) {
+                        return Promise.all(keys.map(function (k) { return caches.delete(k); }));
+                    }).catch(function () {});
+                }
+            } catch (e) {
+                console.warn('SW cleanup skipped', e);
+            }
+        })();
+
+        async function registerServiceWorker() {
+            if (window.__sw_disabled) return null;
+            if (!("serviceWorker" in navigator)) {
+                return null;
+            }
+            try {
+                return await navigator.serviceWorker.register("{{ url_for('pwa_service_worker') }}");
+            } catch (error) {
+                console.warn("Service worker registration failed", error);
+                return null;
+            }
+        }
+
+        async function subscribeToPushIfConfigured(registration) {
+            if (!registration || !("PushManager" in window) || Notification.permission !== "granted") {
+                return;
+            }
+
+            try {
+                const keyResponse = await fetch("/api/push/vapid-public-key", { credentials: "same-origin" });
+                if (!keyResponse.ok) {
+                    return;
+                }
+                const keyPayload = await keyResponse.json();
+                if (!keyPayload.publicKey) {
+                    return;
+                }
+
+                const existing = await registration.pushManager.getSubscription();
+                const subscription = existing || await registration.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: urlBase64ToUint8Array(keyPayload.publicKey)
+                });
+
+                await fetch("/api/push/subscribe", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    credentials: "same-origin",
+                    body: JSON.stringify({ subscription: subscription.toJSON() })
+                });
+            } catch (error) {
+                console.warn("Push setup skipped", error);
+            }
+        }
+
+        window.enableKasNotifications = async function () {
+            if (!("Notification" in window)) {
+                return false;
+            }
+            const permission = await Notification.requestPermission();
+            if (permission !== "granted") {
+                return false;
+            }
+            const registration = await navigator.serviceWorker.ready;
+            await subscribeToPushIfConfigured(registration);
+            return true;
+        };
+
+        window.addEventListener("beforeinstallprompt", function (event) {
+            event.preventDefault();
+            deferredInstallPrompt = event;
+            showInstallPrompt();
+        });
+
+        if (installBtn) {
+            installBtn.disabled = true;
+            installBtn.addEventListener("click", async function () {
+                if (!deferredInstallPrompt) {
+                    showInstallPrompt();
+                    return;
+                }
+                deferredInstallPrompt.prompt();
+                await deferredInstallPrompt.userChoice;
+                deferredInstallPrompt = null;
+                hideInstallPrompts();
+            });
+        }
+
+        if (installDismiss) {
+            installDismiss.addEventListener("click", function () {
+                localStorage.setItem("kas-install-dismissed", "true");
+                hideInstallPrompts();
+            });
+        }
+
+        if (installHeaderBtn) {
+            installHeaderBtn.addEventListener('click', async function () {
+                // If we have a deferred prompt (Android/Chrome) show it
+                if (deferredInstallPrompt) {
+                    deferredInstallPrompt.prompt();
+                    try { await deferredInstallPrompt.userChoice; } catch (e) {}
+                    deferredInstallPrompt = null;
+                    hideInstallPrompts();
+                    return;
+                }
+
+                // If iOS, show the iOS install tip
+                if (isIos) {
+                    if (iosInstallTip) iosInstallTip.hidden = false;
+                    return;
+                }
+
+                // Otherwise show the install CTA if available
+                if (installCta) {
+                    installCta.hidden = false;
+                    if (installBtn) installBtn.disabled = !deferredInstallPrompt;
+                }
+            });
+        }
+
+        // Floating FAB install button
+        const installFab = document.getElementById('install-fab');
+        if (installFab) {
+            // Show FAB when install CTA would be shown on mobile
+            function updateFabVisibility() {
+                const shouldShow = !supportsStandalone && !installDismissed && !isIos && !!deferredInstallPrompt;
+                installFab.hidden = !shouldShow;
+            }
+            installFab.addEventListener('click', async function () {
+                if (deferredInstallPrompt) {
+                    deferredInstallPrompt.prompt();
+                    try { await deferredInstallPrompt.userChoice; } catch (e) {}
+                    deferredInstallPrompt = null;
+                    hideInstallPrompts();
+                    installFab.hidden = true;
+                    return;
+                }
+                // fallback: show CTA or iOS tip
+                if (isIos && iosInstallTip) iosInstallTip.hidden = false;
+                if (installCta) installCta.hidden = false;
+            });
+            // update when prompt arrives
+            window.addEventListener('beforeinstallprompt', function () { updateFabVisibility(); });
+            // initial state
+            setTimeout(updateFabVisibility, 300);
+        }
+
+        // PWA diagnostics handlers
+        const diagnosticsBtn = document.getElementById('install-diagnostics-btn');
+        const diagnosticsModal = document.getElementById('pwa-diagnostics-modal');
+        const diagnosticsClose = document.getElementById('pwa-diagnostics-close');
+        const diagnosticsClose2 = document.getElementById('pwa-diagnostics-close-2');
+        const diagnosticsRefresh = document.getElementById('pwa-diagnostics-refresh');
+        const diagnosticsCopy = document.getElementById('pwa-diagnostics-copy');
+        const diagnosticsOutput = document.getElementById('pwa-diagnostics-output');
+
+        function showDiagnostics() {
+            if (!diagnosticsModal) return;
+            diagnosticsModal.hidden = false;
+            diagnosticsModal.setAttribute('aria-hidden', 'false');
+            runDiagnostics();
+        }
+
+        function hideDiagnostics() {
+            if (!diagnosticsModal) return;
+            diagnosticsModal.hidden = true;
+            diagnosticsModal.setAttribute('aria-hidden', 'true');
+        }
+
+        async function runDiagnostics() {
+            const results = {
+                serviceWorkerSupported: 'serviceWorker' in navigator,
+                serviceWorkerRegistered: false,
+                serviceWorkerScript: '{{ url_for('pwa_service_worker') }}',
+                manifestUrl: '{{ url_for('pwa_manifest') }}',
+                manifestLoaded: false,
+                manifest: null,
+                beforeInstallPromptAvailable: !!deferredInstallPrompt,
+                displayMode: (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone) ? 'standalone' : 'browser',
+                timestamp: new Date().toISOString(),
+            };
+
+            // check SW registration
+            try {
+                const reg = await navigator.serviceWorker.getRegistration();
+                results.serviceWorkerRegistered = !!reg;
+                if (reg && reg.active) results.serviceWorkerScope = reg.scope;
+            } catch (e) {
+                results.swError = String(e);
+            }
+
+            // fetch manifest
+            try {
+                const r = await fetch(results.manifestUrl, { cache: 'no-store' });
+                if (r.ok) {
+                    results.manifestLoaded = true;
+                    try { results.manifest = await r.json(); } catch (e) { results.manifest = await r.text(); }
+                } else {
+                    results.manifestError = r.status + ' ' + r.statusText;
+                }
+            } catch (e) {
+                results.manifestError = String(e);
+            }
+
+            diagnosticsOutput.textContent = JSON.stringify(results, null, 2);
+            diagnosticsOutput.dataset.json = JSON.stringify(results);
+        }
+
+        if (diagnosticsBtn) diagnosticsBtn.addEventListener('click', showDiagnostics);
+        if (diagnosticsClose) diagnosticsClose.addEventListener('click', hideDiagnostics);
+        if (diagnosticsClose2) diagnosticsClose2.addEventListener('click', hideDiagnostics);
+        if (diagnosticsRefresh) diagnosticsRefresh.addEventListener('click', runDiagnostics);
+        if (diagnosticsCopy) diagnosticsCopy.addEventListener('click', function () {
+            const data = diagnosticsOutput.dataset.json || diagnosticsOutput.textContent;
+            navigator.clipboard && navigator.clipboard.writeText(data).then(() => alert('Copied diagnostics to clipboard')); 
+        });
+
+        if (iosTipDismiss) {
+            iosTipDismiss.addEventListener("click", function () {
+                localStorage.setItem("kas-install-dismissed", "true");
+                hideInstallPrompts();
+            });
+        }
+
+        window.addEventListener("appinstalled", function () {
+            localStorage.removeItem("kas-install-dismissed");
+            hideInstallPrompts();
+        });
+
+        document.addEventListener("visibilitychange", function () {
+            if (!document.hidden) {
+                showInstallPrompt();
+            }
+        });
+
+        showInstallPrompt();
+        registerServiceWorker().then(subscribeToPushIfConfigured);
+    })();
+    </script>
+    <script src="{{ url_for('static', filename='app.js') }}?v=2"></script>
+</body>
+</html>

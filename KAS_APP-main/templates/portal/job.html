@@ -1,0 +1,129 @@
+{% extends "portal/base.html" %}
+{% block title %}{{ job.name }} | Your Project | KAS{% endblock %}
+{% block content %}
+
+{% set status_steps = [
+  ('Estimate approved', ['Approved','Scheduled','Started','In Progress','Completed','Invoiced','Paid']),
+  ('Work started',      ['Started','In Progress','Completed','Invoiced','Paid']),
+  ('In progress',       ['In Progress','Completed','Invoiced','Paid']),
+  ('Final inspection',  ['Completed','Invoiced','Paid']),
+  ('Complete',          ['Invoiced','Paid'])
+] %}
+
+{% for doc in documents if doc.requires_client_signature and not doc.signed_at %}
+<div class="banner banner-warning">
+  <div style="flex:1;">
+    <div style="font-size:13px;font-weight:600;color:#92400e;">Approval needed: {{ doc.name }}</div>
+    <div style="font-size:12px;color:#b45309;margin-top:2px;">Please review and sign to proceed to the next phase.</div>
+  </div>
+  <a href="{{ url_for('portal_sign', token=token, doc_id=doc.id) }}" class="btn btn-warning">Review & sign</a>
+</div>
+{% endfor %}
+
+<div style="background:#0f6a47;border-radius:14px;padding:20px 24px 28px;margin-bottom:16px;color:#fff;">
+  <div style="font-size:11px;color:rgba(255,255,255,0.6);letter-spacing:0.06em;margin-bottom:4px;">YOUR PROJECT</div>
+  <div style="font-size:20px;font-weight:600;margin-bottom:2px;">{{ job.name }}</div>
+  <div style="font-size:13px;color:rgba(255,255,255,0.7);margin-bottom:14px;">{{ job.location }} · Job #KAS-{{ job.id }}</div>
+  <div class="pill pill-green"><div class="status-dot"></div>{{ job.status }}{% if job.created_at %} · started {{ job.created_at[:10] }}{% endif %}</div>
+</div>
+
+<div class="card">
+  <div class="section-label">PROJECT TIMELINE</div>
+  <div class="timeline-track">
+    {% for label, active_statuses in status_steps %}
+      {% set is_done = job.status in active_statuses %}
+      {% set is_active = (loop.index == 3 and job.status in ['Started','In Progress']) or
+                         (loop.index == 1 and job.status == 'Approved') or
+                         (loop.index == 2 and job.status == 'Scheduled') or
+                         (loop.index == 4 and job.status == 'Completed') or
+                         (loop.index == 5 and job.status in ['Invoiced','Paid']) %}
+      <div class="tl-step {% if is_done %}done{% endif %}">
+        <div class="tl-circle {% if is_done %}done{% elif is_active %}active{% else %}future{% endif %}">
+          {% if is_done %}✓{% else %}{{ loop.index }}{% endif %}
+        </div>
+        <div class="tl-label {% if is_active %}active{% endif %}">{{ label }}</div>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="stat-grid" style="margin-bottom:16px;">
+  <div class="stat-item">
+    <div class="stat-value">{{ job.due_date if job.due_date else 'TBD' }}</div>
+    <div class="stat-label">Estimated completion</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-value">{{ money(job.proposal_amount) if job.proposal_amount else '—' }}</div>
+    <div class="stat-label">Project total</div>
+  </div>
+</div>
+
+{% if updates %}
+<div class="card">
+  <div class="section-label">RECENT UPDATES</div>
+  <div class="update-feed">
+    {% for update in updates[:5] %}
+    <div class="update-item">
+      <div class="update-dot" style="{% if loop.index > 1 %}background:#d1d5db;{% endif %}"></div>
+      <div>
+        <div class="update-text">{{ update.notes or 'Site photos and progress logged.' }}</div>
+        <div class="update-meta">{{ update.timestamp[:10] if update.timestamp else '' }} · {{ (update.author_role or 'team')|title }}</div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% set photos = updates | selectattr('photo_url') | list %}
+{% if photos %}
+<div class="card">
+  <div class="section-label">SITE PHOTOS</div>
+  <div class="photo-grid">
+    {% for update in updates if update.photo_url %}
+      <div class="photo-tile">
+        <a href="{{ update.photo_url }}" target="_blank" rel="noopener">
+          <img src="{{ update.photo_url }}" alt="Site photo" loading="lazy">
+        </a>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% if documents %}
+<div class="card">
+  <div class="section-label">DOCUMENTS</div>
+  {% for doc in documents %}
+  <div class="doc-row">
+    <div class="doc-icon">📄</div>
+    <div style="flex:1;">
+      <div class="doc-name">{{ doc.name }}</div>
+      <div class="doc-meta">{{ doc.document_type or 'Document' }}{% if doc.signed_at %} · Signed {{ doc.signed_at[:10] }}{% endif %}</div>
+    </div>
+    {% if doc.file_url %}
+      <a href="{{ doc.file_url }}" class="btn" target="_blank" rel="noopener">Download</a>
+    {% endif %}
+    {% if doc.requires_client_signature and not doc.signed_at %}
+      <a href="{{ url_for('portal_sign', token=token, doc_id=doc.id) }}" class="btn btn-primary">Sign</a>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="contact-strip">
+  <div class="contact-avatar">KA</div>
+  <div style="flex:1;">
+    <div style="font-size:13px;font-weight:500;">KAS Operations</div>
+    <div style="font-size:12px;color:#6b7280;">
+      {% if workspace_settings and workspace_settings.company_phone %}{{ workspace_settings.company_phone }}{% endif %}
+      {% if workspace_settings and workspace_settings.company_email %} · {{ workspace_settings.company_email }}{% endif %}
+    </div>
+  </div>
+  {% if workspace_settings and workspace_settings.company_phone %}
+    <a href="tel:{{ workspace_settings.company_phone }}" class="btn">Call</a>
+  {% endif %}
+</div>
+
+{% endblock %}
