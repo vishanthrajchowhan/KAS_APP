@@ -101,7 +101,6 @@
                                 <input type="hidden" name="view_as" value="{{ request.args.get('view_as') }}">
                             {% endif %}
                             <div class="search-input-shell">
-                                <span class="search-input-icon" aria-hidden="true" data-lucide="search"></span>
                                 <input type="search" name="q" placeholder="Search jobs, clients, addresses" value="{{ request.args.get('q', '') }}" aria-label="Search">
                             </div>
                         </form>
