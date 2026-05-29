@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container" style="max-width: 980px;">
+  <section class="panel" style="background: white; padding: 18px; border-radius: 8px; margin-bottom: 20px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+      <div>
+        <h2 style="margin: 0 0 8px 0;">Walkthrough Report #{{ walkthrough.id }}</h2>
+        <p style="margin: 0; color: #66736c; font-size: 14px;">
+          <strong>Job ID:</strong> {{ walkthrough.job_id }} |
+          <strong>Created:</strong> {{ walkthrough.created_at }}
+        </p>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <a class="button" href="{{ url_for('download_walkthrough_pdf', walkthrough_id=walkthrough.id) }}?inline=1" target="_blank">Preview</a>
+        <a class="button button-primary" href="{{ url_for('download_walkthrough_pdf', walkthrough_id=walkthrough.id) }}">Download</a>
+        <button id="upload-pdf-btn" class="button button-ghost" {% if not walkthrough.pdf_url %}disabled{% endif %}>Upload PDF</button>
+      </div>
+    </div>
+  </section>
+
+  {% if not walkthrough.ai_summary %}
+    <section class="panel" style="background: #fff8db; padding: 16px; border-radius: 8px; margin-bottom: 20px; color: #6f5500;">
+      The walkthrough is still processing. Refresh this page in a moment to see the AI report.
+    </section>
+  {% endif %}
+
+  <section class="panel" style="background: white; padding: 16px; border-radius: 8px; margin-bottom: 20px;">
+    <h3>Project Summary</h3>
+    <div style="background: #f7faf8; padding: 12px; border-left: 4px solid #0f6a47; border-radius: 4px; white-space: pre-wrap;">
+      {{ (ai.project_summary or ai.client_summary or ai.raw or 'No summary generated yet.')|report_value }}
+    </div>
+  </section>
+
+  {% if ai.observations %}
+  <section class="panel" style="background: white; padding: 16px; border-radius: 8px; margin-bottom: 20px;">
+    <h3>Photo-Linked Observations</h3>
+    <div style="display: grid; gap: 10px;">
+      {% for obs in ai.observations %}
+        <article style="border: 1px solid #dfe7e2; border-radius: 8px; padding: 12px;">
+          <div style="font-weight: 700;">{{ obs.area or 'Observation' }}</div>
+          <div style="font-size: 12px; color: #66736c; margin: 4px 0 8px;">
+            {% if obs.timestamp_seconds is not none %}{{ obs.timestamp_seconds|int }}s{% endif %}
+            {% if obs.photo_refs %} | {{ obs.photo_refs|join(', ') if obs.photo_refs is iterable and obs.photo_refs is not string else obs.photo_refs }}{% endif %}
+            {% if obs.priority %} | Priority: {{ obs.priority }}{% endif %}
+          </div>
+          {% if obs.employee_notes %}<p style="margin: 0 0 6px;"><strong>Notes:</strong> {{ obs.employee_notes }}</p>{% endif %}
+          {% if obs.issue %}<p style="margin: 0 0 6px;"><strong>Issue:</strong> {{ obs.issue }}</p>{% endif %}
+          {% if obs.action_required %}<p style="margin: 0;"><strong>Action:</strong> {{ obs.action_required }}</p>{% endif %}
+        </article>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  <section class="panel" style="background: white; padding: 16px; border-radius: 8px; margin-bottom: 20px;">
+    <h3>Report Sections</h3>
+    <div style="display: grid; gap: 12px;">
+      {% for title, value in [
+        ('Completed Work', ai.completed_work),
+        ('Materials Used', ai.materials_used),
+        ('Issues Found', ai.issues_found),
+        ('Safety Notes', ai.safety_notes),
+        ('Next Steps', ai.next_steps)
+      ] %}
+        <div>
+          <strong>{{ title }}</strong>
+          <div style="background: #f7faf8; padding: 10px; border-radius: 4px; margin-top: 6px; white-space: pre-wrap;">{{ (value or 'None noted.')|report_value }}</div>
+        </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="panel" style="background: white; padding: 16px; border-radius: 8px; margin-bottom: 20px;">
+    <h3>Photo Timeline</h3>
+    <div id="timeline" class="timeline">
+      {% for f in frames %}
+        <div class="thumb">
+          <img src="{{ f.frame_url }}" alt="Photo {{ loop.index }} at {{ f.timestamp_seconds }} seconds" loading="lazy">
+          <div class="ts">Photo {{ loop.index }} | {{ f.timestamp_seconds|int }}s</div>
+        </div>
+      {% else %}
+        <p style="color: #66736c;">No photos were captured for this walkthrough.</p>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="panel" style="background: white; padding: 16px; border-radius: 8px;">
+    <h3>Transcript</h3>
+    <pre style="background: #f7faf8; padding: 12px; border-radius: 4px; overflow-x: auto; white-space: pre-wrap; font-size: 13px;">{{ transcript or '(No transcript available)' }}</pre>
+  </section>
+</div>
+<script src="{{ url_for('static', filename='walkthrough.js') }}"></script>
+<script>
+document.getElementById('upload-pdf-btn')?.addEventListener('click', async function(){
+  if(!confirm('Upload this PDF to Supabase and attach to the job?')) return;
+  const resp = await fetch('{{ url_for('upload_walkthrough_pdf', walkthrough_id=walkthrough.id) }}', {method:'POST', headers:{'X-CSRFToken': '{{ session.get("_csrf_token") if session else "" }}'}})
+  if(resp.redirected){ window.location.href = resp.url; } else { window.location.reload(); }
+});
+</script>
+{% if not walkthrough.ai_summary %}
+<script>
+  setTimeout(() => window.location.reload(), 5000);
+</script>
+{% endif %}
+<link rel="stylesheet" href="{{ url_for('static', filename='walkthrough.css') }}">
+{% endblock %}

@@ -1,0 +1,352 @@
+/* CompanyCam-style Walkthrough Recorder Modal */
+
+#walkthrough-modal {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  position: fixed !important;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  max-width: 100vw;
+  z-index: 20000;
+  display: flex;
+  flex-direction: column;
+  background: white;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+#walkthrough-modal .wt-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  background: #0f6a47;
+  color: #fff;
+  border-bottom: 1px solid rgba(255,255,255,0.18);
+}
+
+#walkthrough-modal .wt-title {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+#walkthrough-modal .wt-close-btn {
+  background: rgba(255,255,255,0.14);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.28);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
+#wt-status {
+  padding: 10px 16px;
+  background: #f8faf9;
+  color: #33443b;
+  border-top: 1px solid #e4ebe6;
+  font-size: 13px;
+}
+
+#wt-status[data-tone="recording"] {
+  background: #fff4e6;
+  color: #7a4100;
+}
+
+#wt-status[data-tone="success"] {
+  background: #ecf8f0;
+  color: #0f6a47;
+}
+
+#wt-status[data-tone="warning"] {
+  background: #fff8db;
+  color: #6f5500;
+}
+
+#wt-status[data-tone="error"] {
+  background: #fff0f0;
+  color: #a32020;
+}
+
+#wt-photo-count {
+  position: absolute;
+  left: 16px;
+  top: 16px;
+  padding: 8px 10px;
+  background: rgba(0,0,0,0.62);
+  color: #fff;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+#walkthrough-modal video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+#walkthrough-modal button {
+  transition: background 0.2s, transform 0.1s;
+}
+
+#walkthrough-modal button:active {
+  transform: scale(0.95);
+}
+
+#walkthrough-modal button:hover {
+  opacity: 0.9;
+}
+
+/* Walkthrough timeline and UI styles */
+.timeline { 
+  display: flex; 
+  gap: 12px; 
+  flex-wrap: wrap; 
+  margin: 12px 0;
+}
+
+.thumb { 
+  position: relative; 
+  width: 160px; 
+}
+
+.thumb img { 
+  width: 100%; 
+  height: auto; 
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.thumb .ts { 
+  position: absolute; 
+  right: 6px; 
+  bottom: 6px; 
+  background: rgba(0,0,0,0.6); 
+  color: #fff; 
+  padding: 2px 6px; 
+  font-size: 12px; 
+  border-radius: 4px;
+}
+
+/* Walkthrough action buttons */
+.walkthrough-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 12px 0;
+}
+
+.button {
+  display: inline-block;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.2s;
+}
+
+/* Video container helper to allow proper shrinking on mobile */
+.wt-video-container {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0; /* allow flex children to shrink on mobile */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+  overflow: hidden;
+}
+
+/* Controls pinned to bottom to remain visible */
+.wt-controls {
+  padding: 12px 16px; background: white;
+  display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;
+  border-top: 1px solid #ddd;
+  z-index: 20002;
+}
+
+.wt-notes {
+  padding: 12px 16px; background: white; border-top: 1px solid #ddd;
+  max-height: 160px; overflow-y: auto;
+}
+
+.wt-hide-on-mobile {
+  display: block;
+}
+
+/* Header safe-area handling for iOS notch */
+.wt-header {
+  position: relative;
+  padding-top: constant(safe-area-inset-top);
+  padding-top: env(safe-area-inset-top);
+}
+
+.button-primary {
+  background: #2b6cb0;
+  color: #fff;
+}
+
+.button-primary:hover {
+  background: #1e4f7a;
+}
+
+.button {
+  background: #6c757d;
+  color: #fff;
+}
+
+.button:hover {
+  background: #5a6268;
+}
+
+/* Status messages */
+#walkthrough-status {
+  animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(400px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* Video preview styles */
+#walkthrough-preview {
+  object-fit: cover;
+}
+
+#wt-timer {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  padding: 8px 10px;
+  background: rgba(180, 35, 35, 0.9);
+  color: #fff;
+  border-radius: 6px;
+  font-size: 16px;
+  font-weight: 700;
+  font-family: 'Courier New', monospace;
+}
+
+.wt-control {
+  padding: 10px 14px;
+  border: 0;
+  border-radius: 6px;
+  color: #fff;
+  font-weight: 700;
+}
+
+.wt-record { background: #b42323; }
+.wt-snap { background: #1f6fb2; }
+.wt-camera { background: #5b5f66; }
+.wt-done { background: #0f6a47; }
+
+.wt-notes label {
+  display: block;
+  margin-bottom: 6px;
+  color: #24332b;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.wt-notes textarea {
+  width: 100%;
+  min-height: 90px;
+  padding: 10px;
+  border: 1px solid #d7ded9;
+  border-radius: 6px;
+  resize: vertical;
+  font: inherit;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  #walkthrough-modal {
+    font-size: 14px;
+    height: 100vh;
+  }
+  
+  #walkthrough-modal button {
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+  
+  .thumb {
+    width: 120px;
+  }
+
+  #walkthrough-modal.wt-compact-mobile {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  #walkthrough-modal.wt-compact-mobile .wt-hide-on-mobile {
+    display: none !important;
+  }
+
+  #walkthrough-modal.wt-compact-mobile .wt-video-container {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  #walkthrough-modal.wt-compact-mobile video {
+    width: 100%;
+    height: 100% !important;
+    max-height: 100% !important;
+  }
+
+  #walkthrough-modal.wt-compact-mobile .wt-controls {
+    position: sticky;
+    bottom: 0;
+    background: rgba(255,255,255,0.98);
+    padding: 8px 10px;
+    flex-wrap: nowrap;
+    justify-content: space-between;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  #walkthrough-modal.wt-compact-mobile .wt-controls button {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    min-width: 78px;
+  }
+
+  #walkthrough-modal.wt-compact-mobile .wt-notes {
+    display: none !important;
+  }
+}
+
+/* Floating action button for mobile to ensure walkthrough button is visible */
+.wt-fab {
+  display: none;
+  position: fixed;
+  right: 16px;
+  bottom: 24px;
+  z-index: 20000;
+  width: 56px;
+  height: 56px;
+  border-radius: 28px;
+  background: #2b6cb0;
+  color: white;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.18);
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  border: none;
+}
+
+@media (max-width: 768px) {
+  .wt-fab { display: flex; }
+}
