@@ -23,10 +23,12 @@
                 <strong>{{ ops_metrics.open_jobs }}</strong>
                 <small>Open jobs</small>
             </span>
+            {% if g.user.role == 'admin' %}
             <span>
                 <strong>{{ ops_metrics.pending_estimates }}</strong>
                 <small>Pending estimates</small>
             </span>
+            {% endif %}
             <span>
                 <strong>{{ completed_jobs }}</strong>
                 <small>Closed and paid</small>
@@ -100,6 +102,7 @@
                 <small>Open jobs in motion</small>
             </div>
         </div>
+        {% if g.user.role == 'admin' %}
         <div class="activity-strip-item">
             <span class="activity-strip-icon" data-lucide="file-text"></span>
             <div>
@@ -107,6 +110,7 @@
                 <small>Pending estimates</small>
             </div>
         </div>
+        {% endif %}
         <div class="activity-strip-item">
             <span class="activity-strip-icon" data-lucide="edit-3"></span>
             <div>
@@ -136,9 +140,11 @@
     <article class="kpi-card glass-panel reveal">
         <div class="kpi-icon"><span data-lucide="file-text"></span></div>
         <div class="kpi-copy">
+            {% if g.user.role == 'admin' %}
             <span class="kpi-value" data-count="{{ ops_metrics.pending_estimates }}">{{ ops_metrics.pending_estimates }}</span>
             <p>Pending Estimates</p>
             <small>Quotes awaiting decision</small>
+            {% endif %}
         </div>
     </article>
     <article class="kpi-card glass-panel reveal">
