@@ -18,6 +18,21 @@
             <p>Track your project progress, updates, and completion milestones from your client portal view.</p>
         {% endif %}
 
+        <div class="hero-insight-row" aria-label="Operations summary">
+            <span>
+                <strong>{{ ops_metrics.open_jobs }}</strong>
+                <small>Open jobs</small>
+            </span>
+            <span>
+                <strong>{{ ops_metrics.pending_estimates }}</strong>
+                <small>Pending estimates</small>
+            </span>
+            <span>
+                <strong>{{ completed_jobs }}</strong>
+                <small>Closed and paid</small>
+            </span>
+        </div>
+
         <!-- dashboard tags removed -->
     </div>
 
@@ -115,6 +130,7 @@
         <div class="kpi-copy">
             <span class="kpi-value" data-count="{{ ops_metrics.open_jobs }}">{{ ops_metrics.open_jobs }}</span>
             <p>Open Jobs</p>
+            <small>Active work in motion</small>
         </div>
     </article>
     <article class="kpi-card glass-panel reveal">
@@ -122,6 +138,7 @@
         <div class="kpi-copy">
             <span class="kpi-value" data-count="{{ ops_metrics.pending_estimates }}">{{ ops_metrics.pending_estimates }}</span>
             <p>Pending Estimates</p>
+            <small>Quotes awaiting decision</small>
         </div>
     </article>
     <article class="kpi-card glass-panel reveal">
@@ -129,6 +146,7 @@
         <div class="kpi-copy">
             <span class="kpi-value" data-count="{{ ops_metrics.scheduled_this_week }}">{{ ops_metrics.scheduled_this_week }}</span>
             <p>Scheduled This Week</p>
+            <small>Upcoming field work</small>
         </div>
     </article>
     <article class="kpi-card glass-panel reveal">
@@ -136,6 +154,7 @@
         <div class="kpi-copy">
             <span class="kpi-value" data-count="{{ ops_metrics.field_updates_today }}">{{ ops_metrics.field_updates_today }}</span>
             <p>Field Updates Today</p>
+            <small>Latest crew reporting</small>
         </div>
     </article>
 </section>
@@ -294,9 +313,20 @@ document.addEventListener('DOMContentLoaded', function() {
                     <h3>Jobs by Status</h3>
                 </div>
                 <span class="panel-chip">Live</span>
+        </div>
+        {% set total_jobs = jobs|length if jobs else 0 %}
+        {% if total_jobs %}
+            <div class="pipeline-overview">
+                <div>
+                    <strong>{{ active_jobs }}</strong>
+                    <small>Active jobs</small>
+                </div>
+                <div>
+                    <strong>{{ completed_jobs }}</strong>
+                    <small>Completed</small>
+                </div>
             </div>
             <div class="bar-list">
-                {% set total_jobs = jobs|length if jobs else 1 %}
                 {% for status_name, count in status_counts.items() %}
                     {% set ratio = (count / total_jobs * 100) if total_jobs else 0 %}
                     <div class="bar-row">
@@ -310,6 +340,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     </div>
                 {% endfor %}
             </div>
+        {% else %}
+            <div class="panel-empty-state">
+                <span data-lucide="chart-no-axes-column-increasing"></span>
+                <strong>No pipeline data yet</strong>
+                <p>Add your first lead or estimate to start tracking job movement here.</p>
+            </div>
+        {% endif %}
         </section>
     </div>
 
@@ -331,9 +368,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     </div>
                 {% endfor %}
             {% else %}
-                <div class="activity-item premium-activity-item">
+                <div class="panel-empty-state panel-empty-state-compact">
+                    <span data-lucide="radio"></span>
                     <strong>No activity yet</strong>
-                    <p class="muted">New updates from jobs and estimates will appear here.</p>
+                    <p>New updates from jobs and estimates will appear here.</p>
                 </div>
             {% endif %}
         </div>

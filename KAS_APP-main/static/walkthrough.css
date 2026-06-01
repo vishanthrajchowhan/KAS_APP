@@ -22,7 +22,7 @@
   justify-content: space-between;
   gap: 12px;
   padding: 12px 16px;
-  background: #0f6a47;
+  background: #b88746;
   color: #fff;
   border-bottom: 1px solid rgba(255,255,255,0.18);
 }
@@ -55,7 +55,7 @@
 
 #wt-status[data-tone="success"] {
   background: #ecf8f0;
-  color: #0f6a47;
+  color: #8b642f;
 }
 
 #wt-status[data-tone="warning"] {
@@ -249,7 +249,7 @@
 .wt-record { background: #b42323; }
 .wt-snap { background: #1f6fb2; }
 .wt-camera { background: #5b5f66; }
-.wt-done { background: #0f6a47; }
+.wt-done { background: #b88746; }
 
 .wt-notes label {
   display: block;

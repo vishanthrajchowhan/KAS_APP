@@ -51,42 +51,47 @@
         </div>
     </section>
 
-    <form class="jobs-toolbar glass-panel reveal" method="get" action="{{ url_for('jobs') }}">
-        <div>
-            <label for="q">Search jobs</label>
-            <input id="q" name="q" type="search" placeholder="Client, address, service, employee" value="{{ filters.q }}">
-        </div>
-        <div>
-            <label for="status">Status</label>
-            <select id="status" name="status">
-                <option value="">All statuses</option>
-                {% for status in status_options %}
-                    <option value="{{ status }}" {% if filters.status == status %}selected{% endif %}>{{ status }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        {% if can_manage_jobs %}
-            <div>
-                <label for="employee">Employee</label>
-                <select id="employee" name="employee">
-                    <option value="">All employees</option>
-                    {% for employee in employees %}
-                        <option value="{{ employee.id }}" {% if filters.employee|int == employee.id %}selected{% endif %}>{{ employee.name }}</option>
+    <form class="jobs-toolbar premium-panel reveal" method="get" action="{{ url_for('jobs') }}" aria-label="Job filters">
+        <div class="toolbar-row">
+            <div class="search-shell">
+                <label class="sr-only" for="q">Search jobs</label>
+                <input id="q" name="q" type="search" class="search-input" placeholder="Client, job, location" value="{{ filters.q }}">
+            </div>
+
+            <div class="select-group">
+                <label class="sr-only" for="status">Status</label>
+                <select id="status" name="status" class="select-compact">
+                    <option value="">All statuses</option>
+                    {% for status in status_options %}
+                        <option value="{{ status }}" {% if filters.status == status %}selected{% endif %}>{{ status }}</option>
                     {% endfor %}
                 </select>
+
+                {% if can_manage_jobs %}
+                    <label class="sr-only" for="employee">Employee</label>
+                    <select id="employee" name="employee" class="select-compact">
+                        <option value="">All employees</option>
+                        {% for employee in employees %}
+                            <option value="{{ employee.id }}" {% if filters.employee|int == employee.id %}selected{% endif %}>{{ employee.name }}</option>
+                        {% endfor %}
+                    </select>
+                {% endif %}
+
+                <label class="sr-only" for="sort">Sort</label>
+                <select id="sort" name="sort" class="select-compact">
+                    <option value="priority" {% if filters.sort == 'priority' %}selected{% endif %}>Priority</option>
+                    <option value="due" {% if filters.sort == 'due' %}selected{% endif %}>Due Date</option>
+                    <option value="status" {% if filters.sort == 'status' %}selected{% endif %}>Status</option>
+                    <option value="employee" {% if filters.sort == 'employee' %}selected{% endif %}>Employee</option>
+                    <option value="oldest" {% if filters.sort == 'oldest' %}selected{% endif %}>Oldest</option>
+                </select>
             </div>
-        {% endif %}
-        <div>
-            <label for="sort">Sort</label>
-            <select id="sort" name="sort">
-                <option value="priority" {% if filters.sort == 'priority' %}selected{% endif %}>Priority</option>
-                <option value="due" {% if filters.sort == 'due' %}selected{% endif %}>Due Date</option>
-                <option value="status" {% if filters.sort == 'status' %}selected{% endif %}>Status</option>
-                <option value="employee" {% if filters.sort == 'employee' %}selected{% endif %}>Employee</option>
-                <option value="oldest" {% if filters.sort == 'oldest' %}selected{% endif %}>Oldest</option>
-            </select>
+
+            <div class="toolbar-actions">
+                <button class="button button-ghost" type="button" onclick="location.href='{{ url_for('jobs') }}'">Reset</button>
+                <button class="button button-gold" type="submit">Apply</button>
+            </div>
         </div>
-        <button class="button button-primary" type="submit">Filter</button>
     </form>
 
     <section class="jobs-board stagger-grid" aria-label="Jobs board">
@@ -121,12 +126,15 @@
                 </div>
             </article>
         {% else %}
-            <section class="empty-state reveal">
-                <h2>No jobs found</h2>
-                <p>Try a different filter or create a new job record.</p>
-                {% if can_manage_jobs %}
-                    <a class="button button-primary" href="{{ url_for('add_job') }}">Quick Add Job</a>
-                {% endif %}
+            <section class="empty-state premium-empty reveal">
+                <div class="empty-card">
+                    <div class="empty-illustration" aria-hidden="true"></div>
+                    <h2>No matching jobs</h2>
+                    <p>Adjust filters or add a new lead to start your premium workflow.</p>
+                    {% if can_manage_jobs %}
+                        <a class="button button-gold button-large" href="{{ url_for('add_job') }}">Add Lead</a>
+                    {% endif %}
+                </div>
             </section>
         {% endfor %}
     </section>
