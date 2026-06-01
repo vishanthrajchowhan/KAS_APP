@@ -29,6 +29,7 @@
         </div>
     </section>
 
+    {% if g.user.role == 'admin' %}
     <section class="panel">
         <h3>Approved Estimates</h3>
         <div class="activity-feed">
@@ -48,6 +49,7 @@
             {% endif %}
         </div>
     </section>
+    {% endif %}
 </div>
 
 <section class="panel" style="margin-top:14px;">

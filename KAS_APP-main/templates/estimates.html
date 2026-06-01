@@ -3,6 +3,7 @@
 {% block title %}Estimates | KAS{% endblock %}
 
 {% block content %}
+{% if g.user.role == 'admin' %}
 <section class="form-shell">
     <div class="page-title reveal">
         <div>
@@ -185,4 +186,12 @@
     });
 })();
 </script>
+{% else %}
+<section class="form-shell">
+    <div class="empty-state">
+        <h2>Estimates are not available</h2>
+        <p>Your account does not have permission to view or manage estimates. Contact an administrator for access.</p>
+    </div>
+</section>
+{% endif %}
 {% endblock %}

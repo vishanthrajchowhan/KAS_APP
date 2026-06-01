@@ -47,6 +47,7 @@
                     <small>Capture a new job opportunity</small>
                 </span>
             </a>
+            {% if g.user.role == 'admin' %}
             <a class="hero-action-card" href="{{ url_for('create_estimate') }}">
                 <span class="hero-action-icon" data-lucide="file-plus-2"></span>
                 <span class="hero-action-copy">
@@ -54,6 +55,7 @@
                     <small>Build a professional quote</small>
                 </span>
             </a>
+            {% endif %}
             <a class="hero-action-card" href="{{ url_for('clients') }}">
                 <span class="hero-action-icon" data-lucide="users"></span>
                 <span class="hero-action-copy">

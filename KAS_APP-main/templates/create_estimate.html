@@ -3,6 +3,7 @@
 {% block title %}Create Quote | KAS{% endblock %}
 
 {% block content %}
+{% if g.user.role == 'admin' %}
 <section class="form-shell">
     <div class="page-title compact">
         <div>
@@ -82,4 +83,12 @@
         </div>
     </form>
 </section>
+{% else %}
+<section class="form-shell">
+    <div class="empty-state">
+        <h2>Access denied</h2>
+        <p>You don't have permission to create estimates. Contact an administrator.</p>
+    </div>
+</section>
+{% endif %}
 {% endblock %}
