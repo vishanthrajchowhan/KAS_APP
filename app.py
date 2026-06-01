@@ -1,5 +1,6 @@
 import os
 import re
+import sqlite3
 import time
 import uuid
 import secrets
@@ -70,6 +71,7 @@ except Exception:
 
 BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
+SQLITE_DB_PATH = BASE_DIR / "database.db"
 
 UPLOAD_FOLDER = BASE_DIR / "uploads"
 STATIC_UPLOAD_FOLDER = BASE_DIR / "static" / "uploads"
@@ -361,6 +363,7 @@ def build_postgres_conninfo():
 
 
 POSTGRES_CONNINFO = build_postgres_conninfo()
+DATABASE_BACKEND = "postgres" if POSTGRES_CONNINFO else "sqlite"
 POSTGRES_POOL = None
 SUPABASE_CLIENT = None
 SUPABASE_HTTP_CLIENT = None
@@ -794,8 +797,86 @@ class PgConnection:
         return cursor
 
 
+class SqliteNoopCursor:
+    def fetchone(self):
+        return None
+
+    def fetchall(self):
+        return []
+
+
+def sqlite_normalize_query(query):
+    normalized = query.replace("BIGSERIAL PRIMARY KEY", "INTEGER PRIMARY KEY AUTOINCREMENT")
+    normalized = normalized.replace("DOUBLE PRECISION", "REAL")
+    normalized = normalized.replace("BOOLEAN", "INTEGER")
+    return normalized
+
+
+def sqlite_column_exists(conn, table_name, column_name):
+    rows = conn.execute(f"PRAGMA table_info({table_name})").fetchall()
+    return any(row[1] == column_name for row in rows)
+
+
+def sqlite_execute_ddl(conn, query):
+    alter_match = re.match(
+        r"^\s*ALTER\s+TABLE\s+(?P<table>\w+)\s+ADD\s+COLUMN\s+IF\s+NOT\s+EXISTS\s+(?P<column>\w+)\s+(?P<definition>.+?)\s*;?\s*$",
+        query,
+        re.IGNORECASE | re.DOTALL,
+    )
+    if not alter_match:
+        return None
+
+    table_name = alter_match.group("table")
+    column_name = alter_match.group("column")
+    if sqlite_column_exists(conn, table_name, column_name):
+        return SqliteNoopCursor()
+
+    column_definition = alter_match.group("definition")
+    column_definition = re.sub(r"\bUNIQUE\b", "", column_definition, flags=re.IGNORECASE)
+    column_definition = sqlite_normalize_query(column_definition)
+    cursor = conn.cursor()
+    cursor.execute(
+        f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_definition.strip()}"
+    )
+    return cursor
+
+
+class SqliteConnection:
+    def __init__(self, database_path):
+        self.database_path = database_path
+        self.conn = None
+
+    def __enter__(self):
+        self.conn = sqlite3.connect(self.database_path)
+        self.conn.row_factory = sqlite3.Row
+        self.conn.execute("PRAGMA foreign_keys = ON")
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        if self.conn:
+            try:
+                if exc_type:
+                    self.conn.rollback()
+                else:
+                    self.conn.commit()
+            finally:
+                self.conn.close()
+        return False
+
+    def execute(self, query, params=None):
+        normalized_query = sqlite_normalize_query(query)
+        ddl_cursor = sqlite_execute_ddl(self.conn, normalized_query)
+        if ddl_cursor is not None:
+            return ddl_cursor
+        cursor = self.conn.cursor()
+        cursor.execute(normalized_query, tuple(params or ()))
+        return cursor
+
+
 def get_db_connection():
-    return PgConnection(get_postgres_pool())
+    if DATABASE_BACKEND == "postgres":
+        return PgConnection(get_postgres_pool())
+    return SqliteConnection(SQLITE_DB_PATH)
 
 
 def init_db():
@@ -5223,11 +5304,6 @@ def server_error(_error):
 
 
 if __name__ == "__main__":
-    if not POSTGRES_CONNINFO:
-        raise RuntimeError(
-            "DATABASE_URL is required for PostgreSQL mode. Add DATABASE_URL in .env or environment variables."
-        )
-
     if POSTGRES_CONNINFO:
         ok, result = test_postgres_connection()
         if ok:
@@ -5235,7 +5311,7 @@ if __name__ == "__main__":
         else:
             app.logger.warning("PostgreSQL connection failed: %s", result)
     else:
-        app.logger.info("DATABASE_URL not set. PostgreSQL checks skipped.")
+        app.logger.warning("DATABASE_URL not set. Falling back to local SQLite at %s", SQLITE_DB_PATH)
 
     init_db()
     app.config["DATABASE_INITIALIZED"] = True
