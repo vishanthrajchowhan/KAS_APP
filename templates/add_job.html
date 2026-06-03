@@ -35,7 +35,7 @@
                     {% endfor %}
                 </div>
             </details>
-            <p class="help-text">Selected services create a task checklist for job progress tracking.</p>
+            <p class="help-text">Services organize the job. The actual job tasks come from your scope of work.</p>
             <div id="service-chip-preview" class="service-chip-preview" aria-live="polite"></div>
 
             <div id="other-service-wrapper" {% if 'Other' not in (selected_service_types or []) %}hidden{% endif %}>
@@ -72,8 +72,9 @@
             </div>
         </div>
 
-        <label for="description">Description</label>
-        <textarea id="description" name="description" rows="5">{{ description or '' }}</textarea>
+        <label for="description">Scope of Work</label>
+        <textarea id="description" name="description" rows="5" placeholder="Enter one scope item per line&#10;Example:&#10;Remove failed sealant&#10;Install backer rod&#10;Apply new sealant">{{ description or '' }}</textarea>
+        <p class="help-text">Each line becomes a job task. If you leave this as a single paragraph, the app will use the selected services as the starting tasks.</p>
 
         <div class="form-grid two">
             <button class="button button-primary button-full" type="submit">Create Lead</button>

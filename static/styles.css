@@ -1837,6 +1837,17 @@ tbody tr:last-child td {
     gap: 10px;
 }
 
+.material-points {
+    margin: 0;
+    padding-left: 20px;
+    display: grid;
+    gap: 8px;
+}
+
+.material-points li {
+    color: var(--text);
+}
+
 .material-card,
 .crew-card {
     display: flex;

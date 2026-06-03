@@ -56,14 +56,16 @@
         </article>
 
         <article class="panel">
-            <!-- TODO: connect to job_tasks table in Phase 2 -->
-            <h3>Material Checklist</h3>
-            <div class="material-cards">
-                <label class="material-card"><input type="checkbox">Surface prep complete</label>
-                <label class="material-card"><input type="checkbox">Waterproofing materials delivered</label>
-                <label class="material-card"><input type="checkbox">Crew safety check complete</label>
-                <label class="material-card"><input type="checkbox">Final inspection scheduled</label>
-            </div>
+            <h3>Materials Used</h3>
+            {% if materials_used_items %}
+                <ul class="material-points">
+                    {% for item in materials_used_items %}
+                        <li>{{ item }}</li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p class="muted">No materials entered yet.</p>
+            {% endif %}
         </article>
     </section>
 
@@ -118,7 +120,7 @@
                             {% endfor %}
                         </div>
                     </details>
-                    <p class="help-text">Selected services create and organize the task checklist below.</p>
+                    <p class="help-text">Services organize the job. The checklist below should match the real scope of work, not a generic template.</p>
                     <div id="service-chip-preview" class="service-chip-preview" aria-live="polite"></div>
 
                     <div id="other-service-wrapper" {% if 'Other' not in (selected_service_types or []) %}hidden{% endif %}>
@@ -150,6 +152,10 @@
                     <label for="due_date">Due Date</label>
                     <input id="due_date" name="due_date" type="date" value="{{ job.due_date or '' }}">
                 {% endif %}
+
+                <label for="materials_used">Materials Used</label>
+                <textarea id="materials_used" name="materials_used" rows="4" placeholder="Enter one material per line&#10;Example:&#10;Primer&#10;Sealant&#10;Backer rod">{{ job.materials_used or '' }}</textarea>
+                <p class="help-text">These materials will be shown above as bullet points.</p>
             </section>
 
             {% if can_manage_jobs %}

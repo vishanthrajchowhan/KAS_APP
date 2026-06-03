@@ -936,6 +936,7 @@ def init_db():
                 due_date TEXT,
                 service_type TEXT,
                 other_service_details TEXT,
+                materials_used TEXT,
                 description TEXT NOT NULL,
                 status TEXT NOT NULL DEFAULT 'Lead',
                 client_name TEXT,
@@ -1157,6 +1158,7 @@ def migrate_jobs_table(conn):
     conn.execute("ALTER TABLE jobs ADD COLUMN IF NOT EXISTS client_name TEXT")
     conn.execute("ALTER TABLE jobs ADD COLUMN IF NOT EXISTS service_type TEXT")
     conn.execute("ALTER TABLE jobs ADD COLUMN IF NOT EXISTS other_service_details TEXT")
+    conn.execute("ALTER TABLE jobs ADD COLUMN IF NOT EXISTS materials_used TEXT")
     conn.execute("ALTER TABLE jobs ADD COLUMN IF NOT EXISTS proposal_amount DOUBLE PRECISION")
     conn.execute("ALTER TABLE jobs ADD COLUMN IF NOT EXISTS proposal_sent_date TEXT")
     conn.execute("ALTER TABLE jobs ADD COLUMN IF NOT EXISTS decision_date TEXT")
@@ -1844,8 +1846,62 @@ def build_service_chips(service_type, other_details=""):
     return chips
 
 
-def default_tasks_for_service(service_type):
-    return SERVICE_TASK_TEMPLATES.get(service_type, SERVICE_TASK_TEMPLATES[OTHER_SERVICE_LABEL])
+LEGACY_TEMPLATE_TASK_TITLES = {
+    title
+    for titles in SERVICE_TASK_TEMPLATES.values()
+    for title in titles
+}
+
+
+def parse_scope_of_work_items(text):
+    raw_text = (text or "").strip()
+    if not raw_text:
+        return []
+    has_list_separators = any(token in raw_text for token in ("\n", "\r", ";", "•"))
+    if not has_list_separators:
+        return []
+
+    items = []
+    seen = set()
+    for chunk in re.split(r"(?:\r?\n|;|•)+", raw_text):
+        cleaned = re.sub(r"^[\-\*\u2022\s]+", "", chunk).strip(" -\t")
+        if not cleaned:
+            continue
+        lowered = cleaned.lower()
+        if lowered in seen:
+            continue
+        seen.add(lowered)
+        items.append(cleaned)
+    return items
+
+
+def scope_tasks_from_job(selected_services, description="", other_service_details=""):
+    description_items = parse_scope_of_work_items(description)
+    other_items = parse_scope_of_work_items(other_service_details)
+    scope_items = description_items or other_items
+    if scope_items:
+        service_label = selected_services[0] if len(selected_services) == 1 else None
+        return [(service_label, item) for item in scope_items]
+    return [(service, service) for service in selected_services]
+
+
+def parse_materials_used_items(text):
+    raw_text = (text or "").strip()
+    if not raw_text:
+        return []
+
+    items = []
+    seen = set()
+    for chunk in re.split(r"(?:\r?\n|;|,|•)+", raw_text):
+        cleaned = re.sub(r"^[\-\*\u2022\s]+", "", chunk).strip(" -\t")
+        if not cleaned:
+            continue
+        lowered = cleaned.lower()
+        if lowered in seen:
+            continue
+        seen.add(lowered)
+        items.append(cleaned)
+    return items
 
 
 def normalize_task_status(value):
@@ -1914,28 +1970,37 @@ def serialize_task_row(row):
     }
 
 
-def sync_job_tasks(conn, job_id, selected_services):
-    existing = conn.execute(
-        "SELECT service_type, title FROM job_tasks WHERE job_id = ?",
+def sync_job_tasks(conn, job_id, selected_services, description="", other_service_details=""):
+    now = datetime.now().isoformat(timespec="seconds")
+    existing_rows = conn.execute(
+        """
+        SELECT id, service_type, title, COALESCE(is_custom, FALSE) AS is_custom
+        FROM job_tasks
+        WHERE job_id = ? AND COALESCE(is_removed, FALSE) = FALSE
+        ORDER BY sort_order ASC, id ASC
+        """,
         (job_id,),
     ).fetchall()
-    existing_keys = {(row["service_type"] or "", row["title"]) for row in existing}
-    now = datetime.now().isoformat(timespec="seconds")
-    sort_order = len(existing_keys)
+    generated_rows = [row for row in existing_rows if not bool(row["is_custom"])]
+    if generated_rows and all(row["title"] in LEGACY_TEMPLATE_TASK_TITLES for row in generated_rows):
+        conn.execute(
+            """
+            UPDATE job_tasks
+            SET is_removed = TRUE,
+                updated_at = ?
+            WHERE job_id = ? AND COALESCE(is_removed, FALSE) = FALSE AND COALESCE(is_custom, FALSE) = FALSE
+            """,
+            (now, job_id),
+        )
+        existing_rows = [row for row in existing_rows if bool(row["is_custom"])]
 
-    for service in selected_services:
-        for title in default_tasks_for_service(service):
-            key = (service, title)
-            if key in existing_keys:
-                continue
-            sort_order += 1
-            conn.execute(
-                """
-                INSERT INTO job_tasks (job_id, service_type, title, status, tracking_mode, target_quantity, completed_quantity, is_custom, is_removed, sort_order, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (job_id, service, title, "Not Started", "status", None, None, False, False, sort_order, now),
-            )
+    existing_keys = {(row["service_type"] or "", row["title"].strip().lower()) for row in existing_rows}
+    for service_type, title in scope_tasks_from_job(selected_services, description, other_service_details):
+        key = ((service_type or ""), title.strip().lower())
+        if key in existing_keys:
+            continue
+        add_job_task(conn, job_id, service_type, title, is_custom=False)
+        existing_keys.add(key)
 
 
 def fetch_job_tasks(conn, job_id):
@@ -2994,7 +3059,7 @@ def add_job():
                 (now, name),
             ).fetchone()
             if job_row:
-                sync_job_tasks(conn, job_row["id"], selected_service_types)
+                sync_job_tasks(conn, job_row["id"], selected_service_types, description, other_service_details)
         flash("CRM job created.", "success")
         return redirect(url_for("index"))
 
@@ -3293,10 +3358,8 @@ def update_job(job_id):
         clients = conn.execute(
             "SELECT id, name, email FROM users WHERE role = 'client' ORDER BY name"
         ).fetchall()
+        sync_job_tasks(conn, job_id, split_services(job["service_type"]), job["description"] or "", job["other_service_details"] or "")
         tasks = fetch_job_tasks(conn, job_id)
-        if not tasks and job["service_type"]:
-            sync_job_tasks(conn, job_id, split_services(job["service_type"]))
-            tasks = fetch_job_tasks(conn, job_id)
         # Fetch uploaded walkthrough reports for this job (public URLs)
         reports = conn.execute(
             """
@@ -3313,6 +3376,7 @@ def update_job(job_id):
     return render_template(
         "update_job.html",
         job=job,
+        materials_used_items=parse_materials_used_items(job["materials_used"] or ""),
         selected_service_types=split_services(job["service_type"]),
         updates=updates,
         update_days=update_days,
@@ -3374,9 +3438,8 @@ def job_progress(job_id):
             (job_id,),
         ).fetchone()
         tasks = fetch_job_tasks(conn, job_id)
-        if not tasks and job["service_type"]:
-            sync_job_tasks(conn, job_id, split_services(job["service_type"]))
-            tasks = fetch_job_tasks(conn, job_id)
+        sync_job_tasks(conn, job_id, split_services(job["service_type"]), job["description"] or "", job["other_service_details"] or "")
+        tasks = fetch_job_tasks(conn, job_id)
     updates = group_updates(update_rows)
     update_days = group_updates_by_day(updates)
 
@@ -3415,6 +3478,7 @@ def submit_update():
     selected_service_types = sanitize_selected_services(request.form.getlist("service_type"), JOB_SERVICE_TYPES)
     service_type = compose_service_text(selected_service_types)
     other_service_details = request.form.get("other_service_details", "").strip()
+    materials_used = request.form.get("materials_used", "").strip()
     due_date = request.form.get("due_date", "").strip() or None
 
     if not job_id:
@@ -3579,6 +3643,7 @@ def submit_update():
             client_id != job["client_id"],
             service_type != (job["service_type"] or ""),
             other_service_details != (job["other_service_details"] or ""),
+            materials_used != (job["materials_used"] or ""),
             due_date != (job["due_date"] or None),
         ]
     )
@@ -3643,6 +3708,7 @@ def submit_update():
                     due_date = ?,
                     service_type = ?,
                     other_service_details = ?,
+                    materials_used = ?,
                     proposal_amount = ?,
                     proposal_sent_date = ?,
                     decision_date = ?,
@@ -3659,6 +3725,7 @@ def submit_update():
                     due_date,
                     service_type,
                     other_service_details,
+                    materials_used,
                     proposal_amount,
                     proposal_sent_date,
                     decision_date,
@@ -3701,7 +3768,7 @@ def submit_update():
                 )
 
             if is_admin():
-                sync_job_tasks(conn, job_id, selected_service_types)
+                sync_job_tasks(conn, job_id, selected_service_types, job["description"] or "", other_service_details)
                 for task_id, task_update in task_updates.items():
                     conn.execute(
                         """
