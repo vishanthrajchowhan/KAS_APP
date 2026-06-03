@@ -55,18 +55,6 @@
             </div>
         </article>
 
-        <article class="panel">
-            <h3>Materials Used</h3>
-            {% if materials_used_items %}
-                <ul class="material-points">
-                    {% for item in materials_used_items %}
-                        <li>{{ item }}</li>
-                    {% endfor %}
-                </ul>
-            {% else %}
-                <p class="muted">No materials entered yet.</p>
-            {% endif %}
-        </article>
     </section>
 
     <link rel="stylesheet" href="{{ url_for('static', filename='walkthrough.css') }}">
