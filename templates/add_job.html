@@ -22,9 +22,6 @@
         <label for="location">Location</label>
         <input id="location" name="location" type="text" value="{{ location or '' }}" maxlength="180" autocomplete="street-address">
 
-        <label for="due_date">Due Date</label>
-        <input id="due_date" name="due_date" type="date" value="{{ due_date or '' }}">
-
         <div class="form-section service-type-section">
             <label>Service Types</label>
             <details class="service-multi-select">
@@ -53,17 +50,6 @@
                 <option value="{{ pipeline_status }}" {% if (status or 'Lead') == pipeline_status %}selected{% endif %}>{{ pipeline_status }}</option>
             {% endfor %}
         </select>
-
-        <div class="form-grid two">
-            <div>
-                <label for="proposal_amount">Proposal Amount</label>
-                <input id="proposal_amount" name="proposal_amount" type="number" min="0" step="0.01" value="{{ proposal_amount or '' }}" placeholder="0.00">
-            </div>
-            <div>
-                <label for="proposal_sent_date">Proposal Sent Date</label>
-                <input id="proposal_sent_date" name="proposal_sent_date" type="date" value="{{ proposal_sent_date or '' }}">
-            </div>
-        </div>
 
         <div class="form-grid two">
             <div>

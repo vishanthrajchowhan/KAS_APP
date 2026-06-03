@@ -4,10 +4,12 @@ import sqlite3
 import time
 import uuid
 import secrets
+import importlib
 from io import BytesIO
 from datetime import datetime, timedelta
 from functools import wraps
 from pathlib import Path
+from typing import Any, cast
 from urllib.parse import quote, unquote, urlparse
 
 from dotenv import load_dotenv
@@ -50,7 +52,7 @@ except Exception:
     openai = None
 
 try:
-    from weasyprint import HTML
+    HTML = importlib.import_module("weasyprint").HTML
 except Exception:
     HTML = None
 
@@ -61,11 +63,13 @@ except Exception:
 
 try:
     from reportlab.lib.pagesizes import letter, A4
+    from reportlab.lib.colors import HexColor
     from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, PageBreak
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib.units import inch
     ReportLab = True
 except Exception:
+    HexColor = None
     ReportLab = False
 
 
@@ -341,6 +345,8 @@ def _report_value(val):
 app.jinja_env.filters["fmtdate"] = _fmt_date
 app.jinja_env.filters["report_value"] = _report_value
 
+Mail = None
+Message = None
 try:
     from flask_mail import Mail, Message
     mail = Mail(app)
@@ -467,7 +473,10 @@ def transcribe_with_whisper(audio_path: str) -> str:
     with open(audio_path, "rb") as f:
         # Using the OpenAI Audio Transcription endpoint (Whisper)
         try:
-            resp = openai.Audio.transcribe("whisper-1", f)
+            legacy_audio_api = getattr(openai, "Audio", None)
+            if legacy_audio_api is None or not hasattr(legacy_audio_api, "transcribe"):
+                raise AttributeError("Legacy OpenAI audio API is unavailable")
+            resp = legacy_audio_api.transcribe("whisper-1", f)
             # Some SDKs return dict, some return object with 'text'
             if isinstance(resp, dict):
                 return resp.get("text", "")
@@ -680,9 +689,10 @@ def generate_pdf_with_reportlab(html_content: str, out_pdf_path: str) -> None:
         'CustomTitle',
         parent=styles['Heading1'],
         fontSize=18,
-        textColor='#2b6cb0',
         spaceAfter=12,
     )
+    if HexColor is not None:
+        title_style.textColor = HexColor('#2b6cb0')
     story.append(Paragraph('Walkthrough Report', title_style))
     story.append(Spacer(1, 0.3*inch))
 
@@ -754,6 +764,8 @@ def postgres_now():
         with conn.cursor() as cur:
             cur.execute("SELECT NOW() AS now")
             row = cur.fetchone()
+            if row is None:
+                raise RuntimeError("PostgreSQL NOW() query returned no rows")
             return row["now"]
 
 
@@ -785,6 +797,8 @@ class PgConnection:
                     self.conn.commit()
             except Exception:
                 pass
+        if self._pool_ctx is None:
+            return False
         return self._pool_ctx.__exit__(exc_type, exc, tb)
 
     @staticmethod
@@ -792,6 +806,8 @@ class PgConnection:
         return query.replace("?", "%s")
 
     def execute(self, query, params=None):
+        if self.conn is None:
+            raise RuntimeError("Database connection is not open")
         cursor = self.conn.cursor()
         cursor.execute(self._to_postgres_placeholders(query), tuple(params or ()))
         return cursor
@@ -864,6 +880,8 @@ class SqliteConnection:
         return False
 
     def execute(self, query, params=None):
+        if self.conn is None:
+            raise RuntimeError("SQLite connection is not open")
         normalized_query = sqlite_normalize_query(query)
         ddl_cursor = sqlite_execute_ddl(self.conn, normalized_query)
         if ddl_cursor is not None:
@@ -2128,7 +2146,7 @@ def diagnostics():
         return jsonify({"ok": False, "error": "supabase_init_failed", "detail": safe_error_detail(exc)}), 500
 
     for key, bucket_name in SUPABASE_STORAGE_BUCKETS.items():
-        bucket_info = {"name": bucket_name}
+        bucket_info: dict[str, Any] = {"name": bucket_name}
         try:
             start = time.perf_counter()
             resp = client.storage.from_(bucket_name).list(path="", options={"limit": 1})
@@ -2136,8 +2154,10 @@ def diagnostics():
             items = []
             if isinstance(resp, dict):
                 items = resp.get("data") or []
+            elif isinstance(resp, list):
+                items = resp
             elif hasattr(resp, "get"):
-                items = resp.get("data") or []
+                items = cast(Any, resp).get("data") or []
             bucket_info.update(
                 {
                     "list_ok": True,
@@ -3777,11 +3797,15 @@ def supabase_media(bucket_key, storage_path):
 
     try:
         storage = get_supabase_client().storage.from_(bucket_name)
-        media_bytes = storage.download(storage_path)
-        if hasattr(media_bytes, "read"):
-            media_bytes = media_bytes.read()
-        if isinstance(media_bytes, dict):
-            media_bytes = media_bytes.get("data") or media_bytes.get("body") or b""
+        downloaded_media = storage.download(storage_path)
+        if isinstance(downloaded_media, dict):
+            media_bytes = downloaded_media.get("data") or downloaded_media.get("body") or b""
+        elif isinstance(downloaded_media, (bytes, bytearray)):
+            media_bytes = bytes(downloaded_media)
+        elif hasattr(downloaded_media, "read"):
+            media_bytes = cast(Any, downloaded_media).read()
+        else:
+            media_bytes = b""
         if not media_bytes:
             return "", 404
     except Exception:
@@ -4051,6 +4075,9 @@ def create_estimate():
                 "SELECT id FROM estimates WHERE estimate_number = ?",
                 (estimate_number,),
             ).fetchone()
+            if estimate is None:
+                flash("Estimate was created, but it could not be loaded.", "error")
+                return redirect(url_for("estimates"))
         
         flash(f"Estimate {estimate_number} created.", "success")
         return redirect(url_for("edit_estimate", estimate_id=estimate["id"]))
@@ -4216,7 +4243,7 @@ def add_estimate_item(estimate_id):
             "SELECT MAX(sort_order) AS max_sort FROM estimate_items WHERE estimate_id = ?",
             (estimate_id,),
         ).fetchone()
-        next_sort = (max_sort["max_sort"] or 0) + 1
+        next_sort = ((max_sort["max_sort"] if max_sort else 0) or 0) + 1
         
         conn.execute(
             """
@@ -4414,6 +4441,9 @@ def convert_estimate_to_job(estimate_id):
             "SELECT id FROM jobs WHERE client_name = ? AND created_at = ? ORDER BY id DESC LIMIT 1",
             (estimate["client_name"], now),
         ).fetchone()
+        if job is None:
+            flash("Job was created, but it could not be loaded.", "error")
+            return redirect(url_for("edit_estimate", estimate_id=estimate_id))
     
     flash(f"Estimate converted to job. You can now track it in the Pipeline.", "success")
     return redirect(url_for("update_job", job_id=job["id"]))
@@ -4470,6 +4500,9 @@ def duplicate_estimate(estimate_id):
             "SELECT id FROM estimates WHERE estimate_number = ?",
             (estimate_number,),
         ).fetchone()
+        if new_estimate is None:
+            flash("Estimate was duplicated, but it could not be loaded.", "error")
+            return redirect(url_for("estimates"))
         
         # Copy line items
         items = get_estimate_items(conn, estimate_id)
@@ -4592,10 +4625,11 @@ def api_walkthrough_upload():
         return jsonify({"error": "You do not have permission to update this job"}), 403
     if video is None or video.filename == "":
         return jsonify({"error": "No video file provided"}), 400
-    if not allowed_video_file(video.filename):
+    video_filename = video.filename or ""
+    if not allowed_video_file(video_filename):
         return jsonify({"error": "Invalid video type"}), 400
 
-    filename = secure_filename(video.filename)
+    filename = secure_filename(video_filename)
     subdir = UPLOAD_FOLDER / "walkthroughs"
     subdir.mkdir(parents=True, exist_ok=True)
     unique_name = f"{uuid.uuid4().hex}_{filename}"
@@ -5174,7 +5208,7 @@ def send_portal_email_page(job_id):
     portal_url = url_for("client_portal", token=job["portal_token"], _external=True)
     
     try:
-        if mail:
+        if mail and Message is not None:
             msg = Message(
                 subject="Your project update from KAS Waterproofing & Building Services",
                 recipients=[client_email],
@@ -5234,10 +5268,8 @@ def send_portal_email(job_id):
         return jsonify({"error": "No client email on file"}), 400
 
     portal_url = url_for("client_portal", token=job["portal_token"], _external=True)
-    if mail:
+    if mail and Message is not None:
         try:
-            from flask_mail import Message
-
             html_body = render_template(
                 "emails/portal_invite.html",
                 client_name=job["client_user_name"] or job["client_name"] or "Valued Client",
