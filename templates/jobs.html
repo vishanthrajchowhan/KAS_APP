@@ -102,7 +102,19 @@
                 </div>
 
                 <div class="job-meta">
-                    <small><strong>Service:</strong> {{ job.service_type or 'General' }}</small>
+                    {% set service_chips = build_service_chips(job.service_type, job.other_service_details) %}
+                    <small>
+                        <strong>Service:</strong>
+                        {% if service_chips %}
+                            <ul class="service-bullet-list">
+                                {% for service in service_chips %}
+                                    <li>{{ service }}</li>
+                                {% endfor %}
+                            </ul>
+                        {% else %}
+                            <span>General</span>
+                        {% endif %}
+                    </small>
                     <small><strong>Address:</strong> {{ job.location }}</small>
                     <small><strong>Assigned:</strong> {{ job.assigned_employee_name or 'Unassigned' }}</small>
                     <small><strong>Due:</strong> {{ job.effective_due_date or 'TBD' }}</small>

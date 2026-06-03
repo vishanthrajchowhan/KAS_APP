@@ -157,7 +157,7 @@
                     <div class="section-heading-row">
                         <div>
                             <h2>Job Tasks</h2>
-                            <p class="help-text">{{ task_summary.done }} of {{ task_summary.total }} tasks complete.</p>
+                            <p class="help-text">{{ task_summary.done }} of {{ task_summary.total }} scope units complete across {{ task_summary.task_total }} tasks.</p>
                         </div>
                         <span class="task-percent">{{ task_summary.percent }}%</span>
                     </div>
@@ -165,18 +165,79 @@
                     {% if tasks %}
                         <div class="task-list">
                             {% for task in tasks %}
-                                <label class="task-row">
+                                <div class="task-row task-row-edit task-row-{{ task.status_class }}" data-task-row>
                                     <span>
                                         <strong>{{ task.title }}</strong>
                                         <small>{{ task.service_type or 'General' }}</small>
+                                        <small class="task-progress-copy">{{ task.progress_text }}</small>
+                                        {% if task.is_custom %}
+                                            <small class="task-badge">Custom task</small>
+                                        {% endif %}
                                     </span>
-                                    <select name="task_status_{{ task.id }}" aria-label="Status for {{ task.title }}">
-                                        {% for option in task_statuses %}
-                                            <option value="{{ option }}" {% if task.status == option %}selected{% endif %}>{{ option }}</option>
-                                        {% endfor %}
-                                    </select>
-                                </label>
+                                    <div class="task-control-stack">
+                                        <label class="task-remove-toggle">
+                                            <input type="checkbox" name="remove_task_ids" value="{{ task.id }}">
+                                            <span>Remove this task</span>
+                                        </label>
+                                        <label class="task-field">
+                                            <span>Track By</span>
+                                            <select name="task_tracking_{{ task.id }}" aria-label="Tracking mode for {{ task.title }}" data-task-tracking-select>
+                                                {% for option in task_tracking_modes %}
+                                                    <option value="{{ option }}" {% if task.tracking_mode == option %}selected{% endif %}>{{ option|title }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </label>
+                                        <div class="task-status-fields" data-task-status-fields {% if task.tracking_mode == 'count' %}hidden{% endif %}>
+                                            <label class="task-field">
+                                                <span>Status</span>
+                                                <select name="task_status_{{ task.id }}" aria-label="Status for {{ task.title }}">
+                                                    {% for option in task_statuses %}
+                                                        <option value="{{ option }}" {% if task.status == option %}selected{% endif %}>{{ option }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </label>
+                                        </div>
+                                        <div class="task-count-fields" data-task-count-fields {% if task.tracking_mode != 'count' %}hidden{% endif %}>
+                                            <div class="task-input-grid">
+                                                <label class="task-field">
+                                                    <span>Total</span>
+                                                    <input name="task_target_{{ task.id }}" type="number" min="1" step="1" value="{{ task.target_quantity if task.target_quantity else '' }}" aria-label="Total quantity for {{ task.title }}">
+                                                </label>
+                                                <label class="task-field">
+                                                    <span>Completed</span>
+                                                    <input name="task_completed_{{ task.id }}" type="number" min="0" step="1" value="{{ task.completed_quantity if task.tracking_mode == 'count' else 0 }}" aria-label="Completed quantity for {{ task.title }}">
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             {% endfor %}
+                        </div>
+                        <div class="task-adder" data-task-adder>
+                            <div class="section-heading-row">
+                                <div>
+                                    <h3>Add Scope Item</h3>
+                                    <p class="help-text">Add custom scope items under a service type when the default checklist is not enough.</p>
+                                </div>
+                                <button type="button" class="button" data-add-task-row>Add another</button>
+                            </div>
+                            <div class="task-add-list" data-task-add-list>
+                                <div class="task-add-row">
+                                    <label class="task-field">
+                                        <span>Service Type</span>
+                                        <select name="new_task_service">
+                                            <option value="">General</option>
+                                            {% for option in selected_service_types %}
+                                                <option value="{{ option }}">{{ option }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </label>
+                                    <label class="task-field task-field-wide">
+                                        <span>Scope Item</span>
+                                        <input name="new_task_title" type="text" maxlength="140" placeholder="Example: Seal lobby windows on level 2">
+                                    </label>
+                                </div>
+                            </div>
                         </div>
                     {% else %}
                         <p class="muted">Save services once to create the task checklist.</p>
@@ -428,6 +489,45 @@ function copyPortalLink(button) {
     setTimeout(() => {
         button.textContent = originalText;
     }, 2000);
+}
+
+document.querySelectorAll('[data-task-row]').forEach((row) => {
+    const modeSelect = row.querySelector('[data-task-tracking-select]');
+    const statusFields = row.querySelector('[data-task-status-fields]');
+    const countFields = row.querySelector('[data-task-count-fields]');
+
+    if (!modeSelect || !statusFields || !countFields) {
+        return;
+    }
+
+    const syncTaskFields = () => {
+        const isCountMode = modeSelect.value === 'count';
+        statusFields.hidden = isCountMode;
+        countFields.hidden = !isCountMode;
+    };
+
+    modeSelect.addEventListener('change', syncTaskFields);
+    syncTaskFields();
+});
+
+const taskAdder = document.querySelector('[data-task-adder]');
+if (taskAdder) {
+    const addList = taskAdder.querySelector('[data-task-add-list]');
+    const addButton = taskAdder.querySelector('[data-add-task-row]');
+    const templateRow = addList ? addList.querySelector('.task-add-row') : null;
+
+    if (addList && addButton && templateRow) {
+        addButton.addEventListener('click', () => {
+            const clone = templateRow.cloneNode(true);
+            clone.querySelectorAll('input').forEach((input) => {
+                input.value = '';
+            });
+            clone.querySelectorAll('select').forEach((select) => {
+                select.selectedIndex = 0;
+            });
+            addList.appendChild(clone);
+        });
+    }
 }
 </script>
 

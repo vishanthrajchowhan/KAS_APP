@@ -31,7 +31,7 @@
         <aside class="progress-hero-aside" aria-label="Job summary">
             <div class="progress-hero-card">
                 <p class="eyebrow">Current Snapshot</p>
-                <strong>{{ task_summary.done }} / {{ task_summary.total }} tasks complete</strong>
+                <strong>{{ task_summary.done }} / {{ task_summary.total }} scope units complete</strong>
                 <p class="muted">{{ progress.update_count or 0 }} updates and {{ progress.photo_count or 0 }} photos logged so far.</p>
             </div>
             <div class="progress-hero-meta">
@@ -47,7 +47,7 @@
     <div class="stat-card glass-panel">
         <span data-lucide="check-circle" style="color:#0f6a47;width:20px;height:20px;"></span>
         <span class="kpi-value">{{ task_summary.percent }}%</span>
-        <p>Tasks Done</p>
+        <p>Scope Done</p>
     </div>
     <div class="stat-card glass-panel">
         <span data-lucide="message-square" style="color:#0f6a47;width:20px;height:20px;"></span>
@@ -99,7 +99,7 @@
         <div>
             <p class="eyebrow">Scope Progress</p>
             <h2>Task Checklist</h2>
-            <p class="help-text">{{ task_summary.done }} of {{ task_summary.total }} tasks complete.</p>
+            <p class="help-text">{{ task_summary.done }} of {{ task_summary.total }} scope units complete across {{ task_summary.task_total }} tasks.</p>
         </div>
         <span class="task-percent">{{ task_summary.percent }}%</span>
     </div>
@@ -107,12 +107,13 @@
     {% if tasks %}
         <div class="task-list readonly">
             {% for task in tasks %}
-                <div class="task-row task-row-{{ task.status|lower|replace(' ', '-') }}">
+                <div class="task-row task-row-{{ task.status_class }}">
                     <span>
                         <strong>{{ task.title }}</strong>
                         <small>{{ task.service_type or 'General' }}</small>
+                        <small class="task-progress-copy">{{ task.progress_text }}</small>
                     </span>
-                    <span class="task-status">{{ task.status }}</span>
+                    <span class="task-status">{{ task.display_status }}</span>
                 </div>
             {% endfor %}
         </div>

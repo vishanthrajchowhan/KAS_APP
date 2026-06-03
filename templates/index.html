@@ -475,7 +475,19 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
 
             <div class="job-meta">
-                <span><strong>Service</strong>{{ job.service_type or 'General Service' }}</span>
+                {% set service_chips = build_service_chips(job.service_type, job.other_service_details) %}
+                <span>
+                    <strong>Service</strong>
+                    {% if service_chips %}
+                        <ul class="service-bullet-list">
+                            {% for service in service_chips %}
+                                <li>{{ service }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <span>General Service</span>
+                    {% endif %}
+                </span>
                 {% if job.assigned_employee %}<span><strong>Owner</strong>{{ job.assigned_employee }}</span>{% endif %}
                 <span><strong>Updates</strong>{{ job.update_count }}</span>
                 <span><strong>Last update</strong>{{ job.last_update|replace('T', ' ') if job.last_update else 'No updates yet' }}</span>

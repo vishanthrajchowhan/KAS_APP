@@ -3186,6 +3186,15 @@ body {
     letter-spacing: 0.08em;
 }
 
+.service-bullet-list {
+    margin: 0;
+    padding-left: 18px;
+}
+
+.service-bullet-list li {
+    margin: 0;
+}
+
 .notification-dropdown {
     position: absolute;
     top: calc(100% + 10px);
@@ -3454,8 +3463,91 @@ body {
     font-weight: 700;
 }
 
+.task-progress-copy {
+    font-size: 0.78rem;
+}
+
 .task-row select {
     min-height: 40px;
+}
+
+.task-row.task-row-edit {
+    align-items: start;
+    grid-template-columns: minmax(0, 1fr) minmax(260px, 340px);
+}
+
+.task-control-stack {
+    display: grid;
+    gap: 10px;
+}
+
+.task-remove-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--muted);
+    font-size: 0.84rem;
+    font-weight: 700;
+}
+
+.task-badge {
+    display: inline-flex;
+    width: fit-content;
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--primary) 10%, var(--surface));
+    color: var(--primary);
+    font-size: 0.72rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.task-field {
+    display: grid;
+    gap: 6px;
+}
+
+.task-field span {
+    color: var(--muted);
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.task-input-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.task-field input,
+.task-field select {
+    width: 100%;
+}
+
+.task-adder {
+    display: grid;
+    gap: 12px;
+    padding: 16px;
+    border: 1px dashed var(--line);
+    border-radius: 16px;
+    background: color-mix(in srgb, var(--surface-2) 50%, transparent);
+}
+
+.task-add-list {
+    display: grid;
+    gap: 12px;
+}
+
+.task-add-row {
+    display: grid;
+    grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
+    gap: 12px;
+}
+
+.task-field-wide {
+    min-width: 0;
 }
 
 .task-list.readonly .task-row {
@@ -3471,11 +3563,13 @@ body {
     font-weight: 800;
 }
 
-.task-row-done .task-status {
+.task-row-done .task-status,
+.task-row-completed .task-status {
     background: var(--success-bg);
     color: var(--success-text);
 }
 
+.task-row-started .task-status,
 .task-row-in-progress .task-status {
     background: color-mix(in srgb, var(--primary) 14%, var(--surface));
     color: var(--primary);
@@ -4151,6 +4245,10 @@ body {
 
     .task-row select {
         width: 100%;
+    }
+
+    .task-add-row {
+        grid-template-columns: 1fr;
     }
 
     .modal-actions {

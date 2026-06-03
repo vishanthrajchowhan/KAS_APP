@@ -187,7 +187,8 @@ JOB_SERVICE_TYPES = (
 )
 OTHER_SERVICE_LABEL = "Other"
 LEGACY_OTHER_SERVICE_LABEL = "Other Related Services"
-TASK_STATUSES = ("Not Started", "In Progress", "Done")
+TASK_STATUSES = ("Not Started", "Started", "In Progress", "Completed")
+TASK_TRACKING_MODES = ("status", "count")
 SERVICE_TASK_TEMPLATES = {
     "Waterproofing": ("Inspect substrate", "Prepare surface", "Apply waterproofing system", "Final water-tightness review"),
     "Exterior Window Waterproofing": ("Inspect window perimeters", "Remove failed sealant", "Prime joints", "Install waterproof sealant", "Water test windows"),
@@ -981,12 +982,18 @@ def init_db():
                 service_type TEXT,
                 title TEXT NOT NULL,
                 status TEXT NOT NULL DEFAULT 'Not Started',
+                tracking_mode TEXT NOT NULL DEFAULT 'status',
+                target_quantity INTEGER,
+                completed_quantity INTEGER,
+                is_custom BOOLEAN NOT NULL DEFAULT FALSE,
+                is_removed BOOLEAN NOT NULL DEFAULT FALSE,
                 sort_order INTEGER DEFAULT 0,
                 created_at TEXT NOT NULL,
                 updated_at TEXT
             )
             """
         )
+        migrate_job_tasks_table(conn)
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS estimates (
@@ -1189,6 +1196,19 @@ def migrate_updates_table(conn):
 def migrate_estimates_table(conn):
     conn.execute("ALTER TABLE estimates ADD COLUMN IF NOT EXISTS other_service_details TEXT")
     conn.execute("ALTER TABLE estimates ADD COLUMN IF NOT EXISTS deleted_at TEXT")
+
+
+def migrate_job_tasks_table(conn):
+    conn.execute("ALTER TABLE job_tasks ADD COLUMN IF NOT EXISTS tracking_mode TEXT")
+    conn.execute("ALTER TABLE job_tasks ADD COLUMN IF NOT EXISTS target_quantity INTEGER")
+    conn.execute("ALTER TABLE job_tasks ADD COLUMN IF NOT EXISTS completed_quantity INTEGER")
+    conn.execute("ALTER TABLE job_tasks ADD COLUMN IF NOT EXISTS is_custom BOOLEAN")
+    conn.execute("ALTER TABLE job_tasks ADD COLUMN IF NOT EXISTS is_removed BOOLEAN")
+    conn.execute("UPDATE job_tasks SET status = 'Completed' WHERE status = 'Done'")
+    conn.execute("UPDATE job_tasks SET tracking_mode = 'status' WHERE tracking_mode IS NULL OR tracking_mode = ''")
+    conn.execute("UPDATE job_tasks SET completed_quantity = 0 WHERE completed_quantity IS NULL AND tracking_mode = 'count'")
+    conn.execute("UPDATE job_tasks SET is_custom = FALSE WHERE is_custom IS NULL")
+    conn.execute("UPDATE job_tasks SET is_removed = FALSE WHERE is_removed IS NULL")
 
 
 def migrate_jobs_table_portal(conn):
@@ -1828,6 +1848,72 @@ def default_tasks_for_service(service_type):
     return SERVICE_TASK_TEMPLATES.get(service_type, SERVICE_TASK_TEMPLATES[OTHER_SERVICE_LABEL])
 
 
+def normalize_task_status(value):
+    status = (value or "").strip()
+    if status == "Done":
+        return "Completed"
+    if status in TASK_STATUSES:
+        return status
+    return "Not Started"
+
+
+def normalize_task_tracking_mode(value):
+    tracking_mode = (value or "").strip().lower()
+    if tracking_mode in TASK_TRACKING_MODES:
+        return tracking_mode
+    return "status"
+
+
+def derive_count_task_status(completed_quantity, target_quantity):
+    if completed_quantity <= 0:
+        return "Not Started"
+    if target_quantity > 0 and completed_quantity >= target_quantity:
+        return "Completed"
+    return "In Progress"
+
+
+def serialize_task_row(row):
+    tracking_mode = normalize_task_tracking_mode(row["tracking_mode"])
+    target_quantity = int(row["target_quantity"] or 0)
+    completed_quantity = int(row["completed_quantity"] or 0)
+    status = normalize_task_status(row["status"])
+
+    if tracking_mode == "count":
+        target_quantity = max(target_quantity, 0)
+        completed_quantity = max(completed_quantity, 0)
+        if target_quantity and completed_quantity > target_quantity:
+            completed_quantity = target_quantity
+        display_status = derive_count_task_status(completed_quantity, target_quantity)
+        progress_text = (
+            f"{completed_quantity} of {target_quantity} complete"
+            if target_quantity
+            else "Set a total quantity"
+        )
+    else:
+        display_status = status
+        progress_text = status
+        target_quantity = 0
+        completed_quantity = 0
+
+    return {
+        "id": row["id"],
+        "job_id": row["job_id"],
+        "service_type": row["service_type"],
+        "title": row["title"],
+        "status": display_status if tracking_mode == "count" else status,
+        "tracking_mode": tracking_mode,
+        "target_quantity": target_quantity,
+        "completed_quantity": completed_quantity,
+        "sort_order": row["sort_order"],
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+        "is_custom": bool(row["is_custom"]),
+        "display_status": display_status,
+        "progress_text": progress_text,
+        "status_class": display_status.lower().replace(" ", "-"),
+    }
+
+
 def sync_job_tasks(conn, job_id, selected_services):
     existing = conn.execute(
         "SELECT service_type, title FROM job_tasks WHERE job_id = ?",
@@ -1845,31 +1931,118 @@ def sync_job_tasks(conn, job_id, selected_services):
             sort_order += 1
             conn.execute(
                 """
-                INSERT INTO job_tasks (job_id, service_type, title, status, sort_order, created_at)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO job_tasks (job_id, service_type, title, status, tracking_mode, target_quantity, completed_quantity, is_custom, is_removed, sort_order, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (job_id, service, title, "Not Started", sort_order, now),
+                (job_id, service, title, "Not Started", "status", None, None, False, False, sort_order, now),
             )
 
 
 def fetch_job_tasks(conn, job_id):
-    return conn.execute(
+    rows = conn.execute(
         """
         SELECT *
         FROM job_tasks
-        WHERE job_id = ?
+        WHERE job_id = ? AND COALESCE(is_removed, FALSE) = FALSE
         ORDER BY sort_order ASC, id ASC
         """,
         (job_id,),
     ).fetchall()
+    return [serialize_task_row(row) for row in rows]
+
+
+def add_job_task(conn, job_id, service_type, title, *, is_custom=True):
+    normalized_title = (title or "").strip()
+    normalized_service = (service_type or "").strip() or None
+    if not normalized_title:
+        return False
+
+    existing = conn.execute(
+        """
+        SELECT id, COALESCE(is_removed, FALSE) AS is_removed
+        FROM job_tasks
+        WHERE job_id = ? AND COALESCE(service_type, '') = ? AND LOWER(title) = LOWER(?)
+        ORDER BY id DESC
+        LIMIT 1
+        """,
+        (job_id, normalized_service or "", normalized_title),
+    ).fetchone()
+    now = datetime.now().isoformat(timespec="seconds")
+    if existing is not None:
+        if existing["is_removed"]:
+            conn.execute(
+                """
+                UPDATE job_tasks
+                SET title = ?,
+                    service_type = ?,
+                    is_custom = ?,
+                    is_removed = FALSE,
+                    updated_at = ?
+                WHERE id = ?
+                """,
+                (normalized_title, normalized_service, is_custom, now, existing["id"]),
+            )
+            return True
+        return False
+
+    sort_row = conn.execute(
+        "SELECT COALESCE(MAX(sort_order), 0) AS max_sort FROM job_tasks WHERE job_id = ?",
+        (job_id,),
+    ).fetchone()
+    next_sort = (sort_row["max_sort"] if sort_row is not None else 0) + 1
+    conn.execute(
+        """
+        INSERT INTO job_tasks (
+            job_id,
+            service_type,
+            title,
+            status,
+            tracking_mode,
+            target_quantity,
+            completed_quantity,
+            is_custom,
+            is_removed,
+            sort_order,
+            created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (job_id, normalized_service, normalized_title, "Not Started", "status", None, None, is_custom, False, next_sort, now),
+    )
+    return True
 
 
 def task_progress_summary(tasks):
-    total = len(tasks)
-    done = sum(1 for task in tasks if task["status"] == "Done")
-    in_progress = sum(1 for task in tasks if task["status"] == "In Progress")
-    percent = round((done / total) * 100) if total else 0
-    return {"total": total, "done": done, "in_progress": in_progress, "percent": percent}
+    total_units = 0
+    completed_units = 0
+    in_progress_tasks = 0
+    completed_tasks = 0
+
+    for task in tasks:
+        if task["tracking_mode"] == "count":
+            task_total = max(task["target_quantity"], 1)
+            task_done = min(max(task["completed_quantity"], 0), task_total)
+            total_units += task_total
+            completed_units += task_done
+        else:
+            total_units += 1
+            task_done = 1 if task["display_status"] == "Completed" else 0
+            completed_units += task_done
+
+        if task["display_status"] == "Completed":
+            completed_tasks += 1
+        elif task["display_status"] in {"Started", "In Progress"}:
+            in_progress_tasks += 1
+
+    percent = round((completed_units / total_units) * 100) if total_units else 0
+    return {
+        "total": total_units,
+        "done": completed_units,
+        "in_progress": in_progress_tasks,
+        "percent": percent,
+        "task_total": len(tasks),
+        "task_done": completed_tasks,
+    }
 
 
 def process_logo_upload(uploaded_file):
@@ -1970,18 +2143,18 @@ def group_updates(update_rows):
             grouped.append(group_lookup[group_key])
 
         if row["image_path"]:
-            if not is_client() or normalize_bool(row.get("client_visible")):
-                photo_source = row.get("image_path") or row.get("photo_url") or ""
+            if not is_client() or normalize_bool(row["client_visible"]):
+                photo_source = row["image_path"] or row["photo_url"] or ""
                 group_lookup[group_key]["photos"].append(
                     {
                         "id": row["id"],
                         "path": row["image_path"],
                         "url": media_url(photo_source, "job_photos"),
-                        "client_visible": normalize_bool(row.get("client_visible")),
+                        "client_visible": normalize_bool(row["client_visible"]),
                     }
                 )
         if row["receipt_path"]:
-            receipt_source = row.get("receipt_path") or row.get("receipt_url") or ""
+            receipt_source = row["receipt_path"] or row["receipt_url"] or ""
             group_lookup[group_key]["receipts"].append(
                 {
                     "id": row["id"],
@@ -2221,6 +2394,7 @@ def inject_workspace_context():
             "workspace_settings": DEFAULT_WORKSPACE_SETTINGS.copy(),
             "notifications": [],
             "notification_count": 0,
+            "build_service_chips": build_service_chips,
         }
     with get_db_connection() as conn:
         workspace_settings = load_workspace_settings(conn)
@@ -2231,6 +2405,7 @@ def inject_workspace_context():
         "workspace_settings": workspace_settings,
         "notifications": notifications,
         "notification_count": len(notifications),
+        "build_service_chips": build_service_chips,
     }
 
 
@@ -3119,8 +3294,8 @@ def update_job(job_id):
             "SELECT id, name, email FROM users WHERE role = 'client' ORDER BY name"
         ).fetchall()
         tasks = fetch_job_tasks(conn, job_id)
-        if not tasks and job.get("service_type"):
-            sync_job_tasks(conn, job_id, split_services(job.get("service_type")))
+        if not tasks and job["service_type"]:
+            sync_job_tasks(conn, job_id, split_services(job["service_type"]))
             tasks = fetch_job_tasks(conn, job_id)
         # Fetch uploaded walkthrough reports for this job (public URLs)
         reports = conn.execute(
@@ -3138,7 +3313,7 @@ def update_job(job_id):
     return render_template(
         "update_job.html",
         job=job,
-        selected_service_types=split_services(job.get("service_type")),
+        selected_service_types=split_services(job["service_type"]),
         updates=updates,
         update_days=update_days,
         statuses=STATUSES,
@@ -3156,6 +3331,7 @@ def update_job(job_id):
         clients=clients,
         tasks=tasks,
         task_statuses=TASK_STATUSES,
+        task_tracking_modes=TASK_TRACKING_MODES,
         task_summary=task_progress_summary(tasks),
         reports=reports,
     )
@@ -3198,8 +3374,8 @@ def job_progress(job_id):
             (job_id,),
         ).fetchone()
         tasks = fetch_job_tasks(conn, job_id)
-        if not tasks and job.get("service_type"):
-            sync_job_tasks(conn, job_id, split_services(job.get("service_type")))
+        if not tasks and job["service_type"]:
+            sync_job_tasks(conn, job_id, split_services(job["service_type"]))
             tasks = fetch_job_tasks(conn, job_id)
     updates = group_updates(update_rows)
     update_days = group_updates_by_day(updates)
@@ -3240,14 +3416,6 @@ def submit_update():
     service_type = compose_service_text(selected_service_types)
     other_service_details = request.form.get("other_service_details", "").strip()
     due_date = request.form.get("due_date", "").strip() or None
-    task_status_updates = {}
-    if is_admin():
-        for key, value in request.form.items():
-            if not key.startswith("task_status_"):
-                continue
-            task_id_text = key.removeprefix("task_status_")
-            if task_id_text.isdigit() and value in TASK_STATUSES:
-                task_status_updates[int(task_id_text)] = value
 
     if not job_id:
         flash("Please choose a valid job.", "error")
@@ -3307,23 +3475,96 @@ def submit_update():
     elif invoice_amount is not None and status == "Completed":
         status = "Invoiced"
 
+    task_updates = {}
+    current_tasks = []
+    removed_task_ids = set()
+    new_task_entries = []
+    if is_admin():
+        with get_db_connection() as conn:
+            current_tasks = fetch_job_tasks(conn, job_id)
+
+        for task_id_text in request.form.getlist("remove_task_ids"):
+            if task_id_text.isdigit():
+                removed_task_ids.add(int(task_id_text))
+
+        new_task_services = request.form.getlist("new_task_service")
+        new_task_titles = request.form.getlist("new_task_title")
+        for service_value, title_value in zip(new_task_services, new_task_titles):
+            task_title = (title_value or "").strip()
+            task_service = (service_value or "").strip()
+            if not task_title:
+                continue
+            new_task_entries.append(
+                {
+                    "service_type": task_service or None,
+                    "title": task_title,
+                }
+            )
+
+        for task in current_tasks:
+            task_id = task["id"]
+            if task_id in removed_task_ids:
+                continue
+            tracking_mode = normalize_task_tracking_mode(
+                request.form.get(f"task_tracking_{task_id}", task["tracking_mode"])
+            )
+
+            if tracking_mode == "count":
+                target_quantity = request.form.get(f"task_target_{task_id}", type=int)
+                completed_quantity = request.form.get(f"task_completed_{task_id}", type=int)
+
+                if target_quantity is None or target_quantity < 1:
+                    flash(f"Enter a total quantity for {task['title']}.", "error")
+                    return redirect(url_for("update_job", job_id=job_id))
+                if completed_quantity is None:
+                    completed_quantity = 0
+                if completed_quantity < 0:
+                    flash(f"Completed quantity cannot be negative for {task['title']}.", "error")
+                    return redirect(url_for("update_job", job_id=job_id))
+                if completed_quantity > target_quantity:
+                    flash(f"Completed quantity cannot be greater than total quantity for {task['title']}.", "error")
+                    return redirect(url_for("update_job", job_id=job_id))
+
+                task_updates[task_id] = {
+                    "tracking_mode": tracking_mode,
+                    "status": derive_count_task_status(completed_quantity, target_quantity),
+                    "target_quantity": target_quantity,
+                    "completed_quantity": completed_quantity,
+                }
+                continue
+
+            task_updates[task_id] = {
+                "tracking_mode": "status",
+                "status": normalize_task_status(
+                    request.form.get(f"task_status_{task_id}", task["status"])
+                ),
+                "target_quantity": None,
+                "completed_quantity": None,
+            }
+
     valid_files = [file for file in files if file and file.filename]
     if can_manage_receipts():
         valid_receipt_files = [file for file in receipt_files if file and file.filename]
     else:
         valid_receipt_files = []
     task_fields_changed = False
-    if task_status_updates:
-        with get_db_connection() as conn:
-            current_task_rows = conn.execute(
-                "SELECT id, status FROM job_tasks WHERE job_id = ?",
-                (job_id,),
-            ).fetchall()
-        current_task_statuses = {row["id"]: row["status"] for row in current_task_rows}
-        task_fields_changed = any(
-            current_task_statuses.get(task_id) != task_status
-            for task_id, task_status in task_status_updates.items()
-        )
+    for task in current_tasks:
+        if task["id"] in removed_task_ids:
+            task_fields_changed = True
+            break
+        task_update = task_updates.get(task["id"])
+        if task_update is None:
+            continue
+        if (
+            task_update["tracking_mode"] != task["tracking_mode"]
+            or task_update["status"] != task["status"]
+            or (task_update["target_quantity"] or 0) != (task["target_quantity"] or 0)
+            or (task_update["completed_quantity"] or 0) != (task["completed_quantity"] or 0)
+        ):
+            task_fields_changed = True
+            break
+    if new_task_entries:
+        task_fields_changed = True
     job_fields_changed = any(
         [
             status != job["status"],
@@ -3461,14 +3702,44 @@ def submit_update():
 
             if is_admin():
                 sync_job_tasks(conn, job_id, selected_service_types)
-                for task_id, task_status in task_status_updates.items():
+                for task_id, task_update in task_updates.items():
                     conn.execute(
                         """
                         UPDATE job_tasks
-                        SET status = ?, updated_at = ?
+                        SET tracking_mode = ?,
+                            status = ?,
+                            target_quantity = ?,
+                            completed_quantity = ?,
+                            updated_at = ?
                         WHERE id = ? AND job_id = ?
                         """,
-                        (task_status, now, task_id, job_id),
+                        (
+                            task_update["tracking_mode"],
+                            task_update["status"],
+                            task_update["target_quantity"],
+                            task_update["completed_quantity"],
+                            now,
+                            task_id,
+                            job_id,
+                        ),
+                    )
+                if removed_task_ids:
+                    conn.execute(
+                        f"""
+                        UPDATE job_tasks
+                        SET is_removed = TRUE,
+                            updated_at = ?
+                        WHERE job_id = ? AND id IN ({', '.join(['?'] * len(removed_task_ids))})
+                        """,
+                        [now, job_id, *sorted(removed_task_ids)],
+                    )
+                for task_entry in new_task_entries:
+                    add_job_task(
+                        conn,
+                        job_id,
+                        task_entry["service_type"],
+                        task_entry["title"],
+                        is_custom=True,
                     )
 
     except (OSError, RuntimeError, ValueError) as exc:
@@ -4715,10 +4986,10 @@ def api_walkthrough_status(walkthrough_id: int):
         status = {
             "ok": True,
             "id": row["id"],
-            "transcript_available": bool(row.get("transcript")),
-            "report_available": bool(row.get("ai_summary")),
-            "pdf_available": bool(row.get("pdf_url")),
-            "created_at": row.get("created_at"),
+            "transcript_available": bool(row["transcript"]),
+            "report_available": bool(row["ai_summary"]),
+            "pdf_available": bool(row["pdf_url"]),
+            "created_at": row["created_at"],
         }
     return jsonify(status)
 
@@ -5146,7 +5417,7 @@ def enable_job_portal(job_id):
     
     with get_db_connection() as conn:
         # Generate token if not exists
-        if not job.get("portal_token"):
+        if not job["portal_token"]:
             token = generate_portal_token()
             conn.execute(
                 """
@@ -5193,7 +5464,7 @@ def send_portal_email_page(job_id):
     if job is None:
         return redirect(url_for("index"))
     
-    if not job.get("portal_enabled") or not job.get("portal_token"):
+    if not job["portal_enabled"] or not job["portal_token"]:
         flash("Portal is not enabled for this job.", "error")
         return redirect(url_for("update_job", job_id=job_id))
     
@@ -5214,9 +5485,9 @@ def send_portal_email_page(job_id):
                 recipients=[client_email],
                 html=render_template(
                     "emails/portal_invite.html",
-                    client_name=job.get("client_name", "Valued Client"),
-                    job_name=job.get("name", ""),
-                    job_location=job.get("location", ""),
+                    client_name=job["client_name"] or "Valued Client",
+                    job_name=job["name"] or "",
+                    job_location=job["location"] or "",
                     portal_url=portal_url,
                     company_phone=workspace.get("company_phone", ""),
                     company_city=workspace.get("company_city", "Fort Lauderdale, FL"),
