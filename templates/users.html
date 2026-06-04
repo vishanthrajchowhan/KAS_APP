@@ -90,18 +90,31 @@
                         <th>Email</th>
                         <th>Phone</th>
                         <th>Role</th>
-                        <th>Actions</th>
+                        <th>Temporary Password</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for user in users %}
                         <tr>
-                            <td>{{ user.name }}</td>
-                            <td>{{ user.email }}</td>
-                            <td>{{ user.phone or '—' }}</td>
-                            <td>{{ user.role|title }}</td>
-                            <td>
-                                <button type="button" class="button button-small" onclick="alert('Password reset is not implemented yet.');">Reset Password</button>
+                            <td data-label="Name">{{ user.name }}</td>
+                            <td data-label="Email">{{ user.email }}</td>
+                            <td data-label="Phone">{{ user.phone or '—' }}</td>
+                            <td data-label="Role">{{ user.role|title }}</td>
+                            <td data-label="Temporary Password">
+                                <div class="user-access-actions">
+                                    <form class="user-password-form" method="post" action="{{ url_for('update_user_password', user_id=user.id) }}">
+                                        <div class="password-input-wrap">
+                                            <input id="user-password-{{ user.id }}" name="password" type="password" minlength="6" placeholder="Set temp password" required>
+                                            <button class="icon-button password-toggle" type="button" aria-label="Show password" aria-pressed="false" data-password-toggle data-password-target="user-password-{{ user.id }}">
+                                                <span data-lucide="eye"></span>
+                                            </button>
+                                        </div>
+                                        <button type="submit" class="button button-small">Save Password</button>
+                                    </form>
+                                    <form method="post" action="{{ url_for('delete_user', user_id=user.id) }}" onsubmit="return confirm('Delete {{ user.name|replace("'", "\\'") }}? They will no longer be able to log in.');">
+                                        <button type="submit" class="button button-danger button-small">Delete User</button>
+                                    </form>
+                                </div>
                             </td>
                         </tr>
                     {% endfor %}

@@ -2285,6 +2285,15 @@ tbody tr:last-child td {
         text-align: left;
     }
 
+    .user-password-form {
+        grid-template-columns: 1fr;
+        width: 100%;
+    }
+
+    .user-password-form .button {
+        width: 100%;
+    }
+
     .timeline-card {
         grid-template-columns: 14px 1fr;
         gap: 8px;
@@ -4505,6 +4514,30 @@ body {
     height: 34px;
     min-height: 34px;
     border-radius: 9px;
+}
+
+.user-password-form {
+    display: grid;
+    grid-template-columns: minmax(220px, 1fr) auto;
+    gap: 8px;
+    align-items: center;
+}
+
+.user-access-actions {
+    display: grid;
+    gap: 8px;
+}
+
+.user-access-actions > form {
+    margin: 0;
+}
+
+.user-password-form .password-input-wrap {
+    min-width: 0;
+}
+
+.user-password-form .button {
+    white-space: nowrap;
 }
 
 .remember-me-row {

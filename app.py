@@ -3127,6 +3127,56 @@ def users():
     return render_template("users.html", users=users_list, roles=ROLES, default_role=default_role)
 
 
+@app.route("/users/<int:user_id>/password", methods=("POST",))
+@login_required
+@role_required("admin")
+def update_user_password(user_id: int):
+    password = request.form.get("password", "")
+    if len(password) < 6:
+        flash("Temporary password must be at least 6 characters.", "error")
+        return redirect(url_for("users"))
+
+    with get_db_connection() as conn:
+        user_record = conn.execute("SELECT name FROM users WHERE id = ?", (user_id,)).fetchone()
+        if user_record is None:
+            flash("User not found.", "error")
+            return redirect(url_for("users"))
+
+        conn.execute(
+            "UPDATE users SET password = ? WHERE id = ?",
+            (generate_password_hash(password), user_id),
+        )
+
+    flash(f"Temporary password updated for {user_record['name']}.", "success")
+    return redirect(url_for("users"))
+
+
+@app.route("/users/<int:user_id>/delete", methods=("POST",))
+@login_required
+@role_required("admin")
+def delete_user(user_id: int):
+    if g.user is not None and g.user["id"] == user_id:
+        flash("You cannot delete your own account.", "error")
+        return redirect(url_for("users"))
+
+    with get_db_connection() as conn:
+        user_record = conn.execute("SELECT id, name, role FROM users WHERE id = ?", (user_id,)).fetchone()
+        if user_record is None:
+            flash("User not found.", "error")
+            return redirect(url_for("users"))
+
+        if user_record["role"] == "admin":
+            admin_count = conn.execute("SELECT COUNT(*) AS total FROM users WHERE role = 'admin'").fetchone()
+            if admin_count is not None and int(admin_count["total"] or 0) <= 1:
+                flash("You cannot delete the last admin account.", "error")
+                return redirect(url_for("users"))
+
+        conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+
+    flash(f"{user_record['name']} was deleted and can no longer log in.", "success")
+    return redirect(url_for("users"))
+
+
 @app.route("/jobs")
 @login_required
 def jobs():
