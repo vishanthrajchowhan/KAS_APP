@@ -114,8 +114,17 @@
                             </td>
                             <td data-label="Actions">
                                 <div class="user-action-buttons">
+                                    <form class="user-password-form" method="post" action="{{ url_for('update_user_password', user_id=user.id) }}">
+                                        <div class="password-input-wrap">
+                                            <input id="new-password-{{ user.id }}" name="password" type="password" minlength="6" placeholder="{% if g.user and g.user.id == user.id %}New password for me{% else %}New password{% endif %}" autocomplete="new-password">
+                                            <button class="icon-button password-toggle" type="button" aria-label="Show password" aria-pressed="false" data-password-toggle data-password-target="new-password-{{ user.id }}">
+                                                <span data-lucide="eye"></span>
+                                            </button>
+                                        </div>
+                                        <button type="submit" class="button button-small">{% if g.user and g.user.id == user.id %}Change My Password{% else %}Save Password{% endif %}</button>
+                                    </form>
                                     <form method="post" action="{{ url_for('reset_user_password', user_id=user.id) }}">
-                                        <button type="submit" class="button button-small">Reset Password</button>
+                                        <button type="submit" class="button button-small">Generate Password</button>
                                     </form>
                                     <form method="post" action="{{ url_for('delete_user', user_id=user.id) }}" onsubmit="return confirm('Delete {{ user.name|replace("'", "\\'") }}? They will no longer be able to log in.');">
                                         <button type="submit" class="button button-danger button-small">Delete User</button>

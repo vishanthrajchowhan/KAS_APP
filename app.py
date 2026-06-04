@@ -3139,26 +3139,34 @@ def users():
 
 @app.route("/users/<int:user_id>/password", methods=("POST",))
 @login_required
-@role_required("admin")
 def update_user_password(user_id: int):
     password = request.form.get("password", "")
     if len(password) < 6:
-        flash("Temporary password must be at least 6 characters.", "error")
-        return redirect(url_for("users"))
+        flash("Password must be at least 6 characters.", "error")
+        return redirect(url_for("users") if is_admin() else url_for("index"))
+    if not is_admin() and (g.user is None or g.user["id"] != user_id):
+        flash("You can only change your own password.", "error")
+        return redirect(url_for("index"))
 
     with get_db_connection() as conn:
-        user_record = conn.execute("SELECT name FROM users WHERE id = ?", (user_id,)).fetchone()
+        user_record = conn.execute(
+            "SELECT name FROM users WHERE id = ? AND COALESCE(is_active, TRUE) = TRUE",
+            (user_id,),
+        ).fetchone()
         if user_record is None:
             flash("User not found.", "error")
-            return redirect(url_for("users"))
+            return redirect(url_for("users") if is_admin() else url_for("index"))
 
         conn.execute(
             "UPDATE users SET password = ?, temp_password_plain = ? WHERE id = ? AND COALESCE(is_active, TRUE) = TRUE",
             (generate_password_hash(password), password, user_id),
         )
 
-    flash(f"Temporary password updated for {user_record['name']}.", "success")
-    return redirect(url_for("users"))
+    if g.user is not None and g.user["id"] == user_id:
+        flash("Your password was updated.", "success")
+    else:
+        flash(f"Password updated for {user_record['name']}.", "success")
+    return redirect(url_for("users") if is_admin() else url_for("index"))
 
 
 @app.route("/users/<int:user_id>/reset-password", methods=("POST",))
@@ -4104,6 +4112,73 @@ def bulk_delete_media():
             flash(message, "success")
     else:
         flash("Selected media was not found.", "error")
+
+    return safe_redirect(next_url)
+
+
+@app.route("/media/save-changes", methods=("POST",))
+@login_required
+@role_required("admin")
+def save_media_changes():
+    next_url = request.form.get("next") or ""
+    photo_ids = selected_media_ids("photo_ids")
+    visible_photo_ids = set(selected_media_ids("visible_photo_ids"))
+    delete_photo_ids = selected_media_ids("delete_photo_ids")
+    delete_receipt_ids = selected_media_ids("delete_receipt_ids")
+    delete_photo_id_set = set(delete_photo_ids)
+
+    changed_visibility = 0
+    deleted_count = 0
+    storage_delete_failed = False
+
+    with get_db_connection() as conn:
+        for photo_id in photo_ids:
+            if photo_id in delete_photo_id_set:
+                continue
+            client_visible = photo_id in visible_photo_ids
+            cursor = conn.execute(
+                """
+                UPDATE updates
+                SET client_visible = ?
+                WHERE id = ? AND image_path IS NOT NULL AND client_visible != ?
+                """,
+                (client_visible, photo_id, client_visible),
+            )
+            changed_visibility += cursor.rowcount
+
+        for media_kind, media_ids, path_column in (
+            ("photo", delete_photo_ids, "image_path"),
+            ("receipt", delete_receipt_ids, "receipt_path"),
+        ):
+            if not media_ids:
+                continue
+            placeholders = ", ".join("?" for _ in media_ids)
+            rows = conn.execute(
+                f"""
+                SELECT id, job_id, notes, image_path, photo_url, receipt_path, receipt_url
+                FROM updates
+                WHERE id IN ({placeholders}) AND {path_column} IS NOT NULL
+                """,
+                tuple(media_ids),
+            ).fetchall()
+            for media in rows:
+                if delete_update_media_record(conn, media, media_kind):
+                    storage_delete_failed = True
+                deleted_count += 1
+
+    if changed_visibility or deleted_count:
+        parts = []
+        if changed_visibility:
+            parts.append(f"updated {changed_visibility} visibility setting{'s' if changed_visibility != 1 else ''}")
+        if deleted_count:
+            parts.append(f"deleted {deleted_count} media item{'s' if deleted_count != 1 else ''}")
+        message = "Media changes saved: " + " and ".join(parts) + "."
+        if storage_delete_failed:
+            flash(f"{message} Some storage cleanup needs a retry.", "error")
+        else:
+            flash(message, "success")
+    else:
+        flash("No media changes to save.", "error")
 
     return safe_redirect(next_url)
 

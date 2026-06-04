@@ -360,6 +360,10 @@
     {% endif %}
 </section>
 
+{% if can_manage_jobs %}
+<form id="job-media-changes-form" method="post" action="{{ url_for('save_media_changes') }}">
+    <input type="hidden" name="next" value="{{ request.path }}">
+{% endif %}
 <section class="updates">
     <h2>Update History</h2>
     {% if update_days %}
@@ -399,11 +403,9 @@
                                     <p class="muted">Photos or CRM changes were added with this update.</p>
                                 {% endif %}
                                 {% if can_manage_jobs and (update.photos or (can_manage_receipts and update.receipts)) %}
-                                    <form id="bulk-media-delete-{{ update_loop }}" method="post" action="{{ url_for('bulk_delete_media') }}" class="media-bulk-actions" onsubmit="return confirm('Delete selected media from this update?');">
-                                        <input type="hidden" name="next" value="{{ request.path }}">
+                                    <div class="media-bulk-actions">
                                         <span>Select media to delete</span>
-                                        <button class="button button-danger button-compact" type="submit">Delete selected</button>
-                                    </form>
+                                    </div>
                                 {% endif %}
                                 {% if update.photos %}
                                     <div class="photo-grid">
@@ -413,7 +415,7 @@
                                                     <div class="media-tile-frame">
                                                         {% if can_manage_jobs %}
                                                             <label class="media-select">
-                                                                <input form="bulk-media-delete-{{ update_loop }}" name="photo_ids" type="checkbox" value="{{ photo.id }}">
+                                                                <input form="job-media-changes-form" name="delete_photo_ids" type="checkbox" value="{{ photo.id }}">
                                                                 <span>Select</span>
                                                             </label>
                                                         {% endif %}
@@ -422,17 +424,15 @@
                                                         </a>
                                                     </div>
                                                     {% if can_manage_jobs %}
-                                                        <form method="post" action="{{ url_for('update_photo_visibility', update_id=photo.id) }}">
-                                                            <input type="hidden" name="next" value="{{ request.path }}">
-                                                            <label class="remember-me-row">
-                                                                <input name="client_visible" type="checkbox" value="1" {% if photo.client_visible %}checked{% endif %} onchange="this.form.submit()">
-                                                                <span>Visible to client</span>
-                                                            </label>
-                                                        </form>
-                                                        <form method="post" action="{{ url_for('delete_photo', update_id=photo.id) }}" onsubmit="return confirm('Delete this photo?');">
-                                                            <input type="hidden" name="next" value="{{ request.path }}">
-                                                            <button class="button button-danger button-compact" type="submit">Delete photo</button>
-                                                        </form>
+                                                        <input form="job-media-changes-form" type="hidden" name="photo_ids" value="{{ photo.id }}">
+                                                        <label class="remember-me-row">
+                                                            <input form="job-media-changes-form" name="visible_photo_ids" type="checkbox" value="{{ photo.id }}" {% if photo.client_visible %}checked{% endif %}>
+                                                            <span>Visible to client</span>
+                                                        </label>
+                                                        <label class="button button-danger button-compact media-delete-toggle">
+                                                            <input form="job-media-changes-form" name="delete_photo_ids" type="checkbox" value="{{ photo.id }}">
+                                                            <span>Delete photo</span>
+                                                        </label>
                                                     {% endif %}
                                                 </div>
                                             {% else %}
@@ -447,16 +447,16 @@
                                         {% for receipt in update.receipts %}
                                             <div class="receipt-row{% if can_manage_jobs %} receipt-row-selectable{% endif %}">
                                                 {% if can_manage_jobs %}
-                                                    <input form="bulk-media-delete-{{ update_loop }}" class="media-checkbox" name="receipt_ids" type="checkbox" value="{{ receipt.id }}" aria-label="Select receipt">
+                                                    <input form="job-media-changes-form" class="media-checkbox" name="delete_receipt_ids" type="checkbox" value="{{ receipt.id }}" aria-label="Select receipt">
                                                 {% endif %}
                                                 <a href="{{ receipt.url }}" target="_blank" rel="noopener">
                                                     {{ receipt.name }}
                                                 </a>
                                                 {% if can_manage_jobs %}
-                                                    <form method="post" action="{{ url_for('delete_receipt', update_id=receipt.id) }}" onsubmit="return confirm('Delete this receipt?');">
-                                                        <input type="hidden" name="next" value="{{ request.path }}">
-                                                        <button class="button button-danger button-compact" type="submit">Delete</button>
-                                                    </form>
+                                                    <label class="button button-danger button-compact media-delete-toggle">
+                                                        <input form="job-media-changes-form" name="delete_receipt_ids" type="checkbox" value="{{ receipt.id }}">
+                                                        <span>Delete</span>
+                                                    </label>
                                                 {% endif %}
                                             </div>
                                         {% endfor %}
@@ -471,9 +471,27 @@
     {% else %}
         <p class="muted">No updates have been submitted for this job yet.</p>
     {% endif %}
+    {% if can_manage_jobs and update_days %}
+        <div class="media-save-actions">
+            <button class="button button-primary" type="submit" form="job-media-changes-form">Save Media Changes</button>
+        </div>
+    {% endif %}
 </section>
+{% if can_manage_jobs %}
+</form>
+{% endif %}
 
 <script>
+const mediaChangesForm = document.getElementById('job-media-changes-form');
+if (mediaChangesForm) {
+    mediaChangesForm.addEventListener('submit', (event) => {
+        const hasDeletes = mediaChangesForm.querySelector('input[name="delete_photo_ids"]:checked, input[name="delete_receipt_ids"]:checked');
+        if (hasDeletes && !confirm('Save changes and delete selected media?')) {
+            event.preventDefault();
+        }
+    });
+}
+
 function copyPortalLink(button) {
     const input = button.previousElementSibling;
     input.select();

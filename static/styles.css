@@ -3732,6 +3732,32 @@ body {
     color: var(--danger-text);
 }
 
+.media-save-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 22px;
+    padding-top: 18px;
+    border-top: 1px solid var(--line);
+}
+
+.media-delete-toggle {
+    cursor: pointer;
+    user-select: none;
+}
+
+.media-delete-toggle input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.media-delete-toggle:has(input:checked),
+.media-select:has(input:checked) {
+    border-color: color-mix(in srgb, var(--danger-text) 36%, transparent);
+    background: color-mix(in srgb, var(--danger-bg) 78%, var(--surface));
+    color: var(--danger-text);
+}
+
 .media-tile-frame {
     position: relative;
     overflow: hidden;
@@ -3792,6 +3818,11 @@ body {
 
     .media-bulk-actions .button {
         margin-left: 0;
+        width: 100%;
+        justify-content: center;
+    }
+
+    .media-save-actions .button {
         width: 100%;
         justify-content: center;
     }
@@ -5759,4 +5790,3 @@ input:focus {
         padding: 24px;
     }
 }
-
