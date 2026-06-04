@@ -181,6 +181,23 @@
         });
     }
 
+    function setupFlashToasts() {
+        document.querySelectorAll('.messages .message').forEach((message, index) => {
+            if (message.dataset.toastBound === 'true') {
+                return;
+            }
+
+            message.dataset.toastBound = 'true';
+
+            window.setTimeout(() => {
+                message.classList.add('is-dismissing');
+                window.setTimeout(() => {
+                    message.remove();
+                }, 220);
+            }, 3200 + (index * 180));
+        });
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
         revealElements();
         setupCounters();
@@ -188,6 +205,7 @@
         setupButtons();
         setupServiceChipSelectors();
         setupPasswordToggles();
+        setupFlashToasts();
         setupUploadForms();
         setupIcons();
         setupPWAInstall();

@@ -145,6 +145,8 @@ PAYMENT_STATUSES = ("Not Paid", "Paid")
 ROLES = ("admin", "employee", "client")
 PUBLIC_ENDPOINTS = {"login", "static", "client_portal", "portal_sign", "portal_report"}
 
+TEMP_PASSWORD_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%"
+
 # Estimate statuses
 ESTIMATE_STATUSES = ("Draft", "Sent", "Viewed", "Approved", "Rejected", "Expired")
 
@@ -953,6 +955,9 @@ def init_db():
             """
         )
         conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS phone TEXT")
+        conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS temp_password_plain TEXT")
+        conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE")
+        conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at TEXT")
         migrate_jobs_table(conn)
         conn.execute(
             """
@@ -2447,9 +2452,13 @@ def ensure_database():
     if user_id:
         with get_db_connection() as conn:
             g.user = conn.execute(
-                "SELECT id, name, email, role FROM users WHERE id = ?",
+                "SELECT id, name, email, role FROM users WHERE id = ? AND COALESCE(is_active, TRUE) = TRUE",
                 (user_id,),
             ).fetchone()
+
+
+def generate_temporary_password(length: int = 12) -> str:
+    return "".join(secrets.choice(TEMP_PASSWORD_ALPHABET) for _ in range(length))
 
 
 @app.context_processor
@@ -2536,7 +2545,7 @@ def login():
 
         with get_db_connection() as conn:
             user = conn.execute(
-                "SELECT * FROM users WHERE email = ?",
+                "SELECT * FROM users WHERE email = ? AND COALESCE(is_active, TRUE) = TRUE",
                 (email,),
             ).fetchone()
 
@@ -3101,14 +3110,15 @@ def users():
             with get_db_connection() as conn:
                 conn.execute(
                     """
-                    INSERT INTO users (name, email, phone, password, role, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?)
+                    INSERT INTO users (name, email, phone, password, temp_password_plain, role, is_active, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, TRUE, ?)
                     """,
                     (
                         name,
                         email,
                         phone or None,
                         generate_password_hash(password),
+                        password,
                         role,
                         datetime.now().isoformat(timespec="seconds"),
                     ),
@@ -3117,12 +3127,12 @@ def users():
             flash("A user with that email already exists.", "error")
             return redirect(url_for("users"))
 
-        flash("User created.", "success")
+        flash(f"User created. Temporary password for {name}: {password}", "success")
         return redirect(url_for("users"))
 
     with get_db_connection() as conn:
         users_list = conn.execute(
-            "SELECT id, name, email, phone, role, created_at FROM users ORDER BY role, name"
+            "SELECT id, name, email, phone, role, temp_password_plain, created_at FROM users WHERE COALESCE(is_active, TRUE) = TRUE ORDER BY role, name"
         ).fetchall()
     return render_template("users.html", users=users_list, roles=ROLES, default_role=default_role)
 
@@ -3143,11 +3153,35 @@ def update_user_password(user_id: int):
             return redirect(url_for("users"))
 
         conn.execute(
-            "UPDATE users SET password = ? WHERE id = ?",
-            (generate_password_hash(password), user_id),
+            "UPDATE users SET password = ?, temp_password_plain = ? WHERE id = ? AND COALESCE(is_active, TRUE) = TRUE",
+            (generate_password_hash(password), password, user_id),
         )
 
     flash(f"Temporary password updated for {user_record['name']}.", "success")
+    return redirect(url_for("users"))
+
+
+@app.route("/users/<int:user_id>/reset-password", methods=("POST",))
+@login_required
+@role_required("admin")
+def reset_user_password(user_id: int):
+    temporary_password = generate_temporary_password()
+
+    with get_db_connection() as conn:
+        user_record = conn.execute(
+            "SELECT name FROM users WHERE id = ? AND COALESCE(is_active, TRUE) = TRUE",
+            (user_id,),
+        ).fetchone()
+        if user_record is None:
+            flash("User not found.", "error")
+            return redirect(url_for("users"))
+
+        conn.execute(
+            "UPDATE users SET password = ?, temp_password_plain = ? WHERE id = ?",
+            (generate_password_hash(temporary_password), temporary_password, user_id),
+        )
+
+    flash(f"Password reset for {user_record['name']}. Temporary password: {temporary_password}", "success")
     return redirect(url_for("users"))
 
 
@@ -3160,7 +3194,10 @@ def delete_user(user_id: int):
         return redirect(url_for("users"))
 
     with get_db_connection() as conn:
-        user_record = conn.execute("SELECT id, name, role FROM users WHERE id = ?", (user_id,)).fetchone()
+        user_record = conn.execute(
+            "SELECT id, name, role FROM users WHERE id = ? AND COALESCE(is_active, TRUE) = TRUE",
+            (user_id,),
+        ).fetchone()
         if user_record is None:
             flash("User not found.", "error")
             return redirect(url_for("users"))
@@ -3171,7 +3208,10 @@ def delete_user(user_id: int):
                 flash("You cannot delete the last admin account.", "error")
                 return redirect(url_for("users"))
 
-        conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+        conn.execute(
+            "UPDATE users SET is_active = FALSE, deleted_at = ?, temp_password_plain = NULL WHERE id = ?",
+            (datetime.now().isoformat(timespec="seconds"), user_id),
+        )
 
     flash(f"{user_record['name']} was deleted and can no longer log in.", "success")
     return redirect(url_for("users"))
