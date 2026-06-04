@@ -90,7 +90,6 @@
                         <th>Email</th>
                         <th>Phone</th>
                         <th>Role</th>
-                        <th>Temporary Password</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
@@ -101,17 +100,6 @@
                             <td data-label="Email">{{ user.email }}</td>
                             <td data-label="Phone">{{ user.phone or '—' }}</td>
                             <td data-label="Role">{{ user.role|title }}</td>
-                            <td data-label="Temporary Password">
-                                <div class="user-password-display">
-                                    <div class="password-input-wrap password-preview-wrap">
-                                        <input id="user-password-display-{{ user.id }}" class="password-preview-input" type="password" value="{{ user.temp_password_plain or '' }}" placeholder="No temporary password stored" readonly>
-                                        <button class="icon-button password-toggle" type="button" aria-label="Show password" aria-pressed="false" data-password-toggle data-password-target="user-password-display-{{ user.id }}" {% if not user.temp_password_plain %}disabled{% endif %}>
-                                            <span data-lucide="eye"></span>
-                                        </button>
-                                    </div>
-                                    <small>Visible to admins only</small>
-                                </div>
-                            </td>
                             <td data-label="Actions">
                                 <div class="user-action-buttons">
                                     <form class="user-password-form" method="post" action="{{ url_for('update_user_password', user_id=user.id) }}">

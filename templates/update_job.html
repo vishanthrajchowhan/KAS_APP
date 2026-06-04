@@ -311,11 +311,14 @@
             <button class="button button-primary button-full" type="submit">Save Update</button>
         </form>
     {% elif g.user.role == "client" %}
-        <form class="form-card" method="post" action="{{ url_for('client_comment', job_id=job.id) }}">
+        <form class="form-card" method="post" action="{{ url_for('client_comment', job_id=job.id) }}" enctype="multipart/form-data">
+            <input type="hidden" name="next" value="{{ request.path }}">
             <section class="form-section">
                 <h2>Add Comment</h2>
                 <label for="comment">Message to the office</label>
                 <textarea id="comment" name="comment" rows="4" placeholder="Ask a question or leave feedback about this job."></textarea>
+                <label for="client_comment_files">Photos or files</label>
+                <input id="client_comment_files" name="attachments" type="file" accept="image/png,image/jpeg,image/gif,image/webp,application/pdf,.doc,.docx,.xls,.xlsx" multiple>
             </section>
             <button class="button button-primary button-full" type="submit">Send Comment</button>
         </form>
@@ -441,7 +444,18 @@
                                         {% endfor %}
                                     </div>
                                 {% endif %}
-                                {% if can_manage_receipts and update.receipts %}
+                                {% if g.user.role == "client" and update.receipts %}
+                                    <div class="receipt-list">
+                                        <h3>Attached Files</h3>
+                                        {% for receipt in update.receipts %}
+                                            <div class="receipt-row">
+                                                <a href="{{ receipt.url }}" target="_blank" rel="noopener">
+                                                    {{ receipt.name }}
+                                                </a>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                {% elif can_manage_receipts and update.receipts %}
                                     <div class="receipt-list">
                                         <h3>Receipts / Bills</h3>
                                         {% for receipt in update.receipts %}

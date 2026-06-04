@@ -143,7 +143,7 @@ PROPOSAL_PIPELINE_STATUSES = (
 )
 PAYMENT_STATUSES = ("Not Paid", "Paid")
 ROLES = ("admin", "employee", "client")
-PUBLIC_ENDPOINTS = {"login", "static", "client_portal", "portal_sign", "portal_report"}
+PUBLIC_ENDPOINTS = {"login", "static", "client_portal", "portal_comment", "portal_sign", "portal_report"}
 
 TEMP_PASSWORD_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%"
 
@@ -2223,7 +2223,7 @@ def group_updates(update_rows):
                         "client_visible": normalize_bool(row["client_visible"]),
                     }
                 )
-        if row["receipt_path"]:
+        if row["receipt_path"] and (not is_client() or row["author_role"] == "client"):
             receipt_source = row["receipt_path"] or row["receipt_url"] or ""
             group_lookup[group_key]["receipts"].append(
                 {
@@ -2235,7 +2235,7 @@ def group_updates(update_rows):
             )
 
     if is_client():
-        grouped = [entry for entry in grouped if entry["notes"] or entry["photos"]]
+        grouped = [entry for entry in grouped if entry["notes"] or entry["photos"] or entry["receipts"]]
     return grouped
 
 
@@ -3928,21 +3928,82 @@ def client_comment(job_id):
         return redirect(url_for("index"))
 
     comment = request.form.get("comment", "").strip()
-    if not comment:
-        flash("Please write a comment before submitting.", "error")
-        return redirect(url_for("update_job", job_id=job_id))
+    next_url = request.form.get("next") or ""
+    files = [file for file in request.files.getlist("attachments") if file and file.filename]
+    if not comment and not files:
+        flash("Please write a comment or attach a photo before submitting.", "error")
+        return safe_redirect(next_url) if is_safe_redirect_target(next_url) else redirect(url_for("job_progress", job_id=job_id))
 
     now = datetime.now().isoformat(timespec="seconds")
-    with get_db_connection() as conn:
-        conn.execute(
-            """
-            INSERT INTO updates (job_id, notes, image_path, receipt_path, client_visible, update_group, user_id, author_role, timestamp)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (job_id, comment, None, None, False, uuid.uuid4().hex, g.user["id"], g.user["role"], now),
-        )
-    flash("Comment added.", "success")
-    return redirect(url_for("update_job", job_id=job_id))
+    update_group = uuid.uuid4().hex
+    saved_photos = []
+    saved_files = []
+
+    try:
+        for file in files:
+            if allowed_file(file.filename):
+                saved_photos.append(
+                    save_upload_to_storage(
+                        file,
+                        "job_photos",
+                        "job_photo",
+                        job_id=job_id,
+                        compress_images=True,
+                    )
+                )
+                continue
+            if allowed_receipt_file(file.filename):
+                saved_files.append(
+                    save_upload_to_storage(
+                        file,
+                        "receipts",
+                        "receipt",
+                        job_id=job_id,
+                        compress_images=True,
+                    )
+                )
+                continue
+            else:
+                flash(f"Skipped unsupported file: {file.filename}", "error")
+
+        if not comment and not saved_photos and not saved_files:
+            flash("No comment was sent. Please attach a supported file or write a message.", "error")
+            return safe_redirect(next_url) if is_safe_redirect_target(next_url) else redirect(url_for("job_progress", job_id=job_id))
+
+        with get_db_connection() as conn:
+            if saved_photos:
+                for photo in saved_photos:
+                    conn.execute(
+                        """
+                        INSERT INTO updates (job_id, notes, image_path, photo_url, receipt_path, receipt_url, client_visible, update_group, user_id, author_role, timestamp)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (job_id, comment, photo["path"], photo["url"], None, None, True, update_group, g.user["id"], g.user["role"], now),
+                    )
+            if saved_files:
+                for attached_file in saved_files:
+                    conn.execute(
+                        """
+                        INSERT INTO updates (job_id, notes, image_path, photo_url, receipt_path, receipt_url, client_visible, update_group, user_id, author_role, timestamp)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (job_id, comment, None, None, attached_file["path"], attached_file["url"], True, update_group, g.user["id"], g.user["role"], now),
+                    )
+            if not saved_photos and not saved_files:
+                conn.execute(
+                    """
+                    INSERT INTO updates (job_id, notes, image_path, photo_url, receipt_path, receipt_url, client_visible, update_group, user_id, author_role, timestamp)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (job_id, comment, None, None, None, None, True, update_group, g.user["id"], g.user["role"], now),
+                )
+    except (OSError, RuntimeError, ValueError) as exc:
+        app.logger.exception("Failed to save client comment")
+        flash(f"Comment upload failed: {exc}", "error")
+        return safe_redirect(next_url) if is_safe_redirect_target(next_url) else redirect(url_for("job_progress", job_id=job_id))
+
+    flash("Comment sent.", "success")
+    return safe_redirect(next_url) if is_safe_redirect_target(next_url) else redirect(url_for("job_progress", job_id=job_id))
 
 
 @app.route("/photo/<int:update_id>/visibility", methods=("POST",))
@@ -5579,6 +5640,87 @@ def client_portal(token):
         documents=documents,
         workspace_settings=settings,
     )
+
+
+@app.route("/portal/<token>/comment", methods=("POST",))
+def portal_comment(token):
+    job = get_job_by_portal_token(token)
+    if not job:
+        abort(404)
+
+    comment = request.form.get("comment", "").strip()
+    files = [file for file in request.files.getlist("attachments") if file and file.filename]
+    if not comment and not files:
+        flash("Please write a comment or attach a file before submitting.", "error")
+        return redirect(url_for("client_portal", token=token))
+
+    now = datetime.now().isoformat(timespec="seconds")
+    update_group = uuid.uuid4().hex
+    saved_photos = []
+    saved_files = []
+
+    try:
+        for file in files:
+            if allowed_file(file.filename):
+                saved_photos.append(
+                    save_upload_to_storage(
+                        file,
+                        "job_photos",
+                        "job_photo",
+                        job_id=job["id"],
+                        compress_images=True,
+                    )
+                )
+                continue
+            if allowed_receipt_file(file.filename):
+                saved_files.append(
+                    save_upload_to_storage(
+                        file,
+                        "receipts",
+                        "receipt",
+                        job_id=job["id"],
+                        compress_images=True,
+                    )
+                )
+                continue
+            flash(f"Skipped unsupported file: {file.filename}", "error")
+
+        if not comment and not saved_photos and not saved_files:
+            flash("No comment was sent. Please attach a supported file or write a message.", "error")
+            return redirect(url_for("client_portal", token=token))
+
+        with get_db_connection() as conn:
+            for photo in saved_photos:
+                conn.execute(
+                    """
+                    INSERT INTO updates (job_id, notes, image_path, photo_url, receipt_path, receipt_url, client_visible, update_group, user_id, author_role, timestamp)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (job["id"], comment, photo["path"], photo["url"], None, None, True, update_group, None, "client", now),
+                )
+            for attached_file in saved_files:
+                conn.execute(
+                    """
+                    INSERT INTO updates (job_id, notes, image_path, photo_url, receipt_path, receipt_url, client_visible, update_group, user_id, author_role, timestamp)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (job["id"], comment, None, None, attached_file["path"], attached_file["url"], True, update_group, None, "client", now),
+                )
+            if not saved_photos and not saved_files:
+                conn.execute(
+                    """
+                    INSERT INTO updates (job_id, notes, image_path, photo_url, receipt_path, receipt_url, client_visible, update_group, user_id, author_role, timestamp)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (job["id"], comment, None, None, None, None, True, update_group, None, "client", now),
+                )
+    except (OSError, RuntimeError, ValueError) as exc:
+        app.logger.exception("Failed to save portal comment")
+        flash(f"Comment upload failed: {exc}", "error")
+        return redirect(url_for("client_portal", token=token))
+
+    flash("Comment sent.", "success")
+    return redirect(url_for("client_portal", token=token))
 
 
 @app.route("/portal/<token>/report/<int:walkthrough_id>")

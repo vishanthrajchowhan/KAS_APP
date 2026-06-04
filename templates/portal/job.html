@@ -67,6 +67,11 @@
       <div class="update-dot" style="{% if loop.index > 1 %}background:#d1d5db;{% endif %}"></div>
       <div>
         <div class="update-text">{{ update.notes or 'Site photos and progress logged.' }}</div>
+        {% if update.receipt_url and update.author_role == 'client' %}
+          <div style="margin-top:8px;">
+            <a href="{{ update.receipt_url }}" class="btn" target="_blank" rel="noopener">View attachment</a>
+          </div>
+        {% endif %}
         <div class="update-meta">{{ update.timestamp[:10] if update.timestamp else '' }} · {{ (update.author_role or 'team')|title }}</div>
       </div>
     </div>
@@ -74,6 +79,17 @@
   </div>
 </div>
 {% endif %}
+
+<div class="card">
+  <div class="section-label">SEND A COMMENT</div>
+  <form method="post" action="{{ url_for('portal_comment', token=token) }}" enctype="multipart/form-data">
+    <label for="portal-comment" style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:6px;">Message</label>
+    <textarea id="portal-comment" name="comment" rows="4" placeholder="Ask a question or send an update to the office." style="width:100%;border:1px solid #d1d5db;border-radius:10px;padding:10px 12px;margin-bottom:12px;"></textarea>
+    <label for="portal-attachments" style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:6px;">Photos or files</label>
+    <input id="portal-attachments" name="attachments" type="file" accept="image/png,image/jpeg,image/gif,image/webp,application/pdf,.doc,.docx,.xls,.xlsx" multiple style="width:100%;margin-bottom:14px;">
+    <button class="btn btn-primary" type="submit">Send Comment</button>
+  </form>
+</div>
 
 {% set photos = updates | selectattr('photo_url') | list %}
 {% if photos %}
