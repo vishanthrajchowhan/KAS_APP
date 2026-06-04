@@ -61,7 +61,12 @@
             <div class="form-grid two">
                 <div>
                     <label for="password">Temporary Password</label>
-                    <input id="password" name="password" type="password" minlength="6">
+                    <div class="password-input-wrap">
+                        <input id="password" name="password" type="password" minlength="6">
+                        <button class="icon-button password-toggle" type="button" aria-label="Show password" aria-pressed="false" data-password-toggle data-password-target="password">
+                            <span data-lucide="eye"></span>
+                        </button>
+                    </div>
                 </div>
                 <div></div>
             </div>

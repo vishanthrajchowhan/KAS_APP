@@ -44,7 +44,7 @@
         <label for="password">Password</label>
         <div class="password-input-wrap">
             <input id="password" name="password" type="password" autocomplete="current-password">
-            <button class="icon-button password-toggle" id="password-toggle" type="button" aria-label="Show password">
+            <button class="icon-button password-toggle" type="button" aria-label="Show password" aria-pressed="false" data-password-toggle data-password-target="password">
                 <span data-lucide="eye"></span>
             </button>
         </div>
@@ -57,23 +57,4 @@
         <button class="button button-primary button-full" type="submit">Sign In</button>
     </form>
 </section>
-
-<script>
-(() => {
-    const password = document.getElementById('password');
-    const toggle = document.getElementById('password-toggle');
-    if (!password || !toggle) {
-        return;
-    }
-    toggle.addEventListener('click', () => {
-        const showing = password.type === 'text';
-        password.type = showing ? 'password' : 'text';
-        toggle.setAttribute('aria-label', showing ? 'Show password' : 'Hide password');
-        toggle.innerHTML = `<span data-lucide="${showing ? 'eye' : 'eye-off'}"></span>`;
-        if (window.lucide && typeof window.lucide.createIcons === 'function') {
-            window.lucide.createIcons();
-        }
-    });
-})();
-</script>
 {% endblock %}

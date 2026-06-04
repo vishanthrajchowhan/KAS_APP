@@ -139,6 +139,30 @@
         }
     }
 
+    function setupPasswordToggles() {
+        document.querySelectorAll('[data-password-toggle]').forEach((toggle) => {
+            if (toggle.dataset.passwordToggleBound === 'true') {
+                return;
+            }
+
+            const targetId = toggle.dataset.passwordTarget;
+            const passwordInput = targetId ? document.getElementById(targetId) : null;
+            if (!passwordInput) {
+                return;
+            }
+
+            toggle.dataset.passwordToggleBound = 'true';
+            toggle.addEventListener('click', () => {
+                const showing = passwordInput.type === 'text';
+                passwordInput.type = showing ? 'password' : 'text';
+                toggle.setAttribute('aria-label', showing ? 'Show password' : 'Hide password');
+                toggle.setAttribute('aria-pressed', showing ? 'false' : 'true');
+                toggle.innerHTML = `<span data-lucide="${showing ? 'eye' : 'eye-off'}"></span>`;
+                setupIcons();
+            });
+        });
+    }
+
     function setupUploadForms() {
         document.querySelectorAll('form[enctype="multipart/form-data"]').forEach((form) => {
             form.addEventListener('submit', () => {
@@ -163,6 +187,7 @@
         setupStaggerGroups();
         setupButtons();
         setupServiceChipSelectors();
+        setupPasswordToggles();
         setupUploadForms();
         setupIcons();
         setupPWAInstall();

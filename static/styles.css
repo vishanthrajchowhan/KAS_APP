@@ -3604,19 +3604,47 @@ body {
 .media-bulk-actions {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 10px;
+    flex-wrap: wrap;
+    gap: 12px;
     margin: 14px 0 4px;
-    padding: 10px 12px;
-    border: 1px solid var(--line);
-    border-radius: 10px;
-    background: var(--surface-2);
+    padding: 10px 14px;
+    border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+    border-radius: 14px;
+    background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 96%, transparent), color-mix(in srgb, var(--surface-2) 92%, transparent));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28);
 }
 
 .media-bulk-actions span {
     color: var(--muted);
-    font-size: 0.82rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.73rem;
     font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.media-bulk-actions span::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--primary) 78%, white);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 12%, transparent);
+}
+
+.media-bulk-actions .button {
+    margin-left: auto;
+    min-height: 36px;
+    padding: 8px 14px;
+    border-radius: 999px;
+}
+
+.media-bulk-actions .button.button-danger {
+    border-color: color-mix(in srgb, var(--danger-text) 18%, transparent);
+    background: color-mix(in srgb, var(--danger-bg) 55%, var(--surface));
+    color: var(--danger-text);
 }
 
 .media-tile-frame {
@@ -3631,28 +3659,67 @@ body {
 
 .media-select {
     position: absolute;
-    top: 6px;
-    left: 6px;
+    top: 10px;
+    right: 10px;
     z-index: 1;
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    max-width: calc(100% - 12px);
-    padding: 3px 6px;
+    gap: 5px;
+    max-width: calc(100% - 20px);
+    padding: 4px 8px 4px 6px;
+    border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
     border-radius: 999px;
-    background: color-mix(in srgb, var(--surface) 92%, transparent);
+    background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 84%, transparent), color-mix(in srgb, var(--surface-2) 78%, transparent));
+    backdrop-filter: blur(12px);
     color: var(--ink);
-    box-shadow: var(--shadow-sm);
-    font-size: 0.64rem;
+    box-shadow: 0 12px 22px rgba(20, 27, 21, 0.12);
+    font-size: 0.52rem;
     font-weight: 800;
-    letter-spacing: 0.02em;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+}
+
+.media-select:hover,
+.media-select:focus-within {
+    border-color: color-mix(in srgb, var(--primary) 24%, transparent);
+    background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 90%, transparent), color-mix(in srgb, var(--surface-2) 84%, transparent));
+    box-shadow: 0 14px 28px rgba(20, 27, 21, 0.16);
+    transform: translateY(-1px);
+}
+
+.media-select span {
+    white-space: nowrap;
 }
 
 .media-select input,
 .media-checkbox {
-    width: 13px;
-    height: 13px;
-    accent-color: var(--danger-text);
+    width: 11px;
+    height: 11px;
+    margin: 0;
+    accent-color: var(--primary);
+}
+
+@media (max-width: 640px) {
+    .media-bulk-actions {
+        align-items: stretch;
+    }
+
+    .media-bulk-actions .button {
+        margin-left: 0;
+        width: 100%;
+        justify-content: center;
+    }
+
+    .media-select {
+        top: 8px;
+        right: 8px;
+        padding: 4px 7px 4px 6px;
+    }
+
+    .media-select span {
+        letter-spacing: 0.1em;
+    }
 }
 
 .image-visibility-toggle {
