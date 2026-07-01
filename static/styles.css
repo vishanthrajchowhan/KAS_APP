@@ -622,6 +622,24 @@ h3 {
     margin: 0;
 }
 
+.user-action-buttons > details {
+    margin: 0;
+}
+
+.user-action-buttons > details > summary {
+    list-style: none;
+}
+
+.user-action-buttons > details > summary::-webkit-details-marker {
+    display: none;
+}
+
+.user-edit-form {
+    display: grid;
+    gap: 8px;
+    margin-top: 8px;
+}
+
 .user-password-display {
     display: grid;
     gap: 6px;

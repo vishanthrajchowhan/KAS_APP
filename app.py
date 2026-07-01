@@ -2953,6 +2953,61 @@ def update_user_password(user_id: int):
     return redirect(url_for("users") if is_admin() else url_for("index"))
 
 
+@app.route("/users/<int:user_id>/update", methods=("POST",))
+@login_required
+@role_required("admin")
+def update_user(user_id: int):
+    name = request.form.get("name", "").strip()
+    email = request.form.get("email", "").strip().lower()
+    phone = request.form.get("phone", "").strip()
+    role = request.form.get("role", "").strip().lower()
+
+    if not name or role not in ROLES:
+        flash("Please enter a name and valid role.", "error")
+        return redirect(url_for("users"))
+
+    if not email:
+        email = build_placeholder_email(name)
+
+    try:
+        with get_db_connection() as conn:
+            user_record = conn.execute(
+                "SELECT id, name, role FROM users WHERE id = ? AND COALESCE(is_active, TRUE) = TRUE",
+                (user_id,),
+            ).fetchone()
+            if user_record is None:
+                flash("User not found.", "error")
+                return redirect(url_for("users"))
+
+            if user_record["role"] == "admin" and role != "admin":
+                admin_count = conn.execute(
+                    "SELECT COUNT(*) AS total FROM users WHERE role = 'admin' AND COALESCE(is_active, TRUE) = TRUE"
+                ).fetchone()
+                if admin_count is not None and int(admin_count["total"] or 0) <= 1:
+                    flash("You cannot remove the last admin role.", "error")
+                    return redirect(url_for("users"))
+
+            conn.execute(
+                """
+                UPDATE users
+                SET name = ?, email = ?, phone = ?, role = ?
+                WHERE id = ? AND COALESCE(is_active, TRUE) = TRUE
+                """,
+                (name, email, phone or None, role, user_id),
+            )
+    except errors.UniqueViolation:
+        flash("A user with that email already exists.", "error")
+        return redirect(url_for("users"))
+    except sqlite3.IntegrityError as exc:
+        if "UNIQUE constraint failed" in str(exc):
+            flash("A user with that email already exists.", "error")
+            return redirect(url_for("users"))
+        raise
+
+    flash(f"User details updated for {name}.", "success")
+    return redirect(url_for("users"))
+
+
 @app.route("/users/<int:user_id>/reset-password", methods=("POST",))
 @login_required
 @role_required("admin")
