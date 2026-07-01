@@ -3522,6 +3522,18 @@ def job_progress(job_id):
             """,
             (job_id,),
         ).fetchone()
+        progress_report_where = "AND COALESCE(client_visible, FALSE) = TRUE" if is_client() else ""
+        progress_reports = conn.execute(
+            f"""
+            SELECT id, name, file_url, created_at, client_visible
+            FROM documents
+            WHERE job_id = ?
+              AND document_type = 'Progress Report'
+              {progress_report_where}
+            ORDER BY created_at DESC, id DESC
+            """,
+            (job_id,),
+        ).fetchall()
         tasks = fetch_job_tasks(conn, job_id)
         sync_job_tasks(conn, job_id, split_services(job["service_type"]), job["description"] or "", job["other_service_details"] or "")
         tasks = fetch_job_tasks(conn, job_id)
@@ -3537,6 +3549,7 @@ def job_progress(job_id):
         can_view_financials=can_view_financials(),
         can_manage_receipts=can_manage_receipts(),
         can_manage_jobs=can_manage_jobs(),
+        progress_reports=progress_reports,
         tasks=tasks,
         task_summary=task_progress_summary(tasks),
     )
