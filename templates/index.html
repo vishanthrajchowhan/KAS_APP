@@ -279,6 +279,7 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
             <div class="bar-list">
                 {% for status_name, count in status_counts.items() %}
+                    {% if status_name != 'In Progress' %}
                     {% set ratio = (count / total_jobs * 100) if total_jobs else 0 %}
                     <div class="bar-row">
                         <div class="bar-label-row">
@@ -289,6 +290,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             <div class="bar-fill" style="--bar-width: {{ '%.1f'|format(ratio) }}%;"></div>
                         </div>
                     </div>
+                    {% endif %}
                 {% endfor %}
             </div>
         {% else %}

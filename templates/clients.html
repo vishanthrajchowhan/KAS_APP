@@ -36,16 +36,6 @@
             <p>Repeat Clients</p>
             <small>Accounts with multiple projects</small>
         </div>
-        <div class="stat-card glass-panel reveal">
-            <span class="kpi-value" data-count="{{ total_spent|int }}">{{ money(total_spent or 0) }}</span>
-            <p>Total Spent</p>
-            <small>Paid project value on file</small>
-        </div>
-        <div class="stat-card glass-panel reveal">
-            <span class="kpi-value" data-count="{{ outstanding_balance|int }}">{{ money(outstanding_balance or 0) }}</span>
-            <p>Outstanding Balance</p>
-            <small>Open invoice value</small>
-        </div>
     </section>
 
     <section class="person-grid stagger-grid" aria-label="Client cards">

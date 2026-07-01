@@ -3,28 +3,55 @@
 {% block title %}Add Lead | KAS{% endblock %}
 
 {% block content %}
-<section class="form-shell">
-    <div class="page-title compact">
-        <div>
+<section class="jobs-page management-page">
+    <section class="page-hero glass-panel reveal">
+        <div class="hero-copy shell-copy">
             <p class="eyebrow">Pipeline Intake</p>
             <h1>Add Lead</h1>
-            <p>Create a sales pipeline record before it becomes a scheduled job.</p>
+            <p>Create a polished job record with services, assignment, and client access in one premium workflow.</p>
+            <div class="dashboard-tags">
+                <span class="dashboard-tag">Smart scope points</span>
+                <span class="dashboard-tag">Team assignment</span>
+                <span class="dashboard-tag">Portal ready</span>
+            </div>
         </div>
-    </div>
+        <div class="hero-actions">
+            <a class="button" href="{{ url_for('jobs') }}">Back to Jobs</a>
+        </div>
+    </section>
 
-    <form class="form-card" method="post" action="{{ url_for('add_job') }}">
-        <label for="name">Job Name</label>
-        <input id="name" name="name" type="text" value="{{ name or '' }}" maxlength="120" autocomplete="off">
+    <form class="form-card glass-panel reveal" method="post" action="{{ url_for('add_job') }}">
+        <section class="form-section">
+            <h2>Project Basics</h2>
+            <div class="form-grid two">
+                <div>
+                    <label for="name">Job Name</label>
+                    <input id="name" name="name" type="text" value="{{ name or '' }}" maxlength="120" autocomplete="off" required>
+                </div>
+                <div>
+                    <label for="status">Starting Stage</label>
+                    <select id="status" name="status">
+                        {% for pipeline_status in statuses %}
+                            <option value="{{ pipeline_status }}" {% if (status or 'Lead') == pipeline_status %}selected{% endif %}>{{ pipeline_status }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="form-grid two">
+                <div>
+                    <label for="client_name">Client Name</label>
+                    <input id="client_name" name="client_name" type="text" value="{{ client_name or '' }}" maxlength="140" autocomplete="name">
+                </div>
+                <div>
+                    <label for="location">Location</label>
+                    <input id="location" name="location" type="text" value="{{ location or '' }}" maxlength="180" autocomplete="street-address" placeholder="Street, city, state">
+                </div>
+            </div>
+        </section>
 
-        <label for="client_name">Client Name</label>
-        <input id="client_name" name="client_name" type="text" value="{{ client_name or '' }}" maxlength="140" autocomplete="name">
-
-        <label for="location">Location</label>
-        <input id="location" name="location" type="text" value="{{ location or '' }}" maxlength="180" autocomplete="street-address">
-
-        <div class="form-section service-type-section" data-service-points>
-            <label>Services</label>
-            <p class="help-text">Add each service as its own point. Use Add Service to create more lines.</p>
+        <section class="form-section service-type-section" data-service-points>
+            <h2>Scope Tasks</h2>
+            <p class="help-text">Each service point becomes part of the scope for this job.</p>
             <div class="task-add-list" data-service-points-list>
                 {% set services = selected_service_types if selected_service_types else [''] %}
                 {% for service in services %}
@@ -38,35 +65,31 @@
                 {% endfor %}
             </div>
             <button type="button" class="button" data-add-service-point>Add Service</button>
-        </div>
+        </section>
 
-        <label for="status">Starting Stage</label>
-        <select id="status" name="status">
-            {% for pipeline_status in statuses %}
-                <option value="{{ pipeline_status }}" {% if (status or 'Lead') == pipeline_status %}selected{% endif %}>{{ pipeline_status }}</option>
-            {% endfor %}
-        </select>
-
-        <div class="form-grid two">
-            <div>
-                <label for="assigned_to">Assign Employee</label>
-                <select id="assigned_to" name="assigned_to">
-                    <option value="">Unassigned</option>
-                    {% for employee in employees %}
-                        <option value="{{ employee.id }}" {% if assigned_to == employee.id %}selected{% endif %}>{{ employee.name }} ({{ employee.email }})</option>
-                    {% endfor %}
-                </select>
+        <section class="form-section">
+            <h2>Team and Access</h2>
+            <div class="form-grid two">
+                <div>
+                    <label for="assigned_to">Assign Employee</label>
+                    <select id="assigned_to" name="assigned_to">
+                        <option value="">Unassigned</option>
+                        {% for employee in employees %}
+                            <option value="{{ employee.id }}" {% if assigned_to == employee.id %}selected{% endif %}>{{ employee.name }} ({{ employee.email }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label for="client_id">Client Portal User</label>
+                    <select id="client_id" name="client_id">
+                        <option value="">No client access yet</option>
+                        {% for client in clients %}
+                            <option value="{{ client.id }}" {% if client_id == client.id %}selected{% endif %}>{{ client.name }} ({{ client.email }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
             </div>
-            <div>
-                <label for="client_id">Client Portal User</label>
-                <select id="client_id" name="client_id">
-                    <option value="">No client access yet</option>
-                    {% for client in clients %}
-                        <option value="{{ client.id }}" {% if client_id == client.id %}selected{% endif %}>{{ client.name }} ({{ client.email }})</option>
-                    {% endfor %}
-                </select>
-            </div>
-        </div>
+        </section>
 
         <div class="form-grid two">
             <button class="button button-primary button-full" type="submit">Create Lead</button>

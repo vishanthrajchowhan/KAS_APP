@@ -2844,7 +2844,9 @@ def add_job():
             if job_row:
                 sync_job_tasks(conn, job_row["id"], selected_service_types, description, other_service_details)
         flash("CRM job created.", "success")
-        return redirect(url_for("index"))
+        if job_row:
+            return redirect(url_for("job_progress", job_id=job_row["id"]))
+        return redirect(url_for("jobs"))
 
     with get_db_connection() as conn:
         employees = conn.execute(

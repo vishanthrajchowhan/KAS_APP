@@ -63,8 +63,6 @@
                     {% if g.user.role == 'admin' %}
                         <a class="nav-link {% if request.endpoint == 'clients' %}active{% endif %}" href="{{ url_for('clients') }}"><span class="nav-icon" data-lucide="users"></span><span>Clients</span></a>
                         <a class="nav-link {% if request.endpoint == 'employees' %}active{% endif %}" href="{{ url_for('employees') }}"><span class="nav-icon" data-lucide="user-check"></span><span>Employees</span></a>
-                        <a class="nav-link {% if request.endpoint in ['update_job', 'job_progress', 'submit_update'] %}active{% endif %}" href="{{ url_for('index', sort='updated') }}"><span class="nav-icon" data-lucide="bell"></span><span>Updates</span></a>
-                        <a class="nav-link {% if request.endpoint == 'analytics' %}active{% endif %}" href="{{ url_for('analytics') }}"><span class="nav-icon" data-lucide="bar-chart-3"></span><span>Analytics</span></a>
                         <a class="nav-link {% if request.endpoint == 'settings' %}active{% endif %}" href="{{ url_for('settings') }}"><span class="nav-icon" data-lucide="settings-2"></span><span>Settings</span></a>
                     {% endif %}
                 </nav>
@@ -187,7 +185,6 @@
                     <a href="{{ url_for('employees') }}" class="{% if request.endpoint == 'employees' %}active{% endif %}"><span data-lucide="user-check"></span><span>Employees</span></a>
                     <a href="{{ url_for('settings') }}" class="{% if request.endpoint == 'settings' %}active{% endif %}"><span data-lucide="settings-2"></span><span>Settings</span></a>
                 {% else %}
-                    <a href="{{ url_for('index', sort='updated') }}"><span data-lucide="bell"></span><span>Updates</span></a>
                     <form method="post" action="{{ url_for('logout') }}"><button type="submit">Sign Out</button></form>
                 {% endif %}
             </nav>
