@@ -1670,6 +1670,12 @@ def parse_service_points(values):
     return points
 
 
+def build_placeholder_email(name: str = "user"):
+    slug = re.sub(r"[^a-z0-9]+", "-", (name or "user").strip().lower()).strip("-") or "user"
+    token = uuid.uuid4().hex[:8]
+    return f"{slug}-{token}@no-email.local"
+
+
 def sanitize_selected_services(values, allowed_services):
     allowed = set(allowed_services)
     selected = []
@@ -2763,7 +2769,6 @@ def add_job():
         selected_service_types = parse_service_points(request.form.getlist("service_points"))
         service_type = compose_service_text(selected_service_types)
         other_service_details = ""
-        description = request.form.get("description", "").strip()
         status = request.form.get("status", "Lead").strip()
         proposal_amount = parse_money(request.form.get("proposal_amount"))
         proposal_sent_date = parse_date(request.form.get("proposal_sent_date"))
@@ -2791,7 +2796,6 @@ def add_job():
                 due_date=due_date,
                 selected_service_types=selected_service_types,
                 other_service_details=other_service_details,
-                description=description,
                 status=status,
                 proposal_amount=proposal_amount,
                 proposal_sent_date=proposal_sent_date,
@@ -2803,7 +2807,7 @@ def add_job():
             )
 
         location = location or "TBD"
-        description = description or other_service_details or "No description provided."
+        description = compose_service_text(selected_service_types) or "No description provided."
 
         now = datetime.now().isoformat(timespec="seconds")
         with get_db_connection() as conn:
@@ -2871,9 +2875,14 @@ def users():
         password = request.form.get("password", "")
         role = request.form.get("role", "").strip().lower()
 
-        if not name or not email or not password or role not in ROLES:
-            flash("Please enter a name, email, password, and valid role.", "error")
+        if not name or not password or role not in ROLES:
+            flash("Please enter a name, password, and valid role.", "error")
             return redirect(url_for("users"))
+
+        generated_email = False
+        if not email:
+            email = build_placeholder_email(name)
+            generated_email = True
 
         try:
             with get_db_connection() as conn:
@@ -2896,7 +2905,13 @@ def users():
             flash("A user with that email already exists.", "error")
             return redirect(url_for("users"))
 
-        flash(f"User created. Temporary password for {name}: {password}", "success")
+        if generated_email:
+            flash(
+                f"User created. Generated email for {name}: {email}. Temporary password: {password}",
+                "success",
+            )
+        else:
+            flash(f"User created. Temporary password for {name}: {password}", "success")
         return redirect(url_for("users"))
 
     with get_db_connection() as conn:
@@ -3487,7 +3502,6 @@ def submit_update():
     selected_service_types = parse_service_points(request.form.getlist("service_points"))
     service_type = compose_service_text(selected_service_types)
     other_service_details = ""
-    due_date = request.form.get("due_date", "").strip() or None
 
     if not job_id:
         flash("Please choose a valid job.", "error")
@@ -3499,6 +3513,8 @@ def submit_update():
     if not can_update_job(job):
         flash("You do not have permission to update that job.", "error")
         return redirect(url_for("index"))
+
+    due_date = job["due_date"] or None
 
     # These fields are intentionally managed outside the update form.
     proposal_amount = job["proposal_amount"]
@@ -3522,7 +3538,6 @@ def submit_update():
         client_id = job["client_id"]
         service_type = job["service_type"] or ""
         other_service_details = job["other_service_details"] or ""
-        due_date = job["due_date"] or None
 
     if status == "Rejected" and not rejection_reason:
         flash("Please add a rejection reason before marking a job rejected.", "error")

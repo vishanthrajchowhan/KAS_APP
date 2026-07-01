@@ -33,7 +33,7 @@
                             <span>Service Point</span>
                             <input name="service_points" type="text" maxlength="140" value="{{ service }}" placeholder="Example: Exterior painting">
                         </label>
-                        <button type="button" class="button" data-remove-service-point>Remove</button>
+                        <button type="button" class="button button-compact" style="width:auto;min-width:88px;padding:0.5rem 0.8rem;align-self:end;white-space:nowrap;" data-remove-service-point>Remove</button>
                     </div>
                 {% endfor %}
             </div>
@@ -68,10 +68,6 @@
             </div>
         </div>
 
-        <label for="description">Scope of Work</label>
-        <textarea id="description" name="description" rows="5" placeholder="Enter one scope item per line&#10;Example:&#10;Remove failed sealant&#10;Install backer rod&#10;Apply new sealant">{{ description or '' }}</textarea>
-        <p class="help-text">Each line becomes a job task in the checklist.</p>
-
         <div class="form-grid two">
             <button class="button button-primary button-full" type="submit">Create Lead</button>
             <a class="button button-full" href="{{ url_for('index') }}">Cancel</a>
@@ -94,7 +90,7 @@ if (servicePointsRoot) {
                 <span>Service Point</span>
                 <input name="service_points" type="text" maxlength="140" placeholder="Example: Exterior painting">
             </label>
-            <button type="button" class="button" data-remove-service-point>Remove</button>
+            <button type="button" class="button button-compact" style="width:auto;min-width:88px;padding:0.5rem 0.8rem;align-self:end;white-space:nowrap;" data-remove-service-point>Remove</button>
         `;
         row.querySelector('input').value = value;
         return row;

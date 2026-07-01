@@ -107,7 +107,7 @@
                                         <span>Service Point</span>
                                         <input name="service_points" type="text" maxlength="140" value="{{ service }}" placeholder="Example: Exterior painting">
                                     </label>
-                                    <button type="button" class="button" data-remove-service-point>Remove</button>
+                                    <button type="button" class="button button-compact" style="width:auto;min-width:88px;padding:0.5rem 0.8rem;align-self:end;white-space:nowrap;" data-remove-service-point>Remove</button>
                                 </div>
                             {% endfor %}
                         </div>
@@ -135,8 +135,6 @@
                         </div>
                     </div>
 
-                    <label for="due_date">Due Date</label>
-                    <input id="due_date" name="due_date" type="date" value="{{ job.due_date or '' }}">
                 {% endif %}
 
             </section>
@@ -437,7 +435,7 @@ if (servicePointsRoot) {
                 <span>Service Point</span>
                 <input name="service_points" type="text" maxlength="140" placeholder="Example: Exterior painting">
             </label>
-            <button type="button" class="button" data-remove-service-point>Remove</button>
+            <button type="button" class="button button-compact" style="width:auto;min-width:88px;padding:0.5rem 0.8rem;align-self:end;white-space:nowrap;" data-remove-service-point>Remove</button>
         `;
         row.querySelector('input').value = value;
         return row;
