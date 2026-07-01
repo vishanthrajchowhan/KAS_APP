@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block title %}Add Lead | KAS{% endblock %}
+
+{% block content %}
+<section class="form-shell">
+    <div class="page-title compact">
+        <div>
+            <p class="eyebrow">Pipeline Intake</p>
+            <h1>Add Lead</h1>
+            <p>Create a sales pipeline record before it becomes a scheduled job.</p>
+        </div>
+    </div>
+
+    <form class="form-card" method="post" action="{{ url_for('add_job') }}">
+        <label for="name">Job Name</label>
+        <input id="name" name="name" type="text" value="{{ name or '' }}" maxlength="120" autocomplete="off">
+
+        <label for="client_name">Client Name</label>
+        <input id="client_name" name="client_name" type="text" value="{{ client_name or '' }}" maxlength="140" autocomplete="name">
+
+        <label for="location">Location</label>
+        <input id="location" name="location" type="text" value="{{ location or '' }}" maxlength="180" autocomplete="street-address">
+
+        <div class="form-section service-type-section">
+            <label>Service Types</label>
+            <details class="service-multi-select">
+                <summary>Choose one or more services</summary>
+                <div class="service-chip-selector" data-service-chip-selector data-other-value="Other" data-other-wrapper-id="other-service-wrapper" data-other-input-id="other_service_details" data-preview-id="service-chip-preview">
+                    {% for option in service_types %}
+                        <label class="service-chip-option">
+                            <input type="checkbox" name="service_type" value="{{ option }}" {% if option in (selected_service_types or []) %}checked{% endif %}>
+                            <span>{{ option }}{% if option == 'Other' %} +{% endif %}</span>
+                        </label>
+                    {% endfor %}
+                </div>
+            </details>
+            <p class="help-text">Services organize the job. The actual job tasks come from your scope of work.</p>
+            <div id="service-chip-preview" class="service-chip-preview" aria-live="polite"></div>
+
+            <div id="other-service-wrapper" {% if 'Other' not in (selected_service_types or []) %}hidden{% endif %}>
+                <label for="other_service_details">Other Service Details</label>
+                <textarea id="other_service_details" name="other_service_details" rows="3" placeholder="Describe the requested service (e.g. stucco patching + elastomeric coating)">{{ other_service_details or '' }}</textarea>
+            </div>
+        </div>
+
+        <label for="status">Starting Stage</label>
+        <select id="status" name="status">
+            {% for pipeline_status in statuses %}
+                <option value="{{ pipeline_status }}" {% if (status or 'Lead') == pipeline_status %}selected{% endif %}>{{ pipeline_status }}</option>
+            {% endfor %}
+        </select>
+
+        <div class="form-grid two">
+            <div>
+                <label for="assigned_to">Assign Employee</label>
+                <select id="assigned_to" name="assigned_to">
+                    <option value="">Unassigned</option>
+                    {% for employee in employees %}
+                        <option value="{{ employee.id }}" {% if assigned_to == employee.id %}selected{% endif %}>{{ employee.name }} ({{ employee.email }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label for="client_id">Client Portal User</label>
+                <select id="client_id" name="client_id">
+                    <option value="">No client access yet</option>
+                    {% for client in clients %}
+                        <option value="{{ client.id }}" {% if client_id == client.id %}selected{% endif %}>{{ client.name }} ({{ client.email }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <label for="description">Scope of Work</label>
+        <textarea id="description" name="description" rows="5" placeholder="Enter one scope item per line&#10;Example:&#10;Remove failed sealant&#10;Install backer rod&#10;Apply new sealant">{{ description or '' }}</textarea>
+        <p class="help-text">Each line becomes a job task. If you leave this as a single paragraph, the app will use the selected services as the starting tasks.</p>
+
+        <div class="form-grid two">
+            <button class="button button-primary button-full" type="submit">Create Lead</button>
+            <a class="button button-full" href="{{ url_for('index') }}">Cancel</a>
+        </div>
+    </form>
+</section>
+{% endblock %}

@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+
+{% block title %}Access Management | KAS{% endblock %}
+
+{% block content %}
+<section class="page-title">
+    <div>
+        <p class="eyebrow">Access Management</p>
+        <h1>Users</h1>
+        <p>Create admin, employee, and client accounts for secure access.</p>
+    </div>
+</section>
+
+<section class="dashboard-stats" aria-label="User summary">
+    <div>
+        <span>{{ users|length }}</span>
+        <p>Total Users</p>
+    </div>
+    <div>
+        <span>{{ users|selectattr('role', 'equalto', 'admin')|list|length }}</span>
+        <p>Admins</p>
+    </div>
+    <div>
+        <span>{{ users|selectattr('role', 'equalto', 'employee')|list|length }}</span>
+        <p>Employees</p>
+    </div>
+    <div>
+        <span>{{ users|selectattr('role', 'equalto', 'client')|list|length }}</span>
+        <p>Clients</p>
+    </div>
+</section>
+
+<section class="form-shell">
+    <form class="form-card" method="post" action="{{ url_for('users') }}">
+        <section class="form-section">
+            <h2>Add User</h2>
+            <div class="form-grid two">
+                <div>
+                    <label for="name">Name</label>
+                    <input id="name" name="name" type="text" maxlength="140">
+                </div>
+                <div>
+                    <label for="email">Email</label>
+                    <input id="email" name="email" type="email" maxlength="180">
+                </div>
+            </div>
+            <div class="form-grid two">
+                <div>
+                    <label for="phone">Phone</label>
+                    <input id="phone" name="phone" type="tel" maxlength="30" placeholder="(954) 555-0123">
+                </div>
+                <div>
+                    <label for="role">Role</label>
+                    <select id="role" name="role">
+                        {% for role in roles %}
+                            <option value="{{ role }}" {% if default_role == role %}selected{% endif %}>{{ role|title }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="form-grid two">
+                <div>
+                    <label for="password">Temporary Password</label>
+                    <div class="password-input-wrap">
+                        <input id="password" name="password" type="password" minlength="6">
+                        <button class="icon-button password-toggle" type="button" aria-label="Show password" aria-pressed="false" data-password-toggle data-password-target="password">
+                            <span data-lucide="eye"></span>
+                        </button>
+                    </div>
+                </div>
+                <div></div>
+            </div>
+        </section>
+        <button class="button button-primary button-full" type="submit">Create User</button>
+    </form>
+</section>
+
+<section class="updates">
+    <h2>Existing Users</h2>
+    {% if users %}
+        <div class="form-section">
+            <label for="user-table-search">Search users</label>
+            <input id="user-table-search" type="search" placeholder="Filter by name, email, or role" oninput="(function(v){document.querySelectorAll('#users-table tbody tr').forEach(function(r){r.style.display=r.textContent.toLowerCase().indexOf(v.toLowerCase())>-1?'':'none';});})(this.value)">
+        </div>
+        <div class="table-card">
+            <table id="users-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Phone</th>
+                        <th>Role</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                        <tr>
+                            <td data-label="Name">{{ user.name }}</td>
+                            <td data-label="Email">{{ user.email }}</td>
+                            <td data-label="Phone">{{ user.phone or '—' }}</td>
+                            <td data-label="Role">{{ user.role|title }}</td>
+                            <td data-label="Actions">
+                                <div class="user-action-buttons">
+                                    <form class="user-password-form" method="post" action="{{ url_for('update_user_password', user_id=user.id) }}">
+                                        <div class="password-input-wrap">
+                                            <input id="new-password-{{ user.id }}" name="password" type="password" minlength="6" placeholder="{% if g.user and g.user.id == user.id %}New password for me{% else %}New password{% endif %}" autocomplete="new-password">
+                                            <button class="icon-button password-toggle" type="button" aria-label="Show password" aria-pressed="false" data-password-toggle data-password-target="new-password-{{ user.id }}">
+                                                <span data-lucide="eye"></span>
+                                            </button>
+                                        </div>
+                                        <button type="submit" class="button button-small">{% if g.user and g.user.id == user.id %}Change My Password{% else %}Save Password{% endif %}</button>
+                                    </form>
+                                    <form method="post" action="{{ url_for('reset_user_password', user_id=user.id) }}">
+                                        <button type="submit" class="button button-small">Generate Password</button>
+                                    </form>
+                                    <form method="post" action="{{ url_for('delete_user', user_id=user.id) }}" onsubmit="return confirm('Delete {{ user.name|replace("'", "\\'") }}? They will no longer be able to log in.');">
+                                        <button type="submit" class="button button-danger button-small">Delete User</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p class="muted">No users yet.</p>
+    {% endif %}
+</section>
+{% endblock %}

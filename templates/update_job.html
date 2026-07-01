@@ -1,0 +1,560 @@
+{% extends "base.html" %}
+
+{% block title %}{{ job.name }} | KAS{% endblock %}
+
+{% block content %}
+<section class="form-shell">
+    <div class="job-summary">
+        <span class="status status-{{ job.status|lower|replace(' ', '-') }}">{{ job.status }}</span>
+        <h1>{{ job.name }}</h1>
+        {% if g.user.role != "employee" %}
+            <p class="client">{{ job.client_name or "Client not set" }}</p>
+        {% endif %}
+        <p class="location">{{ job.location }}</p>
+        {% if g.user.role != "employee" %}
+            <p>{{ job.description }}</p>
+        {% endif %}
+        {% if can_view_financials %}
+            <div class="pipeline-money detail-money">
+                <span>Proposal {{ money(job.proposal_amount) }}</span>
+                <span>Invoice {{ money(job.invoice_amount) }}</span>
+                <span class="payment payment-{{ (job.payment_status or 'Not Paid')|lower|replace(' ', '-') }}">{{ job.payment_status or "Not Paid" }}</span>
+            </div>
+        {% endif %}
+    </div>
+
+    <section class="analytics-grid" style="margin-top: 20px;">
+      <article class="panel">
+        <h3>AI Walkthrough</h3>
+        <p style="font-size: 13px; color: #666; margin: 8px 0 12px;">Record a spoken walkthrough while the app captures timestamped photos and turns everything into an organized field report.</p>
+        <button class="button button-primary" onclick="startRecording({{ job.id }})" style="width: 100%; padding: 12px;">Start Walkthrough</button>
+                <!-- Mobile floating button (visible on small screens) -->
+                <button class="wt-fab" onclick="startRecording({{ job.id }})" aria-label="Start Walkthrough">AI</button>
+      </article>
+    </section>
+
+    <section class="analytics-grid" aria-label="Construction workspace">
+        <article class="panel">
+            <h3>Crew Status Board</h3>
+            <div class="crew-board">
+                <div class="crew-card">
+                    <strong>Assigned Crew Lead</strong>
+                    <p class="muted" style="margin:4px 0 6px;">{{ employees|selectattr('id', 'equalto', job.assigned_to)|map(attribute='name')|first if job.assigned_to else 'Unassigned' }}</p>
+                    <span class="crew-status">On schedule</span>
+                </div>
+                <div class="crew-card">
+                    <strong>Field Updates</strong>
+                    <p class="muted" style="margin:4px 0 6px;">{{ updates|length }} timeline entries</p>
+                    <span class="crew-status">Reporting active</span>
+                </div>
+                <div class="crew-card">
+                    <strong>Client Communication</strong>
+                    <p class="muted" style="margin:4px 0 6px;">Portal{% if job.client_id %} linked{% else %} not linked{% endif %}</p>
+                    <span class="crew-status">Monitored</span>
+                </div>
+            </div>
+        </article>
+
+    </section>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='walkthrough.css') }}">
+    <script src="{{ url_for('static', filename='walkthrough.js') }}"></script>
+
+    {% if can_edit_job %}
+        <form class="form-card" method="post" action="{{ url_for('submit_update') }}" enctype="multipart/form-data">
+            <input type="hidden" name="job_id" value="{{ job.id }}">
+
+            <section class="form-section">
+                <h2>Project Info</h2>
+                {% if can_manage_jobs %}
+                    <label for="client_name">Client Name</label>
+                    <input id="client_name" name="client_name" type="text" value="{{ job.client_name or '' }}" maxlength="140">
+                {% endif %}
+
+                <label for="status">Pipeline Status</label>
+                {% if can_manage_jobs %}
+                    <select id="status" name="status">
+                        <optgroup label="Pre-Construction">
+                            {% for pipeline_status in pre_construction_statuses %}
+                                <option value="{{ pipeline_status }}" {% if pipeline_status == job.status %}selected{% endif %}>{{ pipeline_status }}</option>
+                            {% endfor %}
+                        </optgroup>
+                        <optgroup label="Execution">
+                            {% for pipeline_status in execution_statuses %}
+                                <option value="{{ pipeline_status }}" {% if pipeline_status == job.status %}selected{% endif %}>{{ pipeline_status }}</option>
+                            {% endfor %}
+                        </optgroup>
+                        <optgroup label="Financial">
+                            {% for pipeline_status in financial_statuses %}
+                                <option value="{{ pipeline_status }}" {% if pipeline_status == job.status %}selected{% endif %}>{{ pipeline_status }}</option>
+                            {% endfor %}
+                        </optgroup>
+                    </select>
+                {% else %}
+                    <input id="status" type="text" value="{{ job.status }}" readonly>
+                    <p class="help-text">Only admins can change pipeline status.</p>
+                {% endif %}
+
+                {% if can_manage_jobs %}
+                    <label>Service Types</label>
+                    <details class="service-multi-select">
+                        <summary>Choose one or more services</summary>
+                        <div class="service-chip-selector" data-service-chip-selector data-other-value="Other" data-other-wrapper-id="other-service-wrapper" data-other-input-id="other_service_details" data-preview-id="service-chip-preview">
+                            {% for option in service_types %}
+                                <label class="service-chip-option">
+                                    <input type="checkbox" name="service_type" value="{{ option }}" {% if option in (selected_service_types or []) %}checked{% endif %}>
+                                    <span>{{ option }}{% if option == 'Other' %} +{% endif %}</span>
+                                </label>
+                            {% endfor %}
+                        </div>
+                    </details>
+                    <p class="help-text">Services organize the job. The checklist below should match the real scope of work, not a generic template.</p>
+                    <div id="service-chip-preview" class="service-chip-preview" aria-live="polite"></div>
+
+                    <div id="other-service-wrapper" {% if 'Other' not in (selected_service_types or []) %}hidden{% endif %}>
+                        <label for="other_service_details">Other Service Details</label>
+                        <textarea id="other_service_details" name="other_service_details" rows="3" placeholder="Describe custom services">{{ job.other_service_details or '' }}</textarea>
+                    </div>
+
+                    <div class="form-grid two">
+                        <div>
+                            <label for="assigned_to">Assigned Employee</label>
+                            <select id="assigned_to" name="assigned_to">
+                                <option value="">Unassigned</option>
+                                {% for employee in employees %}
+                                    <option value="{{ employee.id }}" {% if job.assigned_to == employee.id %}selected{% endif %}>{{ employee.name }} ({{ employee.email }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label for="client_id">Client Portal User</label>
+                            <select id="client_id" name="client_id">
+                                <option value="">No client access yet</option>
+                                {% for client in clients %}
+                                    <option value="{{ client.id }}" {% if job.client_id == client.id %}selected{% endif %}>{{ client.name }} ({{ client.email }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <label for="due_date">Due Date</label>
+                    <input id="due_date" name="due_date" type="date" value="{{ job.due_date or '' }}">
+                {% endif %}
+
+                <label for="materials_used">Materials Used</label>
+                <textarea id="materials_used" name="materials_used" rows="4" placeholder="Enter one material per line&#10;Example:&#10;Primer&#10;Sealant&#10;Backer rod">{{ job.materials_used or '' }}</textarea>
+                <p class="help-text">These materials will be shown above as bullet points.</p>
+            </section>
+
+            {% if can_manage_jobs %}
+                <section class="form-section task-planner">
+                    <div class="section-heading-row">
+                        <div>
+                            <h2>Job Tasks</h2>
+                            <p class="help-text">{{ task_summary.done }} of {{ task_summary.total }} scope units complete across {{ task_summary.task_total }} tasks.</p>
+                        </div>
+                        <span class="task-percent">{{ task_summary.percent }}%</span>
+                    </div>
+                    <div class="task-progress-track"><span style="--progress: {{ task_summary.percent }}%;"></span></div>
+                    {% if tasks %}
+                        <div class="task-list">
+                            {% for task in tasks %}
+                                <div class="task-row task-row-edit task-row-{{ task.status_class }}" data-task-row>
+                                    <span>
+                                        <strong>{{ task.title }}</strong>
+                                        <small>{{ task.service_type or 'General' }}</small>
+                                        <small class="task-progress-copy">{{ task.progress_text }}</small>
+                                        {% if task.is_custom %}
+                                            <small class="task-badge">Custom task</small>
+                                        {% endif %}
+                                    </span>
+                                    <div class="task-control-stack">
+                                        <label class="task-remove-toggle">
+                                            <input type="checkbox" name="remove_task_ids" value="{{ task.id }}">
+                                            <span>Remove this task</span>
+                                        </label>
+                                        <label class="task-field">
+                                            <span>Track By</span>
+                                            <select name="task_tracking_{{ task.id }}" aria-label="Tracking mode for {{ task.title }}" data-task-tracking-select>
+                                                {% for option in task_tracking_modes %}
+                                                    <option value="{{ option }}" {% if task.tracking_mode == option %}selected{% endif %}>{{ option|title }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </label>
+                                        <div class="task-status-fields" data-task-status-fields {% if task.tracking_mode == 'count' %}hidden{% endif %}>
+                                            <label class="task-field">
+                                                <span>Status</span>
+                                                <select name="task_status_{{ task.id }}" aria-label="Status for {{ task.title }}">
+                                                    {% for option in task_statuses %}
+                                                        <option value="{{ option }}" {% if task.status == option %}selected{% endif %}>{{ option }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </label>
+                                        </div>
+                                        <div class="task-count-fields" data-task-count-fields {% if task.tracking_mode != 'count' %}hidden{% endif %}>
+                                            <div class="task-input-grid">
+                                                <label class="task-field">
+                                                    <span>Total</span>
+                                                    <input name="task_target_{{ task.id }}" type="number" min="1" step="1" value="{{ task.target_quantity if task.target_quantity else '' }}" aria-label="Total quantity for {{ task.title }}">
+                                                </label>
+                                                <label class="task-field">
+                                                    <span>Completed</span>
+                                                    <input name="task_completed_{{ task.id }}" type="number" min="0" step="1" value="{{ task.completed_quantity if task.tracking_mode == 'count' else 0 }}" aria-label="Completed quantity for {{ task.title }}">
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                        <div class="task-adder" data-task-adder>
+                            <div class="section-heading-row">
+                                <div>
+                                    <h3>Add Scope Item</h3>
+                                    <p class="help-text">Add custom scope items under a service type when the default checklist is not enough.</p>
+                                </div>
+                                <button type="button" class="button" data-add-task-row>Add another</button>
+                            </div>
+                            <div class="task-add-list" data-task-add-list>
+                                <div class="task-add-row">
+                                    <label class="task-field">
+                                        <span>Service Type</span>
+                                        <select name="new_task_service">
+                                            <option value="">General</option>
+                                            {% for option in selected_service_types %}
+                                                <option value="{{ option }}">{{ option }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </label>
+                                    <label class="task-field task-field-wide">
+                                        <span>Scope Item</span>
+                                        <input name="new_task_title" type="text" maxlength="140" placeholder="Example: Seal lobby windows on level 2">
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    {% else %}
+                        <p class="muted">Save services once to create the task checklist.</p>
+                    {% endif %}
+                </section>
+            {% endif %}
+
+            {% if can_view_financials %}
+                <section class="form-section">
+                    <h2>Proposal</h2>
+                    <div class="form-grid two">
+                        <div>
+                            <label for="proposal_amount">Amount</label>
+                            <input id="proposal_amount" name="proposal_amount" type="number" min="0" step="0.01" value="{{ job.proposal_amount or '' }}" placeholder="0.00">
+                        </div>
+                        <div>
+                            <label for="proposal_sent_date">Sent Date</label>
+                            <input id="proposal_sent_date" name="proposal_sent_date" type="date" value="{{ job.proposal_sent_date or '' }}">
+                        </div>
+                    </div>
+                </section>
+
+                <section class="form-section">
+                    <h2>Decision</h2>
+                    <label for="decision_date">Decision Date</label>
+                    <input id="decision_date" name="decision_date" type="date" value="{{ job.decision_date or '' }}">
+
+                    <label for="rejection_reason">Rejected Reason</label>
+                    <textarea id="rejection_reason" name="rejection_reason" rows="3" placeholder="Required when status is Rejected">{{ job.rejection_reason or '' }}</textarea>
+                </section>
+
+                <section class="form-section">
+                    <h2>Financial</h2>
+                    {% if job.status == "Completed" %}
+                        <p class="help-text">This job is completed. Enter an invoice amount to move it into Invoiced.</p>
+                    {% endif %}
+                    <div class="form-grid two">
+                        <div>
+                            <label for="invoice_amount">Invoice Amount</label>
+                            <input id="invoice_amount" name="invoice_amount" type="number" min="0" step="0.01" value="{{ job.invoice_amount or '' }}" placeholder="0.00">
+                        </div>
+                        <div>
+                            <label for="payment_status">Payment Status</label>
+                            <select id="payment_status" name="payment_status">
+                                {% for option in payment_statuses %}
+                                    <option value="{{ option }}" {% if (job.payment_status or 'Not Paid') == option %}selected{% endif %}>{{ option }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                </section>
+            {% endif %}
+
+            <section class="form-section">
+                <h2>New Update</h2>
+                <p class="help-text">Write one update note, then attach all photos that belong with that update.</p>
+                <label for="notes">Update Notes</label>
+                <textarea id="notes" name="notes" rows="5" placeholder="Example: Finished drywall repair in hallway. Uploaded before, during, and after photos."></textarea>
+
+                <label for="images">Update Photos</label>
+                <input id="images" name="images" type="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple>
+                <p class="help-text">Select multiple photos at once. They will appear together under this note.</p>
+                {% if can_manage_jobs %}
+                    <label class="remember-me-row image-visibility-toggle">
+                        <input id="photos_client_visible" name="photos_client_visible" type="checkbox" value="1">
+                        <span>Show these new photos to client</span>
+                    </label>
+                {% endif %}
+
+                {% if can_manage_receipts %}
+                    <label for="receipts">Receipts / Bills</label>
+                    <input id="receipts" name="receipts" type="file" accept="image/png,image/jpeg,image/gif,image/webp,application/pdf,.doc,.docx,.xls,.xlsx" multiple>
+                    <p class="help-text">Upload receipts, material bills, supplier invoices, or cost documents separately from job photos.</p>
+                {% endif %}
+            </section>
+
+            <button class="button button-primary button-full" type="submit">Save Update</button>
+        </form>
+    {% elif g.user.role == "client" %}
+        <form class="form-card" method="post" action="{{ url_for('client_comment', job_id=job.id) }}" enctype="multipart/form-data">
+            <input type="hidden" name="next" value="{{ request.path }}">
+            <section class="form-section">
+                <h2>Add Comment</h2>
+                <label for="comment">Message to the office</label>
+                <textarea id="comment" name="comment" rows="4" placeholder="Ask a question or leave feedback about this job."></textarea>
+                <label for="client_comment_files">Photos or files</label>
+                <input id="client_comment_files" name="attachments" type="file" accept="image/png,image/jpeg,image/gif,image/webp,application/pdf,.doc,.docx,.xls,.xlsx" multiple>
+            </section>
+            <button class="button button-primary button-full" type="submit">Send Comment</button>
+        </form>
+    {% endif %}
+
+    <!-- Client Portal Admin Section - Outside Forms -->
+    {% if can_manage_jobs %}
+    <section class="form-section" style="background: #f0f7f4; border-left: 4px solid #0f6a47; padding: 1.5rem; border-radius: 8px; margin-top: 2rem;">
+        <h2 style="color: #0f6a47; margin-top: 0;">🔗 Client Portal</h2>
+        <p class="help-text">Share a public-facing portal link with your client to track project progress and view updates without login.</p>
+        
+        {% if job.portal_enabled and job.portal_token %}
+            <div class="alert alert-success" style="background: #d1e7dd; border: 1px solid #0f6a47; color: #0f6a47; padding: 1rem; border-radius: 6px; margin-bottom: 1rem;">
+                <strong>✓ Portal Enabled</strong> · Portal is active and client can view updates.
+            </div>
+            
+            <label>Portal Link</label>
+            <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+                <input type="text" value="{{ url_for('client_portal', token=job.portal_token, _external=True) }}" readonly style="flex: 1; padding: 0.75rem; border: 1px solid #dee2e6; border-radius: 6px; font-family: monospace; font-size: 0.9rem;">
+                <button type="button" class="button button-secondary" onclick="copyPortalLink(this)" style="white-space: nowrap;">📋 Copy</button>
+            </div>
+            
+            <label>Send to Client</label>
+            <div style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem;">
+                <input type="email" id="client_email_input" placeholder="Client email address" style="flex: 1; padding: 0.75rem; border: 1px solid #dee2e6; border-radius: 6px;">
+                <form method="post" action="{{ url_for('send_portal_email_page', job_id=job.id) }}" style="display: contents;">
+                    <input type="hidden" name="client_email" id="client_email_hidden">
+                    <button type="submit" class="button button-primary" onclick="document.getElementById('client_email_hidden').value = document.getElementById('client_email_input').value;">📧 Send</button>
+                </form>
+            </div>
+            
+            <form method="post" action="{{ url_for('disable_job_portal', job_id=job.id) }}" style="display: inline;">
+                <button type="submit" class="button button-danger" onclick="return confirm('Disable portal access for this job?');" style="background: #dc3545;">🔒 Disable Portal</button>
+            </form>
+        {% else %}
+            <p class="help-text" style="color: #666; margin-bottom: 1rem;">Portal is not enabled yet. Enable it to generate a shareable link.</p>
+            <form method="post" action="{{ url_for('enable_job_portal', job_id=job.id) }}" style="display: inline;">
+                <button type="submit" class="button button-primary" style="background: #0f6a47;">🔓 Enable Portal</button>
+            </form>
+        {% endif %}
+    </section>
+    {% endif %}
+</section>
+
+{% if can_manage_jobs %}
+<form id="job-media-changes-form" method="post" action="{{ url_for('save_media_changes') }}">
+    <input type="hidden" name="next" value="{{ request.path }}">
+{% endif %}
+<section class="updates">
+    <h2>Update History</h2>
+    {% if update_days %}
+        {% for day in update_days %}
+            {% set day_loop = loop.index %}
+            <article class="timeline-day">
+                <div class="timeline-day-rail" aria-hidden="true"><span></span></div>
+                <div class="timeline-day-card">
+                    <header class="timeline-day-header">
+                        <div>
+                            <p class="eyebrow">Daily Log</p>
+                            <h3>{{ day.display_date }}</h3>
+                        </div>
+                        <div class="timeline-day-stats">
+                            <span>{{ day.update_count }} update{% if day.update_count != 1 %}s{% endif %}</span>
+                            <span>{{ day.photo_count }} photo{% if day.photo_count != 1 %}s{% endif %}</span>
+                            {% if can_manage_receipts %}
+                                <span>{{ day.receipt_count }} receipt{% if day.receipt_count != 1 %}s{% endif %}</span>
+                            {% endif %}
+                        </div>
+                    </header>
+                    <div class="timeline-entry-list">
+                        {% for update in day.updates %}
+                            {% set update_loop = day_loop ~ '-' ~ loop.index %}
+                            <section class="timeline-entry">
+                                <div class="timeline-entry-meta">
+                                    <time datetime="{{ update.timestamp }}">{{ update.display_time or (update.timestamp | fmtdate) }}</time>
+                                    {% if update.author_role == "client" %}
+                                        <span>Client Comment</span>
+                                    {% else %}
+                                        <span>Field Update</span>
+                                    {% endif %}
+                                </div>
+                                {% if update.notes %}
+                                    <p class="update-notes">{{ update.notes }}</p>
+                                {% else %}
+                                    <p class="muted">Photos or CRM changes were added with this update.</p>
+                                {% endif %}
+                                {% if can_manage_jobs and (update.photos or (can_manage_receipts and update.receipts)) %}
+                                    <div class="media-bulk-actions">
+                                        <span>Select media to delete</span>
+                                    </div>
+                                {% endif %}
+                                {% if update.photos %}
+                                    <div class="photo-grid">
+                                        {% for photo in update.photos %}
+                                            {% if photo.url %}
+                                                <div class="photo-visibility-card">
+                                                    <div class="media-tile-frame">
+                                                        {% if can_manage_jobs %}
+                                                            <label class="media-select">
+                                                                <input form="job-media-changes-form" name="delete_photo_ids" type="checkbox" value="{{ photo.id }}">
+                                                                <span>Select</span>
+                                                            </label>
+                                                        {% endif %}
+                                                        <a href="{{ photo.url }}" target="_blank" rel="noopener">
+                                                            <img src="{{ photo.url }}" alt="Job update photo" loading="lazy" decoding="async">
+                                                        </a>
+                                                    </div>
+                                                    {% if can_manage_jobs %}
+                                                        <input form="job-media-changes-form" type="hidden" name="photo_ids" value="{{ photo.id }}">
+                                                        <label class="remember-me-row">
+                                                            <input form="job-media-changes-form" name="visible_photo_ids" type="checkbox" value="{{ photo.id }}" {% if photo.client_visible %}checked{% endif %}>
+                                                            <span>Visible to client</span>
+                                                        </label>
+                                                        <label class="button button-danger button-compact media-delete-toggle">
+                                                            <input form="job-media-changes-form" name="delete_photo_ids" type="checkbox" value="{{ photo.id }}">
+                                                            <span>Delete photo</span>
+                                                        </label>
+                                                    {% endif %}
+                                                </div>
+                                            {% else %}
+                                                <div class="photo-visibility-card muted">No image available</div>
+                                            {% endif %}
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                                {% if g.user.role == "client" and update.receipts %}
+                                    <div class="receipt-list">
+                                        <h3>Attached Files</h3>
+                                        {% for receipt in update.receipts %}
+                                            <div class="receipt-row">
+                                                <a href="{{ receipt.url }}" target="_blank" rel="noopener">
+                                                    {{ receipt.name }}
+                                                </a>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                {% elif can_manage_receipts and update.receipts %}
+                                    <div class="receipt-list">
+                                        <h3>Receipts / Bills</h3>
+                                        {% for receipt in update.receipts %}
+                                            <div class="receipt-row{% if can_manage_jobs %} receipt-row-selectable{% endif %}">
+                                                {% if can_manage_jobs %}
+                                                    <input form="job-media-changes-form" class="media-checkbox" name="delete_receipt_ids" type="checkbox" value="{{ receipt.id }}" aria-label="Select receipt">
+                                                {% endif %}
+                                                <a href="{{ receipt.url }}" target="_blank" rel="noopener">
+                                                    {{ receipt.name }}
+                                                </a>
+                                                {% if can_manage_jobs %}
+                                                    <label class="button button-danger button-compact media-delete-toggle">
+                                                        <input form="job-media-changes-form" name="delete_receipt_ids" type="checkbox" value="{{ receipt.id }}">
+                                                        <span>Delete</span>
+                                                    </label>
+                                                {% endif %}
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </section>
+                        {% endfor %}
+                    </div>
+                </div>
+            </article>
+        {% endfor %}
+    {% else %}
+        <p class="muted">No updates have been submitted for this job yet.</p>
+    {% endif %}
+    {% if can_manage_jobs and update_days %}
+        <div class="media-save-actions">
+            <button class="button button-primary" type="submit" form="job-media-changes-form">Save Media Changes</button>
+        </div>
+    {% endif %}
+</section>
+{% if can_manage_jobs %}
+</form>
+{% endif %}
+
+<script>
+const mediaChangesForm = document.getElementById('job-media-changes-form');
+if (mediaChangesForm) {
+    mediaChangesForm.addEventListener('submit', (event) => {
+        const hasDeletes = mediaChangesForm.querySelector('input[name="delete_photo_ids"]:checked, input[name="delete_receipt_ids"]:checked');
+        if (hasDeletes && !confirm('Save changes and delete selected media?')) {
+            event.preventDefault();
+        }
+    });
+}
+
+function copyPortalLink(button) {
+    const input = button.previousElementSibling;
+    input.select();
+    document.execCommand('copy');
+    const originalText = button.textContent;
+    button.textContent = '✓ Copied';
+    setTimeout(() => {
+        button.textContent = originalText;
+    }, 2000);
+}
+
+document.querySelectorAll('[data-task-row]').forEach((row) => {
+    const modeSelect = row.querySelector('[data-task-tracking-select]');
+    const statusFields = row.querySelector('[data-task-status-fields]');
+    const countFields = row.querySelector('[data-task-count-fields]');
+
+    if (!modeSelect || !statusFields || !countFields) {
+        return;
+    }
+
+    const syncTaskFields = () => {
+        const isCountMode = modeSelect.value === 'count';
+        statusFields.hidden = isCountMode;
+        countFields.hidden = !isCountMode;
+    };
+
+    modeSelect.addEventListener('change', syncTaskFields);
+    syncTaskFields();
+});
+
+const taskAdder = document.querySelector('[data-task-adder]');
+if (taskAdder) {
+    const addList = taskAdder.querySelector('[data-task-add-list]');
+    const addButton = taskAdder.querySelector('[data-add-task-row]');
+    const templateRow = addList ? addList.querySelector('.task-add-row') : null;
+
+    if (addList && addButton && templateRow) {
+        addButton.addEventListener('click', () => {
+            const clone = templateRow.cloneNode(true);
+            clone.querySelectorAll('input').forEach((input) => {
+                input.value = '';
+            });
+            clone.querySelectorAll('select').forEach((select) => {
+                select.selectedIndex = 0;
+            });
+            addList.appendChild(clone);
+        });
+    }
+}
+</script>
+
+{% endblock %}
