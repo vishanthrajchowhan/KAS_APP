@@ -329,6 +329,54 @@
     <section class="form-section" style="background: #f0f7f4; border-left: 4px solid #0f6a47; padding: 1.5rem; border-radius: 8px; margin-top: 2rem;">
         <h2 style="color: #0f6a47; margin-top: 0;">🔗 Client Portal</h2>
         <p class="help-text">Share a public-facing portal link with your client to track project progress and view updates without login.</p>
+
+        <div style="margin: 1rem 0 1.5rem; padding: 1rem; border: 1px solid #d9e9e1; border-radius: 8px; background: #fff;">
+            <h3 style="margin: 0 0 0.5rem; color: #0f6a47;">Progress Reports (PDF)</h3>
+            <p class="help-text" style="margin-bottom: 0.75rem;">Upload named PDF reports after lead creation so clients can view them in their portal.</p>
+            <form method="post" action="{{ url_for('upload_progress_report', job_id=job.id) }}" enctype="multipart/form-data">
+                <div class="form-grid two">
+                    <div>
+                        <label for="report_name">Report Name</label>
+                        <input id="report_name" name="report_name" type="text" maxlength="180" placeholder="Example: June 2026 Weekly Progress Report">
+                    </div>
+                    <div>
+                        <label for="report_pdf">PDF File</label>
+                        <input id="report_pdf" name="report_pdf" type="file" accept="application/pdf,.pdf" required>
+                    </div>
+                </div>
+                <label class="remember-me-row" style="margin-top: 0.6rem;">
+                    <input name="client_visible" type="checkbox" value="1" checked>
+                    <span>Visible to client in portal</span>
+                </label>
+                <button type="submit" class="button button-primary" style="margin-top: 0.75rem;">Upload Progress Report</button>
+            </form>
+            {% if progress_reports %}
+                <div style="margin-top: 1rem;">
+                    {% for doc in progress_reports %}
+                        <div style="padding:0.65rem 0; border-top:1px solid #edf2ef;">
+                            <div style="display:flex; gap:0.5rem; align-items:center; justify-content:space-between; margin-bottom:0.45rem;">
+                                <strong>{{ doc.name }}</strong>
+                                <a class="button" href="{{ doc.file_url }}" target="_blank" rel="noopener">Open PDF</a>
+                            </div>
+                            <div class="muted" style="font-size: 0.85rem; margin-bottom: 0.5rem;">{{ doc.created_at[:10] if doc.created_at else '' }}{% if doc.client_visible %} · Visible to client{% else %} · Hidden from client{% endif %}</div>
+                            <div style="display:flex; gap:0.45rem; flex-wrap:wrap; align-items:center;">
+                                <form method="post" action="{{ url_for('rename_progress_report', job_id=job.id, doc_id=doc.id) }}" style="display:flex; gap:0.35rem; flex:1; min-width:260px;">
+                                    <input type="text" name="report_name" value="{{ doc.name }}" maxlength="180" aria-label="Edit report name" style="flex:1;">
+                                    <button type="submit" class="button">Rename</button>
+                                </form>
+                                <form method="post" action="{{ url_for('set_progress_report_visibility', job_id=job.id, doc_id=doc.id) }}" style="display:flex; align-items:center; gap:0.25rem;">
+                                    <input type="hidden" name="client_visible" value="{% if not doc.client_visible %}1{% endif %}">
+                                    <button type="submit" class="button">{% if doc.client_visible %}Hide{% else %}Show{% endif %} Client</button>
+                                </form>
+                                <form method="post" action="{{ url_for('delete_progress_report', job_id=job.id, doc_id=doc.id) }}" onsubmit="return confirm('Delete this progress report?');" style="display:inline;">
+                                    <button type="submit" class="button button-danger">Delete</button>
+                                </form>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        </div>
         
         {% if job.portal_enabled and job.portal_token %}
             <div class="alert alert-success" style="background: #d1e7dd; border: 1px solid #0f6a47; color: #0f6a47; padding: 1rem; border-radius: 6px; margin-bottom: 1rem;">

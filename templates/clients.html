@@ -17,7 +17,6 @@
         </div>
         <div class="hero-actions">
             <a class="button" href="{{ url_for('users') }}">Access Management</a>
-            <a class="button button-primary" href="{{ url_for('create_estimate') }}">Create Quote</a>
         </div>
     </section>
 
@@ -84,7 +83,6 @@
                 <div class="card-actions">
                     <a class="button" href="#client-{{ client.id }}">View</a>
                     <a class="button" href="{{ url_for('users') }}">Edit</a>
-                    <a class="button button-primary" href="{{ url_for('create_estimate') }}">Create Quote</a>
                 </div>
             </article>
         {% else %}

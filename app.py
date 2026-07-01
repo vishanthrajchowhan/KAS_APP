@@ -147,22 +147,6 @@ PUBLIC_ENDPOINTS = {"login", "static", "client_portal", "portal_comment", "porta
 
 TEMP_PASSWORD_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%"
 
-# Estimate statuses
-ESTIMATE_STATUSES = ("Draft", "Sent", "Viewed", "Approved", "Rejected", "Expired")
-
-# Service types for estimates
-SERVICE_TYPES = (
-    "Waterproofing",
-    "Roof Coating",
-    "Exterior Painting",
-    "Interior Painting",
-    "Caulking",
-    "Drywall",
-    "Roofing",
-    "Tiles",
-    "Other",
-)
-
 # Service types for leads/jobs
 JOB_SERVICE_TYPES = (
     "Waterproofing",
@@ -227,104 +211,15 @@ DEFAULT_WORKSPACE_SETTINGS = {
     "logo_path": "",
     "dark_mode_default": False,
     "notify_new_lead": True,
-    "notify_estimate_approved": True,
     "notify_payment_received": True,
     "notify_photo_upload": True,
 }
-
-# Service templates - common line items by service type
-SERVICE_TEMPLATES = {
-    "Waterproofing": [
-        {"name": "Surface Preparation", "description": "Clean and prep surface", "unit": "sqft"},
-        {"name": "Waterproofing Coating", "description": "Apply waterproofing coating", "unit": "sqft"},
-        {"name": "Labor - Waterproofing", "description": "Labor", "unit": "hour"},
-    ],
-    "Roof Coating": [
-        {"name": "Surface Cleaning", "description": "Pressure clean roof surface", "unit": "sqft"},
-        {"name": "Repair & Patching", "description": "Roof repair and patching", "unit": "sqft"},
-        {"name": "Coating Application", "description": "Apply roof coating", "unit": "sqft"},
-        {"name": "Labor - Roof Coating", "description": "Labor", "unit": "hour"},
-    ],
-    "Exterior Painting": [
-        {"name": "Surface Prep", "description": "Pressure wash and prep", "unit": "sqft"},
-        {"name": "Primer", "description": "Primer application", "unit": "sqft"},
-        {"name": "Paint - Exterior", "description": "Paint application (2 coats)", "unit": "sqft"},
-        {"name": "Labor - Painting", "description": "Labor", "unit": "hour"},
-    ],
-    "Interior Painting": [
-        {"name": "Surface Prep", "description": "Prep and patch drywall", "unit": "sqft"},
-        {"name": "Primer", "description": "Primer application", "unit": "sqft"},
-        {"name": "Paint - Interior", "description": "Paint application (2 coats)", "unit": "sqft"},
-        {"name": "Labor - Painting", "description": "Labor", "unit": "hour"},
-    ],
-    "Caulking / Sealants": [
-        {"name": "Sealant Removal", "description": "Remove old sealant", "unit": "linear_ft"},
-        {"name": "Joint Prep", "description": "Clean and prep joints", "unit": "linear_ft"},
-        {"name": "Sealant Install", "description": "Install new sealant", "unit": "linear_ft"},
-        {"name": "Labor - Caulking", "description": "Labor", "unit": "hour"},
-    ],
-    "Concrete Repair": [
-        {"name": "Surface Prep", "description": "Clean and prepare concrete", "unit": "sqft"},
-        {"name": "Concrete Patching", "description": "Patch and repair concrete", "unit": "sqft"},
-        {"name": "Sealant", "description": "Seal repaired concrete", "unit": "sqft"},
-        {"name": "Labor - Concrete", "description": "Labor", "unit": "hour"},
-    ],
-    "Stucco Repair": [
-        {"name": "Surface Prep", "description": "Prepare stucco surface", "unit": "sqft"},
-        {"name": "Stucco Patching", "description": "Patch damaged stucco", "unit": "sqft"},
-        {"name": "Finishing", "description": "Match and finish stucco", "unit": "sqft"},
-        {"name": "Labor - Stucco", "description": "Labor", "unit": "hour"},
-    ],
-    "Balcony Waterproofing": [
-        {"name": "Surface Prep", "description": "Clean and prep balcony", "unit": "sqft"},
-        {"name": "Waterproofing Membrane", "description": "Install waterproofing", "unit": "sqft"},
-        {"name": "Labor - Balcony", "description": "Labor", "unit": "hour"},
-    ],
-    "Garage / Deck Coating": [
-        {"name": "Surface Prep", "description": "Clean and degrease", "unit": "sqft"},
-        {"name": "Primer", "description": "Primer application", "unit": "sqft"},
-        {"name": "Coating Application", "description": "Epoxy/Polyurethane coating", "unit": "sqft"},
-        {"name": "Labor - Coating", "description": "Labor", "unit": "hour"},
-    ],
-    "Pressure Cleaning": [
-        {"name": "Pressure Cleaning Service", "description": "Professional pressure washing", "unit": "sqft"},
-        {"name": "Labor - Cleaning", "description": "Labor", "unit": "hour"},
-    ],
-    "Commercial Building Maintenance": [
-        {"name": "General Maintenance", "description": "Building maintenance service", "unit": "hour"},
-        {"name": "Materials", "description": "Materials and supplies", "unit": "lump_sum"},
-    ],
-    "Custom Construction Services": [
-        {"name": "Labor", "description": "Labor", "unit": "hour"},
-        {"name": "Materials", "description": "Materials and supplies", "unit": "lump_sum"},
-    ],
-}
-
-
-
-app = Flask(__name__)
-app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-change-this-secret")
-app.config["UPLOAD_FOLDER"] = str(UPLOAD_FOLDER)
-app.config["MAX_CONTENT_LENGTH"] = 25 * 1024 * 1024
-app.config["VAPID_PUBLIC_KEY"] = os.environ.get("VAPID_PUBLIC_KEY", "").strip()
-
-# Flask-Mail configuration for Client Portal
-app.config["MAIL_SERVER"] = os.environ.get("MAIL_SERVER", "smtp.gmail.com")
-app.config["MAIL_PORT"] = int(os.environ.get("MAIL_PORT", 587))
-app.config["MAIL_USE_TLS"] = os.environ.get("MAIL_USE_TLS", "true").lower() == "true"
-app.config["MAIL_USERNAME"] = os.environ.get("MAIL_USERNAME", "")
-app.config["MAIL_PASSWORD"] = os.environ.get("MAIL_PASSWORD", "")
-app.config["MAIL_DEFAULT_SENDER"] = os.environ.get("MAIL_DEFAULT_SENDER", os.environ.get("MAIL_USERNAME", "noreply@kas-app.com"))
-app.config.setdefault("DATABASE_INITIALIZED", False)
-
-from datetime import datetime as _dt
-
 
 def _fmt_date(val):
     if not val:
         return "-"
     try:
-        return _dt.fromisoformat(str(val)[:10]).strftime("%b %d, %Y")
+        return datetime.fromisoformat(str(val)[:10]).strftime("%b %d, %Y")
     except Exception:
         return str(val)[:10]
 
@@ -345,6 +240,17 @@ def _report_value(val):
     return str(val)
 
 
+app = Flask(__name__)
+app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-change-this-secret")
+app.config["UPLOAD_FOLDER"] = str(UPLOAD_FOLDER)
+app.config["MAX_CONTENT_LENGTH"] = 25 * 1024 * 1024
+app.config["VAPID_PUBLIC_KEY"] = os.environ.get("VAPID_PUBLIC_KEY", "").strip()
+app.config["MAIL_SERVER"] = os.environ.get("MAIL_SERVER", "smtp.gmail.com")
+app.config["MAIL_PORT"] = int(os.environ.get("MAIL_PORT", 587))
+app.config["MAIL_USE_TLS"] = os.environ.get("MAIL_USE_TLS", "true").lower() == "true"
+app.config["MAIL_USERNAME"] = os.environ.get("MAIL_USERNAME", "")
+app.config["MAIL_PASSWORD"] = os.environ.get("MAIL_PASSWORD", "")
+app.config["MAIL_DEFAULT_SENDER"] = os.environ.get("MAIL_DEFAULT_SENDER", os.environ.get("MAIL_USERNAME", "noreply@kas-app.com"))
 app.jinja_env.filters["fmtdate"] = _fmt_date
 app.jinja_env.filters["report_value"] = _report_value
 
@@ -1000,37 +906,6 @@ def init_db():
             """
         )
         migrate_job_tasks_table(conn)
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS estimates (
-                id BIGSERIAL PRIMARY KEY,
-                estimate_number TEXT NOT NULL UNIQUE,
-                client_name TEXT NOT NULL,
-                company_name TEXT,
-                phone TEXT,
-                email TEXT,
-                address TEXT,
-                city TEXT,
-                state TEXT,
-                zip TEXT,
-                service_type TEXT NOT NULL,
-                other_service_details TEXT,
-                project_description TEXT,
-                status TEXT NOT NULL DEFAULT 'Draft',
-                subtotal DOUBLE PRECISION NOT NULL DEFAULT 0,
-                tax DOUBLE PRECISION DEFAULT 0,
-                total DOUBLE PRECISION NOT NULL DEFAULT 0,
-                notes TEXT,
-                created_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
-                created_at TEXT NOT NULL,
-                updated_at TEXT,
-                sent_at TEXT,
-                approved_at TEXT,
-                deleted_at TEXT
-            )
-            """
-        )
-        migrate_estimates_table(conn)
         # Walkthroughs and reports for AI Walkthrough Note feature (Phase 1 MVP)
         conn.execute(
             """
@@ -1072,21 +947,6 @@ def init_db():
             )
             """
         )
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS estimate_items (
-                id BIGSERIAL PRIMARY KEY,
-                estimate_id BIGINT NOT NULL REFERENCES estimates(id) ON DELETE CASCADE,
-                item_name TEXT NOT NULL,
-                description TEXT,
-                quantity DOUBLE PRECISION NOT NULL,
-                unit TEXT NOT NULL,
-                unit_price DOUBLE PRECISION NOT NULL,
-                line_total DOUBLE PRECISION NOT NULL,
-                sort_order INTEGER DEFAULT 0
-            )
-            """
-        )
         # Client Portal feature: documents and portal views
         conn.execute(
             """
@@ -1119,7 +979,6 @@ def init_db():
         )
         migrate_workspace_settings_table(conn)
         migrate_jobs_table_portal(conn)
-        migrate_estimates_table_portal(conn)
         seed_default_users(conn)
 
 
@@ -1200,11 +1059,6 @@ def migrate_updates_table(conn):
     conn.execute("UPDATE updates SET client_visible = FALSE WHERE client_visible IS NULL")
 
 
-def migrate_estimates_table(conn):
-    conn.execute("ALTER TABLE estimates ADD COLUMN IF NOT EXISTS other_service_details TEXT")
-    conn.execute("ALTER TABLE estimates ADD COLUMN IF NOT EXISTS deleted_at TEXT")
-
-
 def migrate_job_tasks_table(conn):
     conn.execute("ALTER TABLE job_tasks ADD COLUMN IF NOT EXISTS tracking_mode TEXT")
     conn.execute("ALTER TABLE job_tasks ADD COLUMN IF NOT EXISTS target_quantity INTEGER")
@@ -1224,11 +1078,6 @@ def migrate_jobs_table_portal(conn):
     conn.execute("ALTER TABLE jobs ADD COLUMN IF NOT EXISTS portal_enabled BOOLEAN NOT NULL DEFAULT FALSE")
 
 
-def migrate_estimates_table_portal(conn):
-    """Link estimates to jobs for portal documents."""
-    conn.execute("ALTER TABLE estimates ADD COLUMN IF NOT EXISTS job_id BIGINT REFERENCES jobs(id) ON DELETE SET NULL")
-
-
 def migrate_workspace_settings_table(conn):
     conn.execute(
         """
@@ -1245,7 +1094,6 @@ def migrate_workspace_settings_table(conn):
             logo_path TEXT,
             dark_mode_default BOOLEAN NOT NULL DEFAULT FALSE,
             notify_new_lead BOOLEAN NOT NULL DEFAULT TRUE,
-            notify_estimate_approved BOOLEAN NOT NULL DEFAULT TRUE,
             notify_payment_received BOOLEAN NOT NULL DEFAULT TRUE,
             notify_photo_upload BOOLEAN NOT NULL DEFAULT TRUE,
             created_at TEXT NOT NULL,
@@ -1265,7 +1113,6 @@ def migrate_workspace_settings_table(conn):
     conn.execute("ALTER TABLE workspace_settings ADD COLUMN IF NOT EXISTS logo_url TEXT")
     conn.execute("ALTER TABLE workspace_settings ADD COLUMN IF NOT EXISTS dark_mode_default BOOLEAN")
     conn.execute("ALTER TABLE workspace_settings ADD COLUMN IF NOT EXISTS notify_new_lead BOOLEAN")
-    conn.execute("ALTER TABLE workspace_settings ADD COLUMN IF NOT EXISTS notify_estimate_approved BOOLEAN")
     conn.execute("ALTER TABLE workspace_settings ADD COLUMN IF NOT EXISTS notify_payment_received BOOLEAN")
     conn.execute("ALTER TABLE workspace_settings ADD COLUMN IF NOT EXISTS notify_photo_upload BOOLEAN")
     conn.execute("ALTER TABLE workspace_settings ADD COLUMN IF NOT EXISTS created_at TEXT")
@@ -1279,10 +1126,10 @@ def migrate_workspace_settings_table(conn):
             INSERT INTO workspace_settings (
                 id, company_name, company_city, company_address, company_state, company_zip, company_phone, company_email,
                 theme, logo_path, dark_mode_default, notify_new_lead,
-                notify_estimate_approved, notify_payment_received, notify_photo_upload,
+                notify_payment_received, notify_photo_upload,
                 created_at, updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 1,
@@ -1297,7 +1144,6 @@ def migrate_workspace_settings_table(conn):
                 DEFAULT_WORKSPACE_SETTINGS["logo_path"],
                 DEFAULT_WORKSPACE_SETTINGS["dark_mode_default"],
                 DEFAULT_WORKSPACE_SETTINGS["notify_new_lead"],
-                DEFAULT_WORKSPACE_SETTINGS["notify_estimate_approved"],
                 DEFAULT_WORKSPACE_SETTINGS["notify_payment_received"],
                 DEFAULT_WORKSPACE_SETTINGS["notify_photo_upload"],
                 now,
@@ -1318,7 +1164,6 @@ def load_workspace_settings(conn):
 
     settings["dark_mode_default"] = normalize_bool(settings.get("dark_mode_default"))
     settings["notify_new_lead"] = normalize_bool(settings.get("notify_new_lead"))
-    settings["notify_estimate_approved"] = normalize_bool(settings.get("notify_estimate_approved"))
     settings["notify_payment_received"] = normalize_bool(settings.get("notify_payment_received"))
     settings["notify_photo_upload"] = normalize_bool(settings.get("notify_photo_upload"))
     settings["theme"] = settings.get("theme") or "light"
@@ -1368,7 +1213,7 @@ def save_workspace_settings(conn, data):
         UPDATE workspace_settings
         SET company_name = ?, company_city = ?, company_address = ?, company_state = ?, company_zip = ?, company_phone = ?, company_email = ?,
             theme = ?, logo_path = ?, logo_url = ?, dark_mode_default = ?, notify_new_lead = ?,
-            notify_estimate_approved = ?, notify_payment_received = ?, notify_photo_upload = ?,
+            notify_payment_received = ?, notify_photo_upload = ?,
             updated_at = ?
         WHERE id = 1
         """,
@@ -1385,7 +1230,6 @@ def save_workspace_settings(conn, data):
             data.get("logo_url", ""),
             bool(data["dark_mode_default"]),
             bool(data["notify_new_lead"]),
-            bool(data["notify_estimate_approved"]),
             bool(data["notify_payment_received"]),
             bool(data["notify_photo_upload"]),
             now,
@@ -1425,19 +1269,6 @@ def build_notifications_for_user(user, settings):
                 ).fetchall()
                 for row in rows:
                     append_item("New lead submitted", row["name"], row["created_at"], url_for("update_job", job_id=row["id"]), "lead")
-
-            if settings["notify_estimate_approved"]:
-                rows = conn.execute(
-                    """
-                    SELECT id, estimate_number, client_name, approved_at
-                    FROM estimates
-                    WHERE status = 'Approved' AND deleted_at IS NULL
-                    ORDER BY approved_at DESC NULLS LAST, created_at DESC
-                    LIMIT 3
-                    """
-                ).fetchall()
-                for row in rows:
-                    append_item("Estimate approved", f"{row['estimate_number']} · {row['client_name']}", row["approved_at"] or now.isoformat(timespec="seconds"), url_for("view_estimate", estimate_id=row["id"]), "estimate")
 
             if settings["notify_payment_received"]:
                 rows = conn.execute(
@@ -2137,51 +1968,6 @@ def money(value):
     return f"${value:,.2f}" if value is not None else "-"
 
 
-def generate_estimate_number(conn):
-    """Generate next estimate number like KAS-1001, KAS-1002, etc."""
-    result = conn.execute(
-        "SELECT COUNT(*) AS total FROM estimates"
-    ).fetchone()
-    next_num = 1001 + (result["total"] or 0)
-    return f"KAS-{next_num}"
-
-
-def get_estimate_or_404(estimate_id):
-    with get_db_connection() as conn:
-        estimate = conn.execute(
-            "SELECT * FROM estimates WHERE id = ? AND deleted_at IS NULL", (estimate_id,)
-        ).fetchone()
-    if estimate is None:
-        flash("Estimate not found.", "error")
-        return None
-    return estimate
-
-
-def get_estimate_items(conn, estimate_id):
-    """Get all line items for an estimate."""
-    items = conn.execute(
-        """
-        SELECT * FROM estimate_items
-        WHERE estimate_id = ?
-        ORDER BY sort_order, id
-        """,
-        (estimate_id,),
-    ).fetchall()
-    return items
-
-
-def calculate_estimate_totals(items):
-    """Calculate subtotal, tax, and total from items."""
-    subtotal = sum(item.get("line_total", 0) for item in items)
-    tax = subtotal * 0.065  # Florida 6.5% tax (can be made configurable)
-    total = subtotal + tax
-    return {
-        "subtotal": subtotal,
-        "tax": tax,
-        "total": total,
-    }
-
-
 
 def group_updates(update_rows):
     grouped = []
@@ -2527,7 +2313,6 @@ def save_push_subscription():
             "message": "Subscription received. Server push dispatch can be enabled with VAPID keys.",
             "events_ready": [
                 "new_job_assigned",
-                "estimate_approved",
                 "new_update_uploaded",
             ],
         }
@@ -2677,17 +2462,6 @@ def index():
             role_params,
         ).fetchall()
 
-        pending_estimates = 0
-        if dashboard_role == "admin":
-            pending_estimate_row = conn.execute(
-                """
-                SELECT COUNT(*) AS count
-                FROM estimates
-                WHERE status IN ('Draft', 'Sent', 'Viewed')
-                """
-            ).fetchone()
-            pending_estimates = pending_estimate_row["count"] if pending_estimate_row else 0
-
         today = datetime.now().date()
         today_str = today.isoformat()
         week_start = today - timedelta(days=today.weekday())
@@ -2752,7 +2526,6 @@ def index():
     )
     ops_metrics = {
         "open_jobs": open_jobs,
-        "pending_estimates": pending_estimates,
         "scheduled_this_week": (scheduled_this_week_row["count"] if scheduled_this_week_row else 0) or 0,
         "jobs_waiting_approval": (jobs_waiting_approval_row["count"] if jobs_waiting_approval_row else 0) or 0,
         "field_updates_today": (field_updates_today_row["count"] if field_updates_today_row else 0) or 0,
@@ -2814,16 +2587,6 @@ def analytics():
             """
         ).fetchall()
 
-        recent_approvals = conn.execute(
-            """
-            SELECT estimate_number, client_name, total, approved_at
-            FROM estimates
-            WHERE status = 'Approved' AND deleted_at IS NULL
-            ORDER BY approved_at DESC NULLS LAST, created_at DESC
-            LIMIT 8
-            """
-        ).fetchall()
-
     monthly_revenue = list(reversed(monthly_revenue))
     revenue_peak = max((row["paid_revenue"] or 0) for row in monthly_revenue) if monthly_revenue else 0
 
@@ -2832,7 +2595,6 @@ def analytics():
         jobs_by_status=jobs_by_status,
         monthly_revenue=monthly_revenue,
         revenue_peak=revenue_peak,
-        recent_approvals=recent_approvals,
         money=money,
     )
 
@@ -2872,7 +2634,6 @@ def settings():
 
         dark_mode_default = parse_checkbox(request.form.get("dark_mode_default"))
         notify_new_lead = parse_checkbox(request.form.get("notify_new_lead"))
-        notify_estimate_approved = parse_checkbox(request.form.get("notify_estimate_approved"))
         notify_payment_received = parse_checkbox(request.form.get("notify_payment_received"))
         notify_photo_upload = parse_checkbox(request.form.get("notify_photo_upload"))
 
@@ -2896,7 +2657,6 @@ def settings():
                         "theme": theme,
                         "dark_mode_default": dark_mode_default,
                         "notify_new_lead": notify_new_lead,
-                        "notify_estimate_approved": notify_estimate_approved,
                         "notify_payment_received": notify_payment_received,
                         "notify_photo_upload": notify_photo_upload,
                     },
@@ -2923,7 +2683,6 @@ def settings():
                         "logo_url": logo_url,
                         "dark_mode_default": dark_mode_default,
                         "notify_new_lead": notify_new_lead,
-                        "notify_estimate_approved": notify_estimate_approved,
                         "notify_payment_received": notify_payment_received,
                         "notify_photo_upload": notify_photo_upload,
                     },
@@ -2947,7 +2706,6 @@ def settings():
                     "logo_url": logo_url,
                     "dark_mode_default": dark_mode_default,
                     "notify_new_lead": notify_new_lead,
-                    "notify_estimate_approved": notify_estimate_approved,
                     "notify_payment_received": notify_payment_received,
                     "notify_photo_upload": notify_photo_upload,
                 },
@@ -3468,6 +3226,15 @@ def update_job(job_id):
             """,
             (job_id,),
         ).fetchall()
+        progress_reports = conn.execute(
+            """
+            SELECT id, name, document_type, file_path, file_url, client_visible, created_at
+            FROM documents
+            WHERE job_id = ? AND document_type = 'Progress Report'
+            ORDER BY created_at DESC, id DESC
+            """,
+            (job_id,),
+        ).fetchall()
     updates = group_updates(update_rows)
     update_days = group_updates_by_day(updates)
 
@@ -3496,7 +3263,148 @@ def update_job(job_id):
         task_tracking_modes=TASK_TRACKING_MODES,
         task_summary=task_progress_summary(tasks),
         reports=reports,
+        progress_reports=progress_reports,
     )
+
+
+@app.route("/job/<int:job_id>/progress-report/upload", methods=("POST",))
+@login_required
+@role_required("admin")
+def upload_progress_report(job_id):
+    """Upload a named PDF progress report and optionally make it visible to the client portal."""
+    job = get_job_or_404(job_id)
+    if job is None:
+        return redirect(url_for("index"))
+
+    report_name = request.form.get("report_name", "").strip()
+    client_visible = parse_checkbox(request.form.get("client_visible"))
+    report_file = request.files.get("report_pdf")
+
+    if not report_file or not report_file.filename:
+        flash("Please select a PDF report file to upload.", "error")
+        return redirect(url_for("update_job", job_id=job_id))
+
+    if extension_for_file(report_file.filename) != "pdf":
+        flash("Progress reports must be PDF files.", "error")
+        return redirect(url_for("update_job", job_id=job_id))
+
+    if not report_name:
+        report_name = clean_storage_stem(report_file.filename).replace("-", " ").title() or "Progress Report"
+
+    try:
+        uploaded = save_upload_to_storage(
+            report_file,
+            "documents",
+            "document",
+            job_id=job_id,
+            compress_images=False,
+        )
+    except (OSError, RuntimeError, ValueError) as exc:
+        app.logger.exception("Progress report upload failed for job %s", job_id)
+        flash(f"Could not upload report: {safe_error_detail(exc)}", "error")
+        return redirect(url_for("update_job", job_id=job_id))
+
+    now = datetime.now().isoformat(timespec="seconds")
+    with get_db_connection() as conn:
+        conn.execute(
+            """
+            INSERT INTO documents (
+                job_id, name, document_type, file_path, file_url,
+                client_visible, requires_client_signature,
+                signed_at, signed_by_name, signed_ip, created_at, created_by
+            )
+            VALUES (?, ?, ?, ?, ?, ?, FALSE, NULL, NULL, NULL, ?, ?)
+            """,
+            (
+                job_id,
+                report_name,
+                "Progress Report",
+                uploaded["path"],
+                uploaded["url"],
+                client_visible,
+                now,
+                g.user["id"],
+            ),
+        )
+
+    flash("Progress report uploaded.", "success")
+    return redirect(url_for("update_job", job_id=job_id))
+
+
+@app.route("/job/<int:job_id>/progress-report/<int:doc_id>/rename", methods=("POST",))
+@login_required
+@role_required("admin")
+def rename_progress_report(job_id, doc_id):
+    report_name = request.form.get("report_name", "").strip()
+    if not report_name:
+        flash("Report name cannot be empty.", "error")
+        return redirect(url_for("update_job", job_id=job_id))
+
+    with get_db_connection() as conn:
+        document = conn.execute(
+            """
+            SELECT id FROM documents
+            WHERE id = ? AND job_id = ? AND document_type = 'Progress Report'
+            """,
+            (doc_id, job_id),
+        ).fetchone()
+        if not document:
+            flash("Progress report not found.", "error")
+            return redirect(url_for("update_job", job_id=job_id))
+        conn.execute("UPDATE documents SET name = ? WHERE id = ?", (report_name[:180], doc_id))
+
+    flash("Progress report name updated.", "success")
+    return redirect(url_for("update_job", job_id=job_id))
+
+
+@app.route("/job/<int:job_id>/progress-report/<int:doc_id>/visibility", methods=("POST",))
+@login_required
+@role_required("admin")
+def set_progress_report_visibility(job_id, doc_id):
+    visible = parse_checkbox(request.form.get("client_visible"))
+    with get_db_connection() as conn:
+        document = conn.execute(
+            """
+            SELECT id FROM documents
+            WHERE id = ? AND job_id = ? AND document_type = 'Progress Report'
+            """,
+            (doc_id, job_id),
+        ).fetchone()
+        if not document:
+            flash("Progress report not found.", "error")
+            return redirect(url_for("update_job", job_id=job_id))
+        conn.execute("UPDATE documents SET client_visible = ? WHERE id = ?", (visible, doc_id))
+
+    flash("Progress report visibility updated.", "success")
+    return redirect(url_for("update_job", job_id=job_id))
+
+
+@app.route("/job/<int:job_id>/progress-report/<int:doc_id>/delete", methods=("POST",))
+@login_required
+@role_required("admin")
+def delete_progress_report(job_id, doc_id):
+    with get_db_connection() as conn:
+        document = conn.execute(
+            """
+            SELECT id, file_path, file_url
+            FROM documents
+            WHERE id = ? AND job_id = ? AND document_type = 'Progress Report'
+            """,
+            (doc_id, job_id),
+        ).fetchone()
+        if not document:
+            flash("Progress report not found.", "error")
+            return redirect(url_for("update_job", job_id=job_id))
+
+        try:
+            delete_storage_object("documents", document["file_path"], document["file_url"])
+        except Exception:
+            app.logger.warning("Could not remove progress report object for document %s", doc_id)
+
+        conn.execute("DELETE FROM documents WHERE id = ?", (doc_id,))
+
+    flash("Progress report deleted.", "success")
+    return redirect(url_for("update_job", job_id=job_id))
 
 
 @app.route("/progress/<int:job_id>")
@@ -4452,685 +4360,6 @@ def migrate_local_uploads_command():
     print(f"Migration complete. Uploaded {migrated} file(s). Skipped {skipped} missing local file(s).")
 
 
-@app.route("/estimates")
-@login_required
-@role_required("admin")
-def estimates():
-    """List all estimates with filters."""
-    search = request.args.get("q", "").strip()
-    status_filter = request.args.get("status", "").strip()
-    sort = request.args.get("sort", "newest").strip()
-    
-    where_clauses = []
-    params = []
-    
-    if status_filter in ESTIMATE_STATUSES:
-        where_clauses.append("status = ?")
-        params.append(status_filter)
-    
-    if search:
-        where_clauses.append(
-            "(client_name LIKE ? OR company_name LIKE ? OR estimate_number LIKE ?)"
-        )
-        like_search = f"%{search}%"
-        params.extend([like_search, like_search, like_search])
-    
-    where_clauses.insert(0, "e.deleted_at IS NULL")
-    where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
-    status_where_sql = where_sql.replace("e.", "")
-    order_by = "created_at DESC"
-    if sort == "oldest":
-        order_by = "created_at ASC"
-    elif sort == "name":
-        order_by = "client_name ASC"
-    elif sort == "value":
-        order_by = "total DESC"
-    
-    with get_db_connection() as conn:
-        estimate_rows = conn.execute(
-            f"""
-            SELECT e.*, u.name as created_by_name
-            FROM estimates e
-            LEFT JOIN users u ON u.id = e.created_by
-            {where_sql}
-            ORDER BY {order_by}
-            """,
-            params,
-        ).fetchall()
-        estimate_list = []
-        for row in estimate_rows:
-            record = dict(row)
-            record["service_chips"] = build_service_chips(row["service_type"], row.get("other_service_details"))
-            estimate_list.append(record)
-        
-        status_counts = {
-            row["status"]: row["count"]
-            for row in conn.execute(
-                f"""
-                SELECT status, COUNT(*) AS count
-                FROM estimates
-                {status_where_sql}
-                GROUP BY status
-                """,
-                params,
-            ).fetchall()
-        }
-        
-        metrics = conn.execute(
-            """
-            SELECT
-                COUNT(*) AS total_estimates,
-                SUM(CASE WHEN status = 'Draft' THEN 1 ELSE 0 END) AS draft_count,
-                SUM(CASE WHEN status IN ('Sent', 'Viewed') THEN 1 ELSE 0 END) AS pending_count,
-                SUM(CASE WHEN status = 'Approved' THEN 1 ELSE 0 END) AS approved_count,
-                COALESCE(SUM(CASE WHEN status = 'Approved' THEN total ELSE 0 END), 0) AS approved_value,
-                COALESCE(SUM(total), 0) AS total_value
-            FROM estimates
-            WHERE deleted_at IS NULL
-            """
-        ).fetchone()
-    
-    return render_template(
-        "estimates.html",
-        estimates=estimate_list,
-        statuses=ESTIMATE_STATUSES,
-        status_counts=status_counts,
-        metrics=metrics,
-        money=money,
-        filters={"q": search, "status": status_filter, "sort": sort},
-    )
-
-
-@app.route("/estimate/create", methods=("GET", "POST"))
-@login_required
-@role_required("admin")
-def create_estimate():
-    """Create a new estimate."""
-    if request.method == "POST":
-        client_name = request.form.get("client_name", "").strip()
-        company_name = request.form.get("company_name", "").strip()
-        phone = request.form.get("phone", "").strip()
-        email = request.form.get("email", "").strip()
-        address = request.form.get("address", "").strip()
-        city = request.form.get("city", "").strip()
-        state = request.form.get("state", "").strip()
-        zip_code = request.form.get("zip", "").strip()
-        selected_service_types = sanitize_selected_services(request.form.getlist("service_type"), SERVICE_TYPES)
-        service_type = compose_service_text(selected_service_types)
-        other_service_details = request.form.get("other_service_details", "").strip()
-        project_description = request.form.get("project_description", "").strip()
-        notes = request.form.get("notes", "").strip()
-        
-        if not client_name or not service_type:
-            flash("Client name and service type are required.", "error")
-            return render_template(
-                "create_estimate.html",
-                service_types=SERVICE_TYPES,
-                service_templates=SERVICE_TEMPLATES,
-                client_name=client_name,
-                company_name=company_name,
-                phone=phone,
-                email=email,
-                address=address,
-                city=city,
-                state=state,
-                zip_code=zip_code,
-                selected_service_types=selected_service_types,
-                other_service_details=other_service_details,
-                project_description=project_description,
-                notes=notes,
-            )
-        if OTHER_SERVICE_LABEL in selected_service_types and not other_service_details:
-            flash("Please provide custom service details when Other is selected.", "error")
-            return render_template(
-                "create_estimate.html",
-                service_types=SERVICE_TYPES,
-                service_templates=SERVICE_TEMPLATES,
-                client_name=client_name,
-                company_name=company_name,
-                phone=phone,
-                email=email,
-                address=address,
-                city=city,
-                state=state,
-                zip_code=zip_code,
-                selected_service_types=selected_service_types,
-                other_service_details=other_service_details,
-                project_description=project_description,
-                notes=notes,
-            )
-        if OTHER_SERVICE_LABEL not in selected_service_types:
-            other_service_details = ""
-        
-        now = datetime.now().isoformat(timespec="seconds")
-        with get_db_connection() as conn:
-            estimate_number = generate_estimate_number(conn)
-            conn.execute(
-                """
-                INSERT INTO estimates (
-                    estimate_number, client_name, company_name, phone, email,
-                    address, city, state, zip, service_type, other_service_details, project_description,
-                    status, notes, created_by, created_at, updated_at
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    estimate_number,
-                    client_name,
-                    company_name,
-                    phone,
-                    email,
-                    address,
-                    city,
-                    state,
-                    zip_code,
-                    service_type,
-                    other_service_details,
-                    project_description,
-                    "Draft",
-                    notes,
-                    g.user["id"],
-                    now,
-                    now,
-                ),
-            )
-            # Get the ID of the newly created estimate
-            estimate = conn.execute(
-                "SELECT id FROM estimates WHERE estimate_number = ?",
-                (estimate_number,),
-            ).fetchone()
-            if estimate is None:
-                flash("Estimate was created, but it could not be loaded.", "error")
-                return redirect(url_for("estimates"))
-        
-        flash(f"Estimate {estimate_number} created.", "success")
-        return redirect(url_for("edit_estimate", estimate_id=estimate["id"]))
-    
-    return render_template(
-        "create_estimate.html",
-        service_types=SERVICE_TYPES,
-        service_templates=SERVICE_TEMPLATES,
-        selected_service_types=[],
-        other_service_details="",
-    )
-
-
-@app.route("/estimate/<int:estimate_id>")
-@login_required
-@role_required("admin")
-def view_estimate(estimate_id):
-    """View an estimate."""
-    estimate = get_estimate_or_404(estimate_id)
-    if estimate is None:
-        return redirect(url_for("estimates"))
-    
-    with get_db_connection() as conn:
-        items = get_estimate_items(conn, estimate_id)
-    
-    totals = calculate_estimate_totals(items)
-    service_chips = build_service_chips(estimate["service_type"], estimate.get("other_service_details"))
-    
-    return render_template(
-        "view_estimate.html",
-        estimate=estimate,
-        service_chips=service_chips,
-        items=items,
-        totals=totals,
-        money=money,
-        statuses=ESTIMATE_STATUSES,
-    )
-
-
-@app.route("/estimate/<int:estimate_id>/edit", methods=("GET", "POST"))
-@login_required
-@role_required("admin")
-def edit_estimate(estimate_id):
-    """Edit an estimate."""
-    estimate = get_estimate_or_404(estimate_id)
-    if estimate is None:
-        return redirect(url_for("estimates"))
-    selected_service_types_for_form = split_services(estimate.get("service_type"))
-    
-    if request.method == "POST":
-        # Handle estimate header updates
-        client_name = request.form.get("client_name", "").strip()
-        company_name = request.form.get("company_name", "").strip()
-        phone = request.form.get("phone", "").strip()
-        email = request.form.get("email", "").strip()
-        address = request.form.get("address", "").strip()
-        city = request.form.get("city", "").strip()
-        state = request.form.get("state", "").strip()
-        zip_code = request.form.get("zip", "").strip()
-        selected_service_types = sanitize_selected_services(request.form.getlist("service_type"), SERVICE_TYPES)
-        service_type = compose_service_text(selected_service_types)
-        other_service_details = request.form.get("other_service_details", "").strip()
-        project_description = request.form.get("project_description", "").strip()
-        notes = request.form.get("notes", "").strip()
-        
-        if not client_name:
-            flash("Client name is required.", "error")
-        elif not service_type:
-            flash("Please choose at least one service type.", "error")
-        elif OTHER_SERVICE_LABEL in selected_service_types and not other_service_details:
-            flash("Please provide custom service details when Other is selected.", "error")
-        else:
-            if OTHER_SERVICE_LABEL not in selected_service_types:
-                other_service_details = ""
-            now = datetime.now().isoformat(timespec="seconds")
-            with get_db_connection() as conn:
-                conn.execute(
-                    """
-                    UPDATE estimates
-                    SET client_name = ?, company_name = ?, phone = ?, email = ?,
-                        address = ?, city = ?, state = ?, zip = ?,
-                        service_type = ?, other_service_details = ?, project_description = ?, notes = ?, updated_at = ?
-                    WHERE id = ?
-                    """,
-                    (
-                        client_name,
-                        company_name,
-                        phone,
-                        email,
-                        address,
-                        city,
-                        state,
-                        zip_code,
-                        service_type,
-                        other_service_details,
-                        project_description,
-                        notes,
-                        now,
-                        estimate_id,
-                    ),
-                )
-            flash("Estimate updated.", "success")
-            return redirect(url_for("view_estimate", estimate_id=estimate_id))
-
-        selected_service_types_for_form = selected_service_types
-        estimate = {
-            **dict(estimate),
-            "client_name": client_name,
-            "company_name": company_name,
-            "phone": phone,
-            "email": email,
-            "address": address,
-            "city": city,
-            "state": state,
-            "zip": zip_code,
-            "service_type": service_type,
-            "other_service_details": other_service_details,
-            "project_description": project_description,
-            "notes": notes,
-        }
-    
-    with get_db_connection() as conn:
-        items = get_estimate_items(conn, estimate_id)
-    
-    totals = calculate_estimate_totals(items)
-    
-    return render_template(
-        "edit_estimate.html",
-        estimate=estimate,
-        selected_service_types=selected_service_types_for_form,
-        items=items,
-        totals=totals,
-        money=money,
-        service_types=SERVICE_TYPES,
-        service_templates=SERVICE_TEMPLATES,
-    )
-
-
-@app.route("/estimate/<int:estimate_id>/item/add", methods=("POST",))
-@login_required
-@role_required("admin")
-def add_estimate_item(estimate_id):
-    """Add a line item to an estimate."""
-    estimate = get_estimate_or_404(estimate_id)
-    if estimate is None:
-        return redirect(url_for("estimates"))
-    
-    item_name = request.form.get("item_name", "").strip()
-    description = request.form.get("description", "").strip()
-    quantity = request.form.get("quantity", type=float)
-    unit = request.form.get("unit", "").strip()
-    unit_price = request.form.get("unit_price", type=float)
-    
-    if not item_name or quantity is None or unit_price is None or not unit:
-        flash("All fields are required for line items.", "error")
-        return redirect(url_for("edit_estimate", estimate_id=estimate_id))
-    
-    line_total = quantity * unit_price
-    
-    with get_db_connection() as conn:
-        # Get max sort order
-        max_sort = conn.execute(
-            "SELECT MAX(sort_order) AS max_sort FROM estimate_items WHERE estimate_id = ?",
-            (estimate_id,),
-        ).fetchone()
-        next_sort = ((max_sort["max_sort"] if max_sort else 0) or 0) + 1
-        
-        conn.execute(
-            """
-            INSERT INTO estimate_items (
-                estimate_id, item_name, description, quantity, unit,
-                unit_price, line_total, sort_order
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                estimate_id,
-                item_name,
-                description,
-                quantity,
-                unit,
-                unit_price,
-                line_total,
-                next_sort,
-            ),
-        )
-        
-        # Update estimate totals
-        items = get_estimate_items(conn, estimate_id)
-        totals = calculate_estimate_totals(items)
-        now = datetime.now().isoformat(timespec="seconds")
-        
-        conn.execute(
-            """
-            UPDATE estimates
-            SET subtotal = ?, tax = ?, total = ?, updated_at = ?
-            WHERE id = ?
-            """,
-            (totals["subtotal"], totals["tax"], totals["total"], now, estimate_id),
-        )
-    
-    flash("Line item added.", "success")
-    return redirect(url_for("edit_estimate", estimate_id=estimate_id))
-
-
-@app.route("/estimate/<int:estimate_id>/item/<int:item_id>/delete", methods=("POST",))
-@login_required
-@role_required("admin")
-def delete_estimate_item(estimate_id, item_id):
-    """Delete a line item from an estimate."""
-    estimate = get_estimate_or_404(estimate_id)
-    if estimate is None:
-        return redirect(url_for("estimates"))
-    
-    with get_db_connection() as conn:
-        conn.execute(
-            "DELETE FROM estimate_items WHERE id = ? AND estimate_id = ?",
-            (item_id, estimate_id),
-        )
-        
-        # Update estimate totals
-        items = get_estimate_items(conn, estimate_id)
-        totals = calculate_estimate_totals(items)
-        now = datetime.now().isoformat(timespec="seconds")
-        
-        conn.execute(
-            """
-            UPDATE estimates
-            SET subtotal = ?, tax = ?, total = ?, updated_at = ?
-            WHERE id = ?
-            """,
-            (totals["subtotal"], totals["tax"], totals["total"], now, estimate_id),
-        )
-    
-    flash("Line item deleted.", "success")
-    return redirect(url_for("edit_estimate", estimate_id=estimate_id))
-
-
-@app.route("/estimate/<int:estimate_id>/send", methods=("POST",))
-@login_required
-@role_required("admin")
-def send_estimate(estimate_id):
-    """Mark estimate as sent and optionally email it."""
-    estimate = get_estimate_or_404(estimate_id)
-    if estimate is None:
-        return redirect(url_for("estimates"))
-    
-    send_email = request.form.get("send_email") == "on"
-    
-    now = datetime.now().isoformat(timespec="seconds")
-    with get_db_connection() as conn:
-        conn.execute(
-            """
-            UPDATE estimates
-            SET status = ?, sent_at = ?, updated_at = ?
-            WHERE id = ?
-            """,
-            ("Sent", now, now, estimate_id),
-        )
-    
-    if send_email and estimate["email"]:
-        flash(f"Estimate sent to {estimate['email']}. (Email integration coming soon)", "success")
-    else:
-        flash("Estimate marked as sent.", "success")
-    
-    return redirect(url_for("view_estimate", estimate_id=estimate_id))
-
-
-@app.route("/estimate/<int:estimate_id>/approve", methods=("POST",))
-@login_required
-@role_required("admin")
-def approve_estimate(estimate_id):
-    """Mark estimate as approved."""
-    estimate = get_estimate_or_404(estimate_id)
-    if estimate is None:
-        return redirect(url_for("estimates"))
-    
-    now = datetime.now().isoformat(timespec="seconds")
-    with get_db_connection() as conn:
-        conn.execute(
-            """
-            UPDATE estimates
-            SET status = ?, approved_at = ?, updated_at = ?
-            WHERE id = ?
-            """,
-            ("Approved", now, now, estimate_id),
-        )
-    
-    flash("Estimate approved.", "success")
-    return redirect(url_for("view_estimate", estimate_id=estimate_id))
-
-
-@app.route("/estimate/<int:estimate_id>/reject", methods=("POST",))
-@login_required
-@role_required("admin")
-def reject_estimate(estimate_id):
-    """Mark estimate as rejected."""
-    estimate = get_estimate_or_404(estimate_id)
-    if estimate is None:
-        return redirect(url_for("estimates"))
-    
-    now = datetime.now().isoformat(timespec="seconds")
-    with get_db_connection() as conn:
-        conn.execute(
-            """
-            UPDATE estimates
-            SET status = ?, updated_at = ?
-            WHERE id = ?
-            """,
-            ("Rejected", now, estimate_id),
-        )
-    
-    flash("Estimate rejected.", "success")
-    return redirect(url_for("view_estimate", estimate_id=estimate_id))
-
-
-@app.route("/estimate/<int:estimate_id>/convert", methods=("POST",))
-@login_required
-@role_required("admin")
-def convert_estimate_to_job(estimate_id):
-    """Convert an approved estimate to a job in the pipeline."""
-    estimate = get_estimate_or_404(estimate_id)
-    if estimate is None:
-        return redirect(url_for("estimates"))
-    
-    if estimate["status"] != "Approved":
-        flash("Only approved estimates can be converted to jobs.", "error")
-        return redirect(url_for("view_estimate", estimate_id=estimate_id))
-    
-    # Create a job from the estimate
-    now = datetime.now().isoformat(timespec="seconds")
-    job_name = f"{estimate['service_type']} - {estimate['client_name']}"
-    
-    with get_db_connection() as conn:
-        conn.execute(
-            """
-            INSERT INTO jobs (
-                name, client_name, location, service_type, other_service_details, description, status,
-                proposal_amount, proposal_sent_date, payment_status,
-                created_at
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                job_name,
-                estimate["client_name"],
-                estimate["address"] or "See estimate",
-                estimate["service_type"],
-                estimate["other_service_details"],
-                estimate["project_description"] or f"{estimate['service_type']} project",
-                "Scheduled",
-                estimate["total"],
-                now[:10],  # Extract date from datetime
-                "Not Paid",
-                now,
-            ),
-        )
-        
-        # Get the newly created job ID
-        job = conn.execute(
-            "SELECT id FROM jobs WHERE client_name = ? AND created_at = ? ORDER BY id DESC LIMIT 1",
-            (estimate["client_name"], now),
-        ).fetchone()
-        if job is None:
-            flash("Job was created, but it could not be loaded.", "error")
-            return redirect(url_for("edit_estimate", estimate_id=estimate_id))
-    
-    flash(f"Estimate converted to job. You can now track it in the Pipeline.", "success")
-    return redirect(url_for("update_job", job_id=job["id"]))
-
-
-@app.route("/estimate/<int:estimate_id>/duplicate", methods=("POST",))
-@login_required
-@role_required("admin")
-def duplicate_estimate(estimate_id):
-    """Duplicate an estimate."""
-    estimate = get_estimate_or_404(estimate_id)
-    if estimate is None:
-        return redirect(url_for("estimates"))
-    
-    now = datetime.now().isoformat(timespec="seconds")
-    
-    with get_db_connection() as conn:
-        # Generate new estimate number
-        estimate_number = generate_estimate_number(conn)
-        
-        # Create new estimate
-        conn.execute(
-            """
-            INSERT INTO estimates (
-                estimate_number, client_name, company_name, phone, email,
-                address, city, state, zip, service_type, other_service_details, project_description,
-                status, notes, created_by, created_at, updated_at
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                estimate_number,
-                estimate["client_name"],
-                estimate["company_name"],
-                estimate["phone"],
-                estimate["email"],
-                estimate["address"],
-                estimate["city"],
-                estimate["state"],
-                estimate["zip"],
-                estimate["service_type"],
-                estimate["other_service_details"],
-                estimate["project_description"],
-                "Draft",
-                estimate["notes"],
-                g.user["id"],
-                now,
-                now,
-            ),
-        )
-        
-        # Get the new estimate ID
-        new_estimate = conn.execute(
-            "SELECT id FROM estimates WHERE estimate_number = ?",
-            (estimate_number,),
-        ).fetchone()
-        if new_estimate is None:
-            flash("Estimate was duplicated, but it could not be loaded.", "error")
-            return redirect(url_for("estimates"))
-        
-        # Copy line items
-        items = get_estimate_items(conn, estimate_id)
-        for idx, item in enumerate(items):
-            conn.execute(
-                """
-                INSERT INTO estimate_items (
-                    estimate_id, item_name, description, quantity, unit,
-                    unit_price, line_total, sort_order
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    new_estimate["id"],
-                    item["item_name"],
-                    item["description"],
-                    item["quantity"],
-                    item["unit"],
-                    item["unit_price"],
-                    item["line_total"],
-                    idx,
-                ),
-            )
-        
-        # Update totals
-        new_items = get_estimate_items(conn, new_estimate["id"])
-        totals = calculate_estimate_totals(new_items)
-        
-        conn.execute(
-            """
-            UPDATE estimates
-            SET subtotal = ?, tax = ?, total = ?
-            WHERE id = ?
-            """,
-            (totals["subtotal"], totals["tax"], totals["total"], new_estimate["id"]),
-        )
-    
-    flash(f"Estimate duplicated as {estimate_number}.", "success")
-    return redirect(url_for("edit_estimate", estimate_id=new_estimate["id"]))
-
-
-@app.route("/estimate/<int:estimate_id>/delete", methods=("POST",))
-@login_required
-@role_required("admin")
-def delete_estimate(estimate_id):
-    estimate = get_estimate_or_404(estimate_id)
-    if estimate is None:
-        return redirect(url_for("estimates"))
-
-    now = datetime.now().isoformat(timespec="seconds")
-    with get_db_connection() as conn:
-        conn.execute(
-            """
-            UPDATE estimates
-            SET deleted_at = ?, updated_at = ?
-            WHERE id = ?
-            """,
-            (now, now, estimate_id),
-        )
-
-    flash("Estimate moved to archive.", "success")
-    return redirect(url_for("estimates"))
-
-
 @app.route("/test-db")
 def test_db():
     ok, result = test_postgres_connection()
@@ -5611,6 +4840,11 @@ def get_portal_views(conn, job_id):
 
 @app.route("/portal/<token>", methods=("GET",))
 def client_portal(token):
+    report_query = request.args.get("report_q", "").strip()
+    report_sort = request.args.get("report_sort", "newest").strip().lower()
+    if report_sort not in {"newest", "oldest", "name"}:
+        report_sort = "newest"
+
     with get_db_connection() as conn:
         job = conn.execute(
             "SELECT * FROM jobs WHERE portal_token = ? AND portal_enabled = TRUE",
@@ -5632,12 +4866,30 @@ def client_portal(token):
             (job["id"],),
         ).fetchall()
         settings = load_workspace_settings(conn)
+
+    progress_reports = [doc for doc in documents if doc.get("document_type") == "Progress Report"]
+    if report_query:
+        q = report_query.lower()
+        progress_reports = [doc for doc in progress_reports if q in (doc.get("name") or "").lower()]
+
+    if report_sort == "oldest":
+        progress_reports.sort(key=lambda doc: (doc.get("created_at") or "", doc.get("id") or 0))
+    elif report_sort == "name":
+        progress_reports.sort(key=lambda doc: ((doc.get("name") or "").lower(), doc.get("id") or 0))
+    else:
+        progress_reports.sort(key=lambda doc: (doc.get("created_at") or "", doc.get("id") or 0), reverse=True)
+
+    portal_documents = [doc for doc in documents if doc.get("document_type") != "Progress Report"]
+
     return render_template(
         "portal/job.html",
         job=job,
         token=token,
         updates=updates,
         documents=documents,
+        progress_reports=progress_reports,
+        portal_documents=portal_documents,
+        report_filters={"q": report_query, "sort": report_sort},
         workspace_settings=settings,
     )
 

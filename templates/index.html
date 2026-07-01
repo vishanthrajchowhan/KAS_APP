@@ -25,10 +25,6 @@
             </span>
             {% if dashboard_role != "client" %}
                 <span>
-                    <strong>{{ ops_metrics.pending_estimates }}</strong>
-                    <small>Pending estimates</small>
-                </span>
-                <span>
                     <strong>{{ completed_jobs }}</strong>
                     <small>Closed and paid</small>
                 </span>
@@ -45,13 +41,6 @@
                 <span class="hero-action-copy">
                     <strong>+ Add Lead</strong>
                     <small>Capture a new job opportunity</small>
-                </span>
-            </a>
-            <a class="hero-action-card" href="{{ url_for('create_estimate') }}">
-                <span class="hero-action-icon" data-lucide="file-plus-2"></span>
-                <span class="hero-action-copy">
-                    <strong>Create Estimate</strong>
-                    <small>Build a professional quote</small>
                 </span>
             </a>
             <a class="hero-action-card" href="{{ url_for('clients') }}">
@@ -102,15 +91,6 @@
                 <small>Open jobs in motion</small>
             </div>
         </div>
-        {% if dashboard_role != "client" %}
-            <div class="activity-strip-item">
-                <span class="activity-strip-icon" data-lucide="file-text"></span>
-                <div>
-                    <strong>{{ ops_metrics.pending_estimates }}</strong>
-                    <small>Pending estimates</small>
-                </div>
-            </div>
-        {% endif %}
         <div class="activity-strip-item">
             <span class="activity-strip-icon" data-lucide="edit-3"></span>
             <div>
@@ -139,16 +119,6 @@
             <small>Active work in motion</small>
         </div>
     </article>
-    {% if dashboard_role != "client" %}
-        <article class="kpi-card glass-panel reveal">
-            <div class="kpi-icon"><span data-lucide="file-text"></span></div>
-            <div class="kpi-copy">
-                <span class="kpi-value" data-count="{{ ops_metrics.pending_estimates }}">{{ ops_metrics.pending_estimates }}</span>
-                <p>Pending Estimates</p>
-                <small>Quotes awaiting decision</small>
-            </div>
-        </article>
-    {% endif %}
     <article class="kpi-card glass-panel reveal">
         <div class="kpi-icon"><span data-lucide="calendar"></span></div>
         <div class="kpi-copy">
@@ -352,7 +322,7 @@ document.addEventListener('DOMContentLoaded', function() {
             <div class="panel-empty-state">
                 <span data-lucide="chart-no-axes-column-increasing"></span>
                 <strong>No pipeline data yet</strong>
-                <p>Add your first lead or estimate to start tracking job movement here.</p>
+                <p>Add your first lead to start tracking job movement here.</p>
             </div>
         {% endif %}
         </section>
@@ -379,7 +349,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div class="panel-empty-state panel-empty-state-compact">
                     <span data-lucide="radio"></span>
                     <strong>No activity yet</strong>
-                    <p>New updates from jobs and estimates will appear here.</p>
+                    <p>New updates from jobs will appear here.</p>
                 </div>
             {% endif %}
         </div>

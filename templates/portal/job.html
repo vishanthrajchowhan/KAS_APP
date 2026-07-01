@@ -107,10 +107,37 @@
 </div>
 {% endif %}
 
-{% if documents %}
+{% if progress_reports %}
+<div class="card">
+  <div class="section-label">PROGRESS REPORTS</div>
+  <form method="get" action="{{ url_for('client_portal', token=token) }}" style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 14px;">
+    <input type="search" name="report_q" value="{{ report_filters.q if report_filters else '' }}" placeholder="Search reports by name" style="flex:1;min-width:180px;">
+    <select name="report_sort">
+      <option value="newest" {% if report_filters and report_filters.sort == 'newest' %}selected{% endif %}>Newest</option>
+      <option value="oldest" {% if report_filters and report_filters.sort == 'oldest' %}selected{% endif %}>Oldest</option>
+      <option value="name" {% if report_filters and report_filters.sort == 'name' %}selected{% endif %}>Name</option>
+    </select>
+    <button class="btn" type="submit">Apply</button>
+  </form>
+  {% for report in progress_reports %}
+  <div class="doc-row">
+    <div class="doc-icon">📄</div>
+    <div style="flex:1;">
+      <div class="doc-name">{{ report.name }}</div>
+      <div class="doc-meta">PDF Progress Report{% if report.created_at %} · {{ report.created_at[:10] }}{% endif %}</div>
+    </div>
+    {% if report.file_url %}
+      <a href="{{ report.file_url }}" class="btn" target="_blank" rel="noopener">View PDF</a>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if portal_documents %}
 <div class="card">
   <div class="section-label">DOCUMENTS</div>
-  {% for doc in documents %}
+  {% for doc in portal_documents %}
   <div class="doc-row">
     <div class="doc-icon">📄</div>
     <div style="flex:1;">

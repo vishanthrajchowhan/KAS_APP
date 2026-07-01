@@ -7,7 +7,7 @@
     <div>
         <p class="eyebrow">Business Intelligence</p>
         <h1>Analytics</h1>
-        <p>Performance insights for pipeline, revenue, and estimate approvals.</p>
+        <p>Performance insights for pipeline and revenue.</p>
     </div>
 </section>
 
@@ -29,25 +29,6 @@
         </div>
     </section>
 
-    <section class="panel">
-        <h3>Approved Estimates</h3>
-        <div class="activity-feed">
-            {% if recent_approvals %}
-                {% for estimate in recent_approvals %}
-                    <div class="activity-item">
-                        <strong>{{ estimate.estimate_number }}</strong>
-                        <p class="muted" style="margin:4px 0 2px;">{{ estimate.client_name }}</p>
-                        <small>{{ money(estimate.total or 0) }}{% if estimate.approved_at %} · {{ estimate.approved_at[:10] }}{% endif %}</small>
-                    </div>
-                {% endfor %}
-            {% else %}
-                <div class="activity-item">
-                    <strong>No approved estimates yet</strong>
-                    <p class="muted" style="margin:4px 0 0;">Approved quote activity will appear here.</p>
-                </div>
-            {% endif %}
-        </div>
-    </section>
 </div>
 
 <section class="panel" style="margin-top:14px;">
