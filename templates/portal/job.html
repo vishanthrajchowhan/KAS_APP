@@ -2,14 +2,6 @@
 {% block title %}{{ job.name }} | Your Project | KAS{% endblock %}
 {% block content %}
 
-{% set status_steps = [
-  ('Estimate approved', ['Approved','Scheduled','Started','In Progress','Completed','Invoiced','Paid']),
-  ('Work started',      ['Started','In Progress','Completed','Invoiced','Paid']),
-  ('In progress',       ['In Progress','Completed','Invoiced','Paid']),
-  ('Final inspection',  ['Completed','Invoiced','Paid']),
-  ('Complete',          ['Invoiced','Paid'])
-] %}
-
 {% for doc in documents if doc.requires_client_signature and not doc.signed_at %}
 <div class="banner banner-warning">
   <div style="flex:1;">
@@ -25,26 +17,6 @@
   <div style="font-size:20px;font-weight:600;margin-bottom:2px;">{{ job.name }}</div>
   <div style="font-size:13px;color:rgba(255,255,255,0.7);margin-bottom:14px;">{{ job.location }} · Job #KAS-{{ job.id }}</div>
   <div class="pill pill-green"><div class="status-dot"></div>{{ job.status }}{% if job.created_at %} · started {{ job.created_at[:10] }}{% endif %}</div>
-</div>
-
-<div class="card">
-  <div class="section-label">PROJECT TIMELINE</div>
-  <div class="timeline-track">
-    {% for label, active_statuses in status_steps %}
-      {% set is_done = job.status in active_statuses %}
-      {% set is_active = (loop.index == 3 and job.status in ['Started','In Progress']) or
-                         (loop.index == 1 and job.status == 'Approved') or
-                         (loop.index == 2 and job.status == 'Scheduled') or
-                         (loop.index == 4 and job.status == 'Completed') or
-                         (loop.index == 5 and job.status in ['Invoiced','Paid']) %}
-      <div class="tl-step {% if is_done %}done{% endif %}">
-        <div class="tl-circle {% if is_done %}done{% elif is_active %}active{% else %}future{% endif %}">
-          {% if is_done %}✓{% else %}{{ loop.index }}{% endif %}
-        </div>
-        <div class="tl-label {% if is_active %}active{% endif %}">{{ label }}</div>
-      </div>
-    {% endfor %}
-  </div>
 </div>
 
 <div class="stat-grid" style="margin-bottom:16px;">

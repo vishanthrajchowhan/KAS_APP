@@ -22,26 +22,22 @@
         <label for="location">Location</label>
         <input id="location" name="location" type="text" value="{{ location or '' }}" maxlength="180" autocomplete="street-address">
 
-        <div class="form-section service-type-section">
-            <label>Service Types</label>
-            <details class="service-multi-select">
-                <summary>Choose one or more services</summary>
-                <div class="service-chip-selector" data-service-chip-selector data-other-value="Other" data-other-wrapper-id="other-service-wrapper" data-other-input-id="other_service_details" data-preview-id="service-chip-preview">
-                    {% for option in service_types %}
-                        <label class="service-chip-option">
-                            <input type="checkbox" name="service_type" value="{{ option }}" {% if option in (selected_service_types or []) %}checked{% endif %}>
-                            <span>{{ option }}{% if option == 'Other' %} +{% endif %}</span>
+        <div class="form-section service-type-section" data-service-points>
+            <label>Services</label>
+            <p class="help-text">Add each service as its own point. Use Add Service to create more lines.</p>
+            <div class="task-add-list" data-service-points-list>
+                {% set services = selected_service_types if selected_service_types else [''] %}
+                {% for service in services %}
+                    <div class="task-add-row" data-service-point-row>
+                        <label class="task-field task-field-wide">
+                            <span>Service Point</span>
+                            <input name="service_points" type="text" maxlength="140" value="{{ service }}" placeholder="Example: Exterior painting">
                         </label>
-                    {% endfor %}
-                </div>
-            </details>
-            <p class="help-text">Services organize the job. The actual job tasks come from your scope of work.</p>
-            <div id="service-chip-preview" class="service-chip-preview" aria-live="polite"></div>
-
-            <div id="other-service-wrapper" {% if 'Other' not in (selected_service_types or []) %}hidden{% endif %}>
-                <label for="other_service_details">Other Service Details</label>
-                <textarea id="other_service_details" name="other_service_details" rows="3" placeholder="Describe the requested service (e.g. stucco patching + elastomeric coating)">{{ other_service_details or '' }}</textarea>
+                        <button type="button" class="button" data-remove-service-point>Remove</button>
+                    </div>
+                {% endfor %}
             </div>
+            <button type="button" class="button" data-add-service-point>Add Service</button>
         </div>
 
         <label for="status">Starting Stage</label>
@@ -74,7 +70,7 @@
 
         <label for="description">Scope of Work</label>
         <textarea id="description" name="description" rows="5" placeholder="Enter one scope item per line&#10;Example:&#10;Remove failed sealant&#10;Install backer rod&#10;Apply new sealant">{{ description or '' }}</textarea>
-        <p class="help-text">Each line becomes a job task. If you leave this as a single paragraph, the app will use the selected services as the starting tasks.</p>
+        <p class="help-text">Each line becomes a job task in the checklist.</p>
 
         <div class="form-grid two">
             <button class="button button-primary button-full" type="submit">Create Lead</button>
@@ -82,4 +78,64 @@
         </div>
     </form>
 </section>
+
+<script>
+const servicePointsRoot = document.querySelector('[data-service-points]');
+if (servicePointsRoot) {
+    const list = servicePointsRoot.querySelector('[data-service-points-list]');
+    const addButton = servicePointsRoot.querySelector('[data-add-service-point]');
+
+    const createRow = (value = '') => {
+        const row = document.createElement('div');
+        row.className = 'task-add-row';
+        row.setAttribute('data-service-point-row', '');
+        row.innerHTML = `
+            <label class="task-field task-field-wide">
+                <span>Service Point</span>
+                <input name="service_points" type="text" maxlength="140" placeholder="Example: Exterior painting">
+            </label>
+            <button type="button" class="button" data-remove-service-point>Remove</button>
+        `;
+        row.querySelector('input').value = value;
+        return row;
+    };
+
+    const syncRemoveButtons = () => {
+        const rows = list.querySelectorAll('[data-service-point-row]');
+        rows.forEach((row, index) => {
+            const button = row.querySelector('[data-remove-service-point]');
+            if (!button) return;
+            button.disabled = rows.length === 1;
+            button.hidden = rows.length === 1;
+            if (rows.length === 1 && index === 0) {
+                const input = row.querySelector('input[name="service_points"]');
+                if (input) {
+                    input.placeholder = 'Example: Exterior painting';
+                }
+            }
+        });
+    };
+
+    addButton?.addEventListener('click', () => {
+        list.appendChild(createRow(''));
+        syncRemoveButtons();
+    });
+
+    list?.addEventListener('click', (event) => {
+        const trigger = event.target.closest('[data-remove-service-point]');
+        if (!trigger) return;
+        const rows = list.querySelectorAll('[data-service-point-row]');
+        if (rows.length === 1) {
+            const input = rows[0].querySelector('input[name="service_points"]');
+            if (input) input.value = '';
+            return;
+        }
+        const row = trigger.closest('[data-service-point-row]');
+        if (row) row.remove();
+        syncRemoveButtons();
+    });
+
+    syncRemoveButtons();
+}
+</script>
 {% endblock %}

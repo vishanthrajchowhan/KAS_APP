@@ -12,7 +12,6 @@
             <div class="dashboard-tags">
                 <span class="dashboard-tag">Active jobs: {{ active_jobs }}</span>
                 <span class="dashboard-tag">Overdue: {{ overdue_jobs }}</span>
-                <span class="dashboard-tag">In progress: {{ in_progress_jobs }}</span>
             </div>
         </div>
         <div class="hero-actions">
@@ -27,17 +26,12 @@
         <div class="stat-card glass-panel reveal">
             <span class="kpi-value" data-count="{{ active_jobs }}">{{ active_jobs }}</span>
             <p>Active Jobs</p>
-            <small>Scheduled, started, and in progress</small>
+            <small>Scheduled and started work</small>
         </div>
         <div class="stat-card glass-panel reveal">
             <span class="kpi-value" data-count="{{ scheduled_jobs }}">{{ scheduled_jobs }}</span>
             <p>Scheduled</p>
             <small>Ready for the field crew</small>
-        </div>
-        <div class="stat-card glass-panel reveal">
-            <span class="kpi-value" data-count="{{ in_progress_jobs }}">{{ in_progress_jobs }}</span>
-            <p>In Progress</p>
-            <small>Work actively underway</small>
         </div>
         <div class="stat-card glass-panel reveal">
             <span class="kpi-value" data-count="{{ completed_jobs }}">{{ completed_jobs }}</span>
@@ -111,15 +105,6 @@
                         <span>Due</span>
                         <strong>{{ job.effective_due_date or 'TBD' }}</strong>
                     </div>
-                </div>
-
-                <div class="job-progress-row">
-                    <span>Progress</span>
-                    <strong>{{ job.progress_percent }}%</strong>
-                </div>
-
-                <div class="progress-bar" aria-label="Job progress">
-                    <span style="--progress: {{ job.progress_percent }}%;"></span>
                 </div>
 
                 <div class="card-actions">

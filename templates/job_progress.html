@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 
-{% block title %}Progress for {{ job.name }} | KAS{% endblock %}
+{% block title %}Updates for {{ job.name }} | KAS{% endblock %}
 
 {% block content %}
 <section class="page-title">
     <div>
-        <h1>Job Progress</h1>
+        <h1>Job Updates</h1>
         {% if g.user.role == "employee" %}
             <p>{{ job.name }} at {{ job.location }}</p>
         {% else %}
@@ -31,8 +31,8 @@
         <aside class="progress-hero-aside" aria-label="Job summary">
             <div class="progress-hero-card">
                 <p class="eyebrow">Current Snapshot</p>
-                <strong>{{ task_summary.done }} / {{ task_summary.total }} scope units complete</strong>
-                <p class="muted">{{ progress.update_count or 0 }} updates and {{ progress.photo_count or 0 }} photos logged so far.</p>
+                <strong>{{ progress.update_count or 0 }} updates logged</strong>
+                <p class="muted">{{ progress.photo_count or 0 }} photos uploaded so far.</p>
             </div>
             <div class="progress-hero-meta">
                 <span><strong>Service</strong><small>{{ job.service_type or "General work" }}</small></span>
@@ -43,12 +43,7 @@
     </div>
 </section>
 
-<section class="dashboard-stats progress-stats" aria-label="Job progress summary">
-    <div class="stat-card glass-panel">
-        <span data-lucide="check-circle" style="color:#0f6a47;width:20px;height:20px;"></span>
-        <span class="kpi-value">{{ task_summary.percent }}%</span>
-        <p>Scope Done</p>
-    </div>
+<section class="dashboard-stats progress-stats" aria-label="Job update summary">
     <div class="stat-card glass-panel">
         <span data-lucide="message-square" style="color:#0f6a47;width:20px;height:20px;"></span>
         <span class="kpi-value">{{ progress.update_count or 0 }}</span>
@@ -97,13 +92,11 @@
 <section class="panel task-progress-panel">
     <div class="section-heading-row">
         <div>
-            <p class="eyebrow">Scope Progress</p>
+            <p class="eyebrow">Scope Tasks</p>
             <h2>Task Checklist</h2>
             <p class="help-text">{{ task_summary.done }} of {{ task_summary.total }} scope units complete across {{ task_summary.task_total }} tasks.</p>
         </div>
-        <span class="task-percent">{{ task_summary.percent }}%</span>
     </div>
-    <div class="task-progress-track"><span style="--progress: {{ task_summary.percent }}%;"></span></div>
     {% if tasks %}
         <div class="task-list readonly">
             {% for task in tasks %}
@@ -155,7 +148,7 @@
     <input type="hidden" name="next" value="{{ request.path }}">
 {% endif %}
 <section class="updates progress-timeline">
-    <h2>Progress Timeline</h2>
+    <h2>Update History</h2>
     {% if update_days %}
         {% for day in update_days %}
             {% set day_loop = loop.index %}
@@ -271,7 +264,7 @@
         {% endfor %}
     {% else %}
         <section class="empty-state">
-            <h2>No progress yet</h2>
+            <h2>No updates yet</h2>
             <p>No updates have been submitted for this job yet.</p>
             <a class="button button-primary" href="{{ url_for('update_job', job_id=job.id) }}">Open Job</a>
         </section>

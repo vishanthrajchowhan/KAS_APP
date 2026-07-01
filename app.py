@@ -1655,6 +1655,21 @@ def split_services(value):
     return deduped
 
 
+def parse_service_points(values):
+    points = []
+    seen = set()
+    for value in values:
+        item = (value or "").strip()
+        if not item:
+            continue
+        lowered = item.lower()
+        if lowered in seen:
+            continue
+        seen.add(lowered)
+        points.append(item)
+    return points
+
+
 def sanitize_selected_services(values, allowed_services):
     allowed = set(allowed_services)
     selected = []
@@ -2745,9 +2760,9 @@ def add_job():
         client_name = request.form.get("client_name", "").strip()
         location = request.form.get("location", "").strip()
         due_date = request.form.get("due_date", "").strip() or None
-        selected_service_types = sanitize_selected_services(request.form.getlist("service_type"), JOB_SERVICE_TYPES)
+        selected_service_types = parse_service_points(request.form.getlist("service_points"))
         service_type = compose_service_text(selected_service_types)
-        other_service_details = request.form.get("other_service_details", "").strip()
+        other_service_details = ""
         description = request.form.get("description", "").strip()
         status = request.form.get("status", "Lead").strip()
         proposal_amount = parse_money(request.form.get("proposal_amount"))
@@ -2757,8 +2772,6 @@ def add_job():
 
         if status not in STATUSES:
             status = "Lead"
-        if OTHER_SERVICE_LABEL not in selected_service_types:
-            other_service_details = ""
 
         with get_db_connection() as conn:
             employees = conn.execute(
@@ -2782,7 +2795,6 @@ def add_job():
                 status=status,
                 proposal_amount=proposal_amount,
                 proposal_sent_date=proposal_sent_date,
-                service_types=JOB_SERVICE_TYPES,
                 statuses=STATUSES,
                 employees=employees,
                 clients=clients,
@@ -2840,7 +2852,6 @@ def add_job():
     return render_template(
         "add_job.html",
         statuses=STATUSES,
-        service_types=JOB_SERVICE_TYPES,
         selected_service_types=[],
         due_date="",
         employees=employees,
@@ -3241,12 +3252,10 @@ def update_job(job_id):
     return render_template(
         "update_job.html",
         job=job,
-        materials_used_items=parse_materials_used_items(job["materials_used"] or ""),
         selected_service_types=split_services(job["service_type"]),
         updates=updates,
         update_days=update_days,
         statuses=STATUSES,
-        service_types=JOB_SERVICE_TYPES,
         pre_construction_statuses=PRE_CONSTRUCTION_STATUSES,
         execution_statuses=EXECUTION_STATUSES,
         financial_statuses=FINANCIAL_STATUSES,
@@ -3470,21 +3479,14 @@ def submit_update():
     status_input = request.form.get("status", "").strip()
     notes = request.form.get("notes", "").strip()
     client_name = request.form.get("client_name", "").strip()
-    proposal_amount = parse_money(request.form.get("proposal_amount"))
-    proposal_sent_date = parse_date(request.form.get("proposal_sent_date"))
-    decision_date = parse_date(request.form.get("decision_date"))
-    rejection_reason = request.form.get("rejection_reason", "").strip()
-    invoice_amount = parse_money(request.form.get("invoice_amount"))
-    payment_status = request.form.get("payment_status", "Not Paid").strip()
     files = request.files.getlist("images")
     receipt_files = request.files.getlist("receipts")
     photos_client_visible = is_admin() and parse_checkbox(request.form.get("photos_client_visible"))
     assigned_to = request.form.get("assigned_to", type=int)
     client_id = request.form.get("client_id", type=int)
-    selected_service_types = sanitize_selected_services(request.form.getlist("service_type"), JOB_SERVICE_TYPES)
+    selected_service_types = parse_service_points(request.form.getlist("service_points"))
     service_type = compose_service_text(selected_service_types)
-    other_service_details = request.form.get("other_service_details", "").strip()
-    materials_used = request.form.get("materials_used", "").strip()
+    other_service_details = ""
     due_date = request.form.get("due_date", "").strip() or None
 
     if not job_id:
@@ -3498,6 +3500,14 @@ def submit_update():
         flash("You do not have permission to update that job.", "error")
         return redirect(url_for("index"))
 
+    # These fields are intentionally managed outside the update form.
+    proposal_amount = job["proposal_amount"]
+    proposal_sent_date = job["proposal_sent_date"]
+    decision_date = job["decision_date"]
+    rejection_reason = job["rejection_reason"] or ""
+    invoice_amount = job["invoice_amount"]
+    payment_status = job["payment_status"] or "Not Paid"
+
     if is_admin():
         status = status_input
         if status not in STATUSES:
@@ -3506,26 +3516,13 @@ def submit_update():
     else:
         status = job["status"]
 
-    if payment_status not in PAYMENT_STATUSES:
-        flash("Please choose a valid payment status.", "error")
-        return redirect(url_for("update_job", job_id=job_id))
-
     if is_employee():
         client_name = job["client_name"] or ""
-        proposal_amount = job["proposal_amount"]
-        proposal_sent_date = job["proposal_sent_date"]
-        decision_date = job["decision_date"]
-        rejection_reason = job["rejection_reason"] or ""
-        invoice_amount = job["invoice_amount"]
-        payment_status = job["payment_status"] or "Not Paid"
         assigned_to = job["assigned_to"]
         client_id = job["client_id"]
         service_type = job["service_type"] or ""
         other_service_details = job["other_service_details"] or ""
         due_date = job["due_date"] or None
-    else:
-        if OTHER_SERVICE_LABEL not in selected_service_types:
-            other_service_details = ""
 
     if status == "Rejected" and not rejection_reason:
         flash("Please add a rejection reason before marking a job rejected.", "error")
@@ -3534,16 +3531,6 @@ def submit_update():
     if payment_status == "Paid" and invoice_amount is None and job["invoice_amount"] is None:
         flash("Enter an invoice amount before marking the job paid.", "error")
         return redirect(url_for("update_job", job_id=job_id))
-
-    today = datetime.now().date().isoformat()
-    if status == "Proposal Sent" and proposal_sent_date is None:
-        proposal_sent_date = today
-    if status in ("Approved", "Rejected") and decision_date is None:
-        decision_date = today
-    if payment_status == "Paid":
-        status = "Paid"
-    elif invoice_amount is not None and status == "Completed":
-        status = "Invoiced"
 
     task_updates = {}
     current_tasks = []
@@ -3649,7 +3636,6 @@ def submit_update():
             client_id != job["client_id"],
             service_type != (job["service_type"] or ""),
             other_service_details != (job["other_service_details"] or ""),
-            materials_used != (job["materials_used"] or ""),
             due_date != (job["due_date"] or None),
         ]
     )
@@ -3714,7 +3700,6 @@ def submit_update():
                     due_date = ?,
                     service_type = ?,
                     other_service_details = ?,
-                    materials_used = ?,
                     proposal_amount = ?,
                     proposal_sent_date = ?,
                     decision_date = ?,
@@ -3731,7 +3716,6 @@ def submit_update():
                     due_date,
                     service_type,
                     other_service_details,
-                    materials_used,
                     proposal_amount,
                     proposal_sent_date,
                     decision_date,

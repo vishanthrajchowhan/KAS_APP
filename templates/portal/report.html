@@ -16,7 +16,6 @@
     {% set sections = [
       ('project_summary',  'Project Summary'),
       ('completed_work',   'Work Completed'),
-      ('materials_used',   'Materials Used'),
       ('issues_found',     'Issues Found'),
       ('safety_notes',     'Safety Notes'),
       ('next_steps',       'Next Steps')
@@ -32,7 +31,7 @@
     try {
       const raw = {{ report.report_text | tojson }};
       const data = typeof raw === 'string' ? JSON.parse(raw) : raw;
-      const keys = ['project_summary','completed_work','materials_used','issues_found','safety_notes','next_steps'];
+      const keys = ['project_summary','completed_work','issues_found','safety_notes','next_steps'];
       keys.forEach(k => {
         const el = document.getElementById('section-' + k);
         if (el) el.textContent = data[k] || 'No information recorded.';

@@ -44,7 +44,7 @@
                 </div>
                 <div class="crew-card">
                     <strong>Field Updates</strong>
-                    <p class="muted" style="margin:4px 0 6px;">{{ updates|length }} timeline entries</p>
+                    <p class="muted" style="margin:4px 0 6px;">{{ updates|length }} updates logged</p>
                     <span class="crew-status">Reporting active</span>
                 </div>
                 <div class="crew-card">
@@ -96,24 +96,22 @@
                 {% endif %}
 
                 {% if can_manage_jobs %}
-                    <label>Service Types</label>
-                    <details class="service-multi-select">
-                        <summary>Choose one or more services</summary>
-                        <div class="service-chip-selector" data-service-chip-selector data-other-value="Other" data-other-wrapper-id="other-service-wrapper" data-other-input-id="other_service_details" data-preview-id="service-chip-preview">
-                            {% for option in service_types %}
-                                <label class="service-chip-option">
-                                    <input type="checkbox" name="service_type" value="{{ option }}" {% if option in (selected_service_types or []) %}checked{% endif %}>
-                                    <span>{{ option }}{% if option == 'Other' %} +{% endif %}</span>
-                                </label>
+                    <div class="form-section service-type-section" data-service-points>
+                        <label>Services</label>
+                        <p class="help-text">Add each service as a point. Use Add Service to include more items.</p>
+                        <div class="task-add-list" data-service-points-list>
+                            {% set services = selected_service_types if selected_service_types else [''] %}
+                            {% for service in services %}
+                                <div class="task-add-row" data-service-point-row>
+                                    <label class="task-field task-field-wide">
+                                        <span>Service Point</span>
+                                        <input name="service_points" type="text" maxlength="140" value="{{ service }}" placeholder="Example: Exterior painting">
+                                    </label>
+                                    <button type="button" class="button" data-remove-service-point>Remove</button>
+                                </div>
                             {% endfor %}
                         </div>
-                    </details>
-                    <p class="help-text">Services organize the job. The checklist below should match the real scope of work, not a generic template.</p>
-                    <div id="service-chip-preview" class="service-chip-preview" aria-live="polite"></div>
-
-                    <div id="other-service-wrapper" {% if 'Other' not in (selected_service_types or []) %}hidden{% endif %}>
-                        <label for="other_service_details">Other Service Details</label>
-                        <textarea id="other_service_details" name="other_service_details" rows="3" placeholder="Describe custom services">{{ job.other_service_details or '' }}</textarea>
+                        <button type="button" class="button" data-add-service-point>Add Service</button>
                     </div>
 
                     <div class="form-grid two">
@@ -141,149 +139,9 @@
                     <input id="due_date" name="due_date" type="date" value="{{ job.due_date or '' }}">
                 {% endif %}
 
-                <label for="materials_used">Materials Used</label>
-                <textarea id="materials_used" name="materials_used" rows="4" placeholder="Enter one material per line&#10;Example:&#10;Primer&#10;Sealant&#10;Backer rod">{{ job.materials_used or '' }}</textarea>
-                <p class="help-text">These materials will be shown above as bullet points.</p>
             </section>
 
-            {% if can_manage_jobs %}
-                <section class="form-section task-planner">
-                    <div class="section-heading-row">
-                        <div>
-                            <h2>Job Tasks</h2>
-                            <p class="help-text">{{ task_summary.done }} of {{ task_summary.total }} scope units complete across {{ task_summary.task_total }} tasks.</p>
-                        </div>
-                        <span class="task-percent">{{ task_summary.percent }}%</span>
-                    </div>
-                    <div class="task-progress-track"><span style="--progress: {{ task_summary.percent }}%;"></span></div>
-                    {% if tasks %}
-                        <div class="task-list">
-                            {% for task in tasks %}
-                                <div class="task-row task-row-edit task-row-{{ task.status_class }}" data-task-row>
-                                    <span>
-                                        <strong>{{ task.title }}</strong>
-                                        <small>{{ task.service_type or 'General' }}</small>
-                                        <small class="task-progress-copy">{{ task.progress_text }}</small>
-                                        {% if task.is_custom %}
-                                            <small class="task-badge">Custom task</small>
-                                        {% endif %}
-                                    </span>
-                                    <div class="task-control-stack">
-                                        <label class="task-remove-toggle">
-                                            <input type="checkbox" name="remove_task_ids" value="{{ task.id }}">
-                                            <span>Remove this task</span>
-                                        </label>
-                                        <label class="task-field">
-                                            <span>Track By</span>
-                                            <select name="task_tracking_{{ task.id }}" aria-label="Tracking mode for {{ task.title }}" data-task-tracking-select>
-                                                {% for option in task_tracking_modes %}
-                                                    <option value="{{ option }}" {% if task.tracking_mode == option %}selected{% endif %}>{{ option|title }}</option>
-                                                {% endfor %}
-                                            </select>
-                                        </label>
-                                        <div class="task-status-fields" data-task-status-fields {% if task.tracking_mode == 'count' %}hidden{% endif %}>
-                                            <label class="task-field">
-                                                <span>Status</span>
-                                                <select name="task_status_{{ task.id }}" aria-label="Status for {{ task.title }}">
-                                                    {% for option in task_statuses %}
-                                                        <option value="{{ option }}" {% if task.status == option %}selected{% endif %}>{{ option }}</option>
-                                                    {% endfor %}
-                                                </select>
-                                            </label>
-                                        </div>
-                                        <div class="task-count-fields" data-task-count-fields {% if task.tracking_mode != 'count' %}hidden{% endif %}>
-                                            <div class="task-input-grid">
-                                                <label class="task-field">
-                                                    <span>Total</span>
-                                                    <input name="task_target_{{ task.id }}" type="number" min="1" step="1" value="{{ task.target_quantity if task.target_quantity else '' }}" aria-label="Total quantity for {{ task.title }}">
-                                                </label>
-                                                <label class="task-field">
-                                                    <span>Completed</span>
-                                                    <input name="task_completed_{{ task.id }}" type="number" min="0" step="1" value="{{ task.completed_quantity if task.tracking_mode == 'count' else 0 }}" aria-label="Completed quantity for {{ task.title }}">
-                                                </label>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            {% endfor %}
-                        </div>
-                        <div class="task-adder" data-task-adder>
-                            <div class="section-heading-row">
-                                <div>
-                                    <h3>Add Scope Item</h3>
-                                    <p class="help-text">Add custom scope items under a service type when the default checklist is not enough.</p>
-                                </div>
-                                <button type="button" class="button" data-add-task-row>Add another</button>
-                            </div>
-                            <div class="task-add-list" data-task-add-list>
-                                <div class="task-add-row">
-                                    <label class="task-field">
-                                        <span>Service Type</span>
-                                        <select name="new_task_service">
-                                            <option value="">General</option>
-                                            {% for option in selected_service_types %}
-                                                <option value="{{ option }}">{{ option }}</option>
-                                            {% endfor %}
-                                        </select>
-                                    </label>
-                                    <label class="task-field task-field-wide">
-                                        <span>Scope Item</span>
-                                        <input name="new_task_title" type="text" maxlength="140" placeholder="Example: Seal lobby windows on level 2">
-                                    </label>
-                                </div>
-                            </div>
-                        </div>
-                    {% else %}
-                        <p class="muted">Save services once to create the task checklist.</p>
-                    {% endif %}
-                </section>
-            {% endif %}
-
-            {% if can_view_financials %}
-                <section class="form-section">
-                    <h2>Proposal</h2>
-                    <div class="form-grid two">
-                        <div>
-                            <label for="proposal_amount">Amount</label>
-                            <input id="proposal_amount" name="proposal_amount" type="number" min="0" step="0.01" value="{{ job.proposal_amount or '' }}" placeholder="0.00">
-                        </div>
-                        <div>
-                            <label for="proposal_sent_date">Sent Date</label>
-                            <input id="proposal_sent_date" name="proposal_sent_date" type="date" value="{{ job.proposal_sent_date or '' }}">
-                        </div>
-                    </div>
-                </section>
-
-                <section class="form-section">
-                    <h2>Decision</h2>
-                    <label for="decision_date">Decision Date</label>
-                    <input id="decision_date" name="decision_date" type="date" value="{{ job.decision_date or '' }}">
-
-                    <label for="rejection_reason">Rejected Reason</label>
-                    <textarea id="rejection_reason" name="rejection_reason" rows="3" placeholder="Required when status is Rejected">{{ job.rejection_reason or '' }}</textarea>
-                </section>
-
-                <section class="form-section">
-                    <h2>Financial</h2>
-                    {% if job.status == "Completed" %}
-                        <p class="help-text">This job is completed. Enter an invoice amount to move it into Invoiced.</p>
-                    {% endif %}
-                    <div class="form-grid two">
-                        <div>
-                            <label for="invoice_amount">Invoice Amount</label>
-                            <input id="invoice_amount" name="invoice_amount" type="number" min="0" step="0.01" value="{{ job.invoice_amount or '' }}" placeholder="0.00">
-                        </div>
-                        <div>
-                            <label for="payment_status">Payment Status</label>
-                            <select id="payment_status" name="payment_status">
-                                {% for option in payment_statuses %}
-                                    <option value="{{ option }}" {% if (job.payment_status or 'Not Paid') == option %}selected{% endif %}>{{ option }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                    </div>
-                </section>
-            {% endif %}
+            
 
             <section class="form-section">
                 <h2>New Update</h2>
@@ -565,43 +423,56 @@ function copyPortalLink(button) {
     }, 2000);
 }
 
-document.querySelectorAll('[data-task-row]').forEach((row) => {
-    const modeSelect = row.querySelector('[data-task-tracking-select]');
-    const statusFields = row.querySelector('[data-task-status-fields]');
-    const countFields = row.querySelector('[data-task-count-fields]');
+const servicePointsRoot = document.querySelector('[data-service-points]');
+if (servicePointsRoot) {
+    const list = servicePointsRoot.querySelector('[data-service-points-list]');
+    const addButton = servicePointsRoot.querySelector('[data-add-service-point]');
 
-    if (!modeSelect || !statusFields || !countFields) {
-        return;
-    }
-
-    const syncTaskFields = () => {
-        const isCountMode = modeSelect.value === 'count';
-        statusFields.hidden = isCountMode;
-        countFields.hidden = !isCountMode;
+    const createRow = (value = '') => {
+        const row = document.createElement('div');
+        row.className = 'task-add-row';
+        row.setAttribute('data-service-point-row', '');
+        row.innerHTML = `
+            <label class="task-field task-field-wide">
+                <span>Service Point</span>
+                <input name="service_points" type="text" maxlength="140" placeholder="Example: Exterior painting">
+            </label>
+            <button type="button" class="button" data-remove-service-point>Remove</button>
+        `;
+        row.querySelector('input').value = value;
+        return row;
     };
 
-    modeSelect.addEventListener('change', syncTaskFields);
-    syncTaskFields();
-});
-
-const taskAdder = document.querySelector('[data-task-adder]');
-if (taskAdder) {
-    const addList = taskAdder.querySelector('[data-task-add-list]');
-    const addButton = taskAdder.querySelector('[data-add-task-row]');
-    const templateRow = addList ? addList.querySelector('.task-add-row') : null;
-
-    if (addList && addButton && templateRow) {
-        addButton.addEventListener('click', () => {
-            const clone = templateRow.cloneNode(true);
-            clone.querySelectorAll('input').forEach((input) => {
-                input.value = '';
-            });
-            clone.querySelectorAll('select').forEach((select) => {
-                select.selectedIndex = 0;
-            });
-            addList.appendChild(clone);
+    const syncRemoveButtons = () => {
+        const rows = list.querySelectorAll('[data-service-point-row]');
+        rows.forEach((row) => {
+            const button = row.querySelector('[data-remove-service-point]');
+            if (!button) return;
+            button.disabled = rows.length === 1;
+            button.hidden = rows.length === 1;
         });
-    }
+    };
+
+    addButton?.addEventListener('click', () => {
+        list.appendChild(createRow(''));
+        syncRemoveButtons();
+    });
+
+    list?.addEventListener('click', (event) => {
+        const trigger = event.target.closest('[data-remove-service-point]');
+        if (!trigger) return;
+        const rows = list.querySelectorAll('[data-service-point-row]');
+        if (rows.length === 1) {
+            const input = rows[0].querySelector('input[name="service_points"]');
+            if (input) input.value = '';
+            return;
+        }
+        const row = trigger.closest('[data-service-point-row]');
+        if (row) row.remove();
+        syncRemoveButtons();
+    });
+
+    syncRemoveButtons();
 }
 </script>
 

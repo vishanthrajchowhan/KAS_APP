@@ -13,9 +13,9 @@
         {% if dashboard_role == "admin" %}
             <p>Operations dashboard for KAS Waterproofing &amp; Building Services.</p>
         {% elif dashboard_role == "employee" %}
-            <p>Your assigned field jobs, updates, and timeline visibility in a mobile-ready workspace.</p>
+            <p>Your assigned field jobs, updates, and update visibility in a mobile-ready workspace.</p>
         {% else %}
-            <p>Track your project progress, updates, and completion milestones from your client portal view.</p>
+            <p>Track your project updates and completion milestones from your client portal view.</p>
         {% endif %}
 
         <div class="hero-insight-row" aria-label="Operations summary">
@@ -420,20 +420,6 @@ document.addEventListener('DOMContentLoaded', function() {
 {% if jobs %}
 <section class="job-list premium-job-list" aria-label="Job list">
     {% for job in jobs %}
-        {% set progress_map = {
-            'Lead': 10,
-            'Estimating': 20,
-            'Proposal Sent': 35,
-            'Negotiation': 45,
-            'Approved': 55,
-            'Scheduled': 62,
-            'Started': 70,
-            'In Progress': 82,
-            'Completed': 92,
-            'Invoiced': 96,
-            'Paid': 100,
-            'Rejected': 0
-        } %}
         <article class="job-card">
             <div class="job-card-top">
                 <div class="job-card-copy">
@@ -448,7 +434,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
                 <div class="job-card-side">
                     <span class="status status-{{ job.status|lower|replace(' ', '-') }}">{{ job.status }}</span>
-                    <span class="job-progress-badge">{{ progress_map.get(job.status, 0) }}% progress</span>
                 </div>
             </div>
 
@@ -471,19 +456,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 <span><strong>Last update</strong>{{ job.last_update|replace('T', ' ') if job.last_update else 'No updates yet' }}</span>
             </div>
 
-            <div class="job-progress" style="--progress: {{ progress_map.get(job.status, 0) }}%;">
-                <div style="display:flex; justify-content:space-between; gap:8px;">
-                    <small class="muted">Progress</small>
-                    <small class="muted">{{ progress_map.get(job.status, 0) }}%</small>
-                </div>
-                <div class="track"><div class="fill"></div></div>
-            </div>
-
             <div class="job-actions">
                 <a class="button button-primary button-compact" href="{{ url_for('job_progress', job_id=job.id) }}">View</a>
                 {% if dashboard_role != "client" %}
                     <a class="button button-compact" href="{{ url_for('update_job', job_id=job.id) }}">Edit</a>
-                    <a class="button" href="{{ url_for('job_progress', job_id=job.id) }}">Timeline</a>
                 {% endif %}
                 {% if can_manage_jobs %}
                     <form method="post" action="{{ url_for('delete_job', job_id=job.id) }}" onsubmit="return confirm('Delete this job?');">

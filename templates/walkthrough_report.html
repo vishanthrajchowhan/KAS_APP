@@ -51,7 +51,7 @@
   </div>
   {% endif %}
 
-  {% for title, key in [('Completed Work', 'completed_work'), ('Materials Used', 'materials_used'), ('Issues Found', 'issues_found'), ('Safety Notes', 'safety_notes'), ('Next Steps', 'next_steps')] %}
+  {% for title, key in [('Completed Work', 'completed_work'), ('Issues Found', 'issues_found'), ('Safety Notes', 'safety_notes'), ('Next Steps', 'next_steps')] %}
     <div class="section">
       <h2>{{ title }}</h2>
       <div class="box">{{ (ai.get(key) or 'None noted.')|report_value }}</div>
