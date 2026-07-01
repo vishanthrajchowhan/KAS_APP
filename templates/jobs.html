@@ -22,29 +22,6 @@
         </div>
     </section>
 
-    <section class="management-stats stagger-grid" aria-label="Job summary">
-        <div class="stat-card glass-panel reveal">
-            <span class="kpi-value" data-count="{{ active_jobs }}">{{ active_jobs }}</span>
-            <p>Active Jobs</p>
-            <small>Scheduled and started work</small>
-        </div>
-        <div class="stat-card glass-panel reveal">
-            <span class="kpi-value" data-count="{{ scheduled_jobs }}">{{ scheduled_jobs }}</span>
-            <p>Scheduled</p>
-            <small>Ready for the field crew</small>
-        </div>
-        <div class="stat-card glass-panel reveal">
-            <span class="kpi-value" data-count="{{ completed_jobs }}">{{ completed_jobs }}</span>
-            <p>Completed</p>
-            <small>Finished or paid projects</small>
-        </div>
-        <div class="stat-card glass-panel reveal">
-            <span class="kpi-value" data-count="{{ overdue_jobs }}">{{ overdue_jobs }}</span>
-            <p>Overdue</p>
-            <small>Past their due date</small>
-        </div>
-    </section>
-
     <form class="jobs-toolbar glass-panel reveal" method="get" action="{{ url_for('jobs') }}">
         <div>
             <label for="q">Search jobs</label>

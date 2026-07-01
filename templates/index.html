@@ -110,33 +110,6 @@
     </div>
 </section>
 
-<section class="dashboard-kpis premium-kpis stagger-grid" aria-label="Business summary">
-    <article class="kpi-card kpi-primary glass-panel reveal">
-        <div class="kpi-icon"><span data-lucide="briefcase"></span></div>
-        <div class="kpi-copy">
-            <span class="kpi-value" data-count="{{ ops_metrics.open_jobs }}">{{ ops_metrics.open_jobs }}</span>
-            <p>Open Jobs</p>
-            <small>Active work in motion</small>
-        </div>
-    </article>
-    <article class="kpi-card glass-panel reveal">
-        <div class="kpi-icon"><span data-lucide="calendar"></span></div>
-        <div class="kpi-copy">
-            <span class="kpi-value" data-count="{{ ops_metrics.scheduled_this_week }}">{{ ops_metrics.scheduled_this_week }}</span>
-            <p>Scheduled This Week</p>
-            <small>Upcoming field work</small>
-        </div>
-    </article>
-    <article class="kpi-card glass-panel reveal">
-        <div class="kpi-icon"><span data-lucide="edit-3"></span></div>
-        <div class="kpi-copy">
-            <span class="kpi-value" data-count="{{ ops_metrics.field_updates_today }}">{{ ops_metrics.field_updates_today }}</span>
-            <p>Field Updates Today</p>
-            <small>Latest crew reporting</small>
-        </div>
-    </article>
-</section>
-
 <!-- Quick Add Update Modal -->
 <div id="quick-update-modal" class="modal" aria-hidden="true" style="display:none;">
     <div class="modal-backdrop"></div>
