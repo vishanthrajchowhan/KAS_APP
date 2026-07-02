@@ -22,16 +22,7 @@
     <link rel="icon" href="{{ dynamic_favicon }}" type="{{ workspace_settings.favicon_mimetype if workspace_settings is defined and workspace_settings.favicon_mimetype else 'image/svg+xml' }}">
     <link rel="apple-touch-icon" href="{{ company_logo_url if company_logo_url else dynamic_favicon }}">
     <link rel="apple-touch-startup-image" href="{{ url_for('static', filename='icons/apple-splash.svg') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v=8">
-    <!-- Dev override: temporary spacing/typography tweaks to verify changes immediately -->
-    <style id="dev-override">
-        .page { padding: 36px !important; }
-        .panel { padding: 36px !important; border-radius: 18px !important; }
-        .dashboard-stats > div { padding: 28px !important; }
-        .hero-action-card { min-height: 120px !important; padding: 24px !important; }
-        .task-row { padding: 20px !important; border-radius: 18px !important; }
-        .job-card-top { margin-bottom: 22px !important; }
-    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v=9">
     <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
