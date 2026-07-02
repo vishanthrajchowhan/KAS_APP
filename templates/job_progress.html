@@ -3,7 +3,10 @@
 {% block title %}Updates for {{ job.name }} | KAS{% endblock %}
 
 {% block content %}
-<section class="page-title">
+{% set reports_count = (reports|length if reports else 0) + (progress_reports|length if progress_reports else 0) %}
+
+<section class="job-progress-dashboard">
+<section class="page-title job-progress-header">
     <div>
         <h1>Job Updates</h1>
         {% if g.user.role == "employee" %}
@@ -15,7 +18,7 @@
     <a class="button button-primary" href="{{ url_for('update_job', job_id=job.id) }}">Open Job</a>
 </section>
 
-<section class="progress-hero">
+<section class="progress-hero glass-panel">
     <div class="progress-hero-grid">
         <div class="progress-hero-copy">
             <span class="status status-{{ job.status|lower|replace(' ', '-') }}">{{ job.status }}</span>
@@ -55,6 +58,11 @@
         <p>Photos</p>
     </div>
     <div class="stat-card glass-panel">
+        <span data-lucide="file-text" style="color:#0f6a47;width:20px;height:20px;"></span>
+        <span class="kpi-value">{{ reports_count }}</span>
+        <p>Reports</p>
+    </div>
+    <div class="stat-card glass-panel">
         <span data-lucide="calendar-clock" style="color:#0f6a47;width:20px;height:20px;"></span>
         <div class="timeline-stat">
             <span>
@@ -70,7 +78,7 @@
 </section>
 
 {% if reports %}
-<section class="panel">
+<section class="panel job-progress-panel glass-panel">
     <h3>Uploaded Reports</h3>
     <div class="report-list">
         {% for r in reports %}
@@ -90,7 +98,7 @@
 {% endif %}
 
 {% if progress_reports %}
-<section class="panel">
+<section class="panel job-progress-panel glass-panel">
     <h3>Progress Reports</h3>
     <div class="report-list">
         {% for report in progress_reports %}
@@ -110,7 +118,7 @@
 </section>
 {% endif %}
 
-<section class="panel task-progress-panel">
+<section class="panel task-progress-panel job-progress-panel glass-panel">
     <div class="section-heading-row">
         <div>
             <h2>Scope Tasks</h2>
@@ -163,7 +171,7 @@
 <form id="job-media-changes-form" method="post" action="{{ url_for('save_media_changes') }}">
     <input type="hidden" name="next" value="{{ request.path }}">
 {% endif %}
-<section class="updates progress-timeline">
+<section class="updates progress-timeline job-progress-panel glass-panel">
     <h2>Update History</h2>
     {% if update_days %}
         {% for day in update_days %}
@@ -294,6 +302,7 @@
 {% if can_manage_jobs %}
 </form>
 {% endif %}
+</section>
 <script>
 const mediaChangesForm = document.getElementById('job-media-changes-form');
 if (mediaChangesForm) {

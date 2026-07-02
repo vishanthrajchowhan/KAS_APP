@@ -1250,6 +1250,110 @@ label { text-transform:uppercase; font-size:0.72rem; color:var(--muted); }
     background: color-mix(in srgb, var(--surface-2) 60%, var(--surface));
 }
 
+.job-progress-dashboard {
+    display: grid;
+    gap: 22px;
+    position: relative;
+}
+
+.job-progress-dashboard::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(circle at 8% 10%, color-mix(in srgb, var(--primary) 12%, transparent), transparent 42%),
+                radial-gradient(circle at 92% 90%, color-mix(in srgb, var(--primary-2) 12%, transparent), transparent 36%);
+    opacity: 0.9;
+}
+
+.job-progress-dashboard > * {
+    position: relative;
+    z-index: 1;
+}
+
+.job-progress-header {
+    margin-bottom: 0;
+    align-items: center;
+}
+
+.job-progress-dashboard .glass-panel,
+.job-progress-dashboard .job-progress-panel,
+.job-progress-dashboard .timeline-day-card {
+    background: linear-gradient(145deg, color-mix(in srgb, var(--surface) 92%, white), color-mix(in srgb, var(--surface-2) 90%, transparent));
+    border: 1px solid color-mix(in srgb, var(--line) 76%, transparent);
+    box-shadow: 0 18px 38px color-mix(in srgb, #0a120f 10%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.42);
+    backdrop-filter: blur(9px);
+}
+
+.job-progress-dashboard .progress-hero {
+    border-radius: 24px;
+}
+
+.job-progress-dashboard .progress-hero-card,
+.job-progress-dashboard .progress-hero-meta {
+    background: linear-gradient(160deg, color-mix(in srgb, var(--surface-2) 82%, white), color-mix(in srgb, var(--surface) 92%, transparent));
+    border-color: color-mix(in srgb, var(--line) 78%, transparent);
+}
+
+.job-progress-dashboard .progress-stats > div {
+    border-radius: 20px;
+    min-height: 142px;
+}
+
+.job-progress-dashboard .job-progress-panel {
+    border-radius: 22px;
+}
+
+.job-progress-dashboard .job-progress-panel > h2,
+.job-progress-dashboard .job-progress-panel > h3 {
+    margin-top: 2px;
+    margin-bottom: 14px;
+}
+
+.job-progress-dashboard .report-list {
+    display: grid;
+    gap: 12px;
+}
+
+.job-progress-dashboard .report-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 14px;
+    border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--surface-2) 72%, var(--surface));
+}
+
+.job-progress-dashboard .report-row > div:last-child {
+    display: inline-flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.job-progress-dashboard .task-list.readonly .task-row {
+    grid-template-columns: 1fr;
+}
+
+.job-progress-dashboard .task-row {
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--surface-2) 80%, var(--surface));
+}
+
+.job-progress-dashboard .timeline-day-card {
+    border-radius: 22px;
+}
+
+.job-progress-dashboard .timeline-day-header {
+    background: linear-gradient(180deg, color-mix(in srgb, var(--surface-2) 72%, var(--surface)), color-mix(in srgb, var(--surface) 92%, transparent));
+}
+
+.job-progress-dashboard .timeline-entry + .timeline-entry {
+    border-top-color: color-mix(in srgb, var(--line) 70%, transparent);
+}
+
 .progress-hero h2 {
     margin-top: 10px;
 }
@@ -2426,6 +2530,15 @@ tbody tr:last-child td {
     .media-bulk-actions {
         align-items: stretch;
         flex-direction: column;
+    }
+
+    .job-progress-dashboard .report-row {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .job-progress-dashboard .report-row > div:last-child {
+        justify-content: flex-start;
     }
 }
 
