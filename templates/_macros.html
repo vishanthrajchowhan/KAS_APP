@@ -1,0 +1,60 @@
+{# ==========================================================================
+   KAS Reusable Jinja Macros — premium components
+   Import in any template with:
+     {% from "_macros.html" import stat_card, status_badge, button, empty_state %}
+   These are additive helpers for NEW markup only — no existing template
+   was required to adopt them, so nothing in the current render paths
+   depends on this file. Use them going forward to avoid re-duplicating
+   card/badge/button markup.
+   ========================================================================== #}
+
+{% macro stat_card(label, value, icon=None, format=None) %}
+<div class="stat-card glass-panel reveal">
+  <span class="stat-label">{{ label }}</span>
+  <span class="stat-value"{% if format %} data-count="{{ value }}" data-format="{{ format }}"{% endif %}>{{ value }}</span>
+</div>
+{% endmacro %}
+
+{% macro status_badge(label, slug) %}
+<span class="status status-{{ slug }}">{{ label }}</span>
+{% endmacro %}
+
+{% macro button(label, href=None, variant="", type="button", extra_class="") %}
+{% set cls = "button " ~ (("button-" ~ variant) if variant else "") ~ " " ~ extra_class %}
+{% if href %}
+<a class="{{ cls }}" href="{{ href }}">{{ label }}</a>
+{% else %}
+<button class="{{ cls }}" type="{{ type }}">{{ label }}</button>
+{% endif %}
+{% endmacro %}
+
+{% macro empty_state(title, message, cta_label=None, cta_href=None) %}
+<section class="empty-state reveal">
+  <h2>{{ title }}</h2>
+  <p>{{ message }}</p>
+  {% if cta_label and cta_href %}
+    <a class="button button-primary" href="{{ cta_href }}">{{ cta_label }}</a>
+  {% endif %}
+</section>
+{% endmacro %}
+
+{% macro card(title=None, subtitle=None) %}
+<section class="card glass-panel reveal">
+  {% if title %}
+    <div class="panel-header">
+      <div>
+        <h3>{{ title }}</h3>
+        {% if subtitle %}<p class="muted">{{ subtitle }}</p>{% endif %}
+      </div>
+    </div>
+  {% endif %}
+  {{ caller() }}
+</section>
+{% endmacro %}
+
+{% macro progress_bar(label, percent) %}
+<div class="bar-row">
+  <div class="bar-label-row"><span>{{ label }}</span><span>{{ percent }}%</span></div>
+  <div class="bar-track"><div class="bar-fill" style="width:{{ percent }}%;"></div></div>
+</div>
+{% endmacro %}

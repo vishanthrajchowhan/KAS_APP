@@ -22,7 +22,7 @@
   justify-content: space-between;
   gap: 12px;
   padding: 12px 16px;
-  background: #b88746;
+  background: linear-gradient(135deg, var(--accent-2), var(--accent));
   color: #fff;
   border-bottom: 1px solid rgba(255,255,255,0.18);
 }
@@ -187,21 +187,21 @@
 }
 
 .button-primary {
-  background: #2b6cb0;
+  background: var(--primary);
   color: #fff;
 }
 
 .button-primary:hover {
-  background: #1e4f7a;
+  background: var(--primary-2);
 }
 
 .button {
-  background: #6c757d;
+  background: #5c5346;
   color: #fff;
 }
 
 .button:hover {
-  background: #5a6268;
+  background: #453f34;
 }
 
 /* Status messages */
@@ -246,10 +246,10 @@
   font-weight: 700;
 }
 
-.wt-record { background: #b42323; }
-.wt-snap { background: #1f6fb2; }
-.wt-camera { background: #5b5f66; }
-.wt-done { background: #b88746; }
+.wt-record { background: #b4342a; }
+.wt-snap { background: var(--primary); }
+.wt-camera { background: #5c5346; }
+.wt-done { background: linear-gradient(135deg, var(--accent-2), var(--accent)); }
 
 .wt-notes label {
   display: block;
@@ -338,8 +338,8 @@
   width: 56px;
   height: 56px;
   border-radius: 28px;
-  background: #2b6cb0;
-  color: white;
+  background: linear-gradient(135deg, var(--accent-2), var(--accent));
+  color: #171310;
   box-shadow: 0 6px 18px rgba(0,0,0,0.18);
   align-items: center;
   justify-content: center;

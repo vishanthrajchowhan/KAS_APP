@@ -16,13 +16,13 @@
     <title>{% block title %}KAS{% endblock %}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,450;9..144,560;9..144,600&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="manifest" href="{{ url_for('pwa_manifest') }}">
     <link rel="icon" type="image/png" href="{{ company_logo_url if company_logo_url else url_for('static', filename='icons/icon-192.png') }}">
     <link rel="icon" href="{{ dynamic_favicon }}" type="{{ workspace_settings.favicon_mimetype if workspace_settings is defined and workspace_settings.favicon_mimetype else 'image/svg+xml' }}">
     <link rel="apple-touch-icon" href="{{ company_logo_url if company_logo_url else dynamic_favicon }}">
     <link rel="apple-touch-startup-image" href="{{ url_for('static', filename='icons/apple-splash.svg') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v=9">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v=10">
     <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
@@ -200,25 +200,6 @@
     </div>
 
     <!-- Install CTA removed: using inline Install button inside auth/login left panel -->
-
-    <!-- PWA Diagnostics Modal -->
-    <div id="pwa-diagnostics-modal" class="pwa-modal" hidden aria-hidden="true">
-        <div class="pwa-modal-panel">
-            <header>
-                <strong>PWA Diagnostics</strong>
-                <button id="pwa-diagnostics-close" class="icon-button">✕</button>
-            </header>
-            <div id="pwa-diagnostics-body">
-                <p>Running checks…</p>
-                <pre id="pwa-diagnostics-output" style="white-space:pre-wrap; font-size:13px;"> </pre>
-            </div>
-            <footer>
-                <button id="pwa-diagnostics-refresh" class="button">Run checks</button>
-                <button id="pwa-diagnostics-copy" class="button">Copy JSON</button>
-                <button id="pwa-diagnostics-close-2" class="button">Close</button>
-            </footer>
-        </div>
-    </div>
 
     <script>
     (function () {
@@ -559,76 +540,6 @@
             // initial state
             setTimeout(updateFabVisibility, 300);
         }
-
-        // PWA diagnostics handlers
-        const diagnosticsBtn = document.getElementById('install-diagnostics-btn');
-        const diagnosticsModal = document.getElementById('pwa-diagnostics-modal');
-        const diagnosticsClose = document.getElementById('pwa-diagnostics-close');
-        const diagnosticsClose2 = document.getElementById('pwa-diagnostics-close-2');
-        const diagnosticsRefresh = document.getElementById('pwa-diagnostics-refresh');
-        const diagnosticsCopy = document.getElementById('pwa-diagnostics-copy');
-        const diagnosticsOutput = document.getElementById('pwa-diagnostics-output');
-
-        function showDiagnostics() {
-            if (!diagnosticsModal) return;
-            diagnosticsModal.hidden = false;
-            diagnosticsModal.setAttribute('aria-hidden', 'false');
-            runDiagnostics();
-        }
-
-        function hideDiagnostics() {
-            if (!diagnosticsModal) return;
-            diagnosticsModal.hidden = true;
-            diagnosticsModal.setAttribute('aria-hidden', 'true');
-        }
-
-        async function runDiagnostics() {
-            const results = {
-                serviceWorkerSupported: 'serviceWorker' in navigator,
-                serviceWorkerRegistered: false,
-                serviceWorkerScript: '{{ url_for('pwa_service_worker') }}',
-                manifestUrl: '{{ url_for('pwa_manifest') }}',
-                manifestLoaded: false,
-                manifest: null,
-                beforeInstallPromptAvailable: !!deferredInstallPrompt,
-                displayMode: (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone) ? 'standalone' : 'browser',
-                timestamp: new Date().toISOString(),
-            };
-
-            // check SW registration
-            try {
-                const reg = await navigator.serviceWorker.getRegistration();
-                results.serviceWorkerRegistered = !!reg;
-                if (reg && reg.active) results.serviceWorkerScope = reg.scope;
-            } catch (e) {
-                results.swError = String(e);
-            }
-
-            // fetch manifest
-            try {
-                const r = await fetch(results.manifestUrl, { cache: 'no-store' });
-                if (r.ok) {
-                    results.manifestLoaded = true;
-                    try { results.manifest = await r.json(); } catch (e) { results.manifest = await r.text(); }
-                } else {
-                    results.manifestError = r.status + ' ' + r.statusText;
-                }
-            } catch (e) {
-                results.manifestError = String(e);
-            }
-
-            diagnosticsOutput.textContent = JSON.stringify(results, null, 2);
-            diagnosticsOutput.dataset.json = JSON.stringify(results);
-        }
-
-        if (diagnosticsBtn) diagnosticsBtn.addEventListener('click', showDiagnostics);
-        if (diagnosticsClose) diagnosticsClose.addEventListener('click', hideDiagnostics);
-        if (diagnosticsClose2) diagnosticsClose2.addEventListener('click', hideDiagnostics);
-        if (diagnosticsRefresh) diagnosticsRefresh.addEventListener('click', runDiagnostics);
-        if (diagnosticsCopy) diagnosticsCopy.addEventListener('click', function () {
-            const data = diagnosticsOutput.dataset.json || diagnosticsOutput.textContent;
-            navigator.clipboard && navigator.clipboard.writeText(data).then(() => alert('Copied diagnostics to clipboard')); 
-        });
 
         if (iosTipDismiss) {
             iosTipDismiss.addEventListener("click", function () {

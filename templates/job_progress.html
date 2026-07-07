@@ -48,22 +48,22 @@
 
 <section class="dashboard-stats progress-stats" aria-label="Job update summary">
     <div class="stat-card glass-panel">
-        <span data-lucide="message-square" style="color:#0f6a47;width:20px;height:20px;"></span>
+        <span data-lucide="message-square" style="color:var(--accent);width:20px;height:20px;"></span>
         <span class="kpi-value">{{ progress.update_count or 0 }}</span>
         <p>Updates</p>
     </div>
     <div class="stat-card glass-panel">
-        <span data-lucide="camera" style="color:#0f6a47;width:20px;height:20px;"></span>
+        <span data-lucide="camera" style="color:var(--accent);width:20px;height:20px;"></span>
         <span class="kpi-value">{{ progress.photo_count or 0 }}</span>
         <p>Photos</p>
     </div>
     <div class="stat-card glass-panel">
-        <span data-lucide="file-text" style="color:#0f6a47;width:20px;height:20px;"></span>
+        <span data-lucide="file-text" style="color:var(--accent);width:20px;height:20px;"></span>
         <span class="kpi-value">{{ reports_count }}</span>
         <p>Reports</p>
     </div>
     <div class="stat-card glass-panel">
-        <span data-lucide="calendar-clock" style="color:#0f6a47;width:20px;height:20px;"></span>
+        <span data-lucide="calendar-clock" style="color:var(--accent);width:20px;height:20px;"></span>
         <div class="timeline-stat">
             <span>
                 <strong>{{ progress.first_update | fmtdate }}</strong>
