@@ -73,6 +73,9 @@
                 <div class="card-actions">
                     <a class="button" href="#client-{{ client.id }}">View</a>
                     <a class="button" href="{{ url_for('users') }}">Edit</a>
+                    <form method="post" action="{{ url_for('delete_user_permanent', user_id=client.id) }}" onsubmit="return confirm('Permanently delete {{ client.name|replace("'", "\\'") }}? This removes the client from the database and cannot be undone.');">
+                        <button type="submit" class="button button-danger">Delete Permanently</button>
+                    </form>
                 </div>
             </article>
         {% else %}

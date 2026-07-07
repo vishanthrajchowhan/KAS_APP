@@ -3226,7 +3226,7 @@ def clients():
                 COALESCE(SUM(CASE WHEN jobs.payment_status != 'Paid' AND COALESCE(jobs.invoice_amount, 0) > 0 THEN COALESCE(jobs.invoice_amount, 0) ELSE 0 END), 0) AS outstanding_balance
             FROM users
             LEFT JOIN jobs ON jobs.client_id = users.id
-            WHERE users.role = 'client'
+            WHERE users.role = 'client' AND COALESCE(users.is_active, TRUE) = TRUE
             GROUP BY users.id
             ORDER BY users.name
             """
