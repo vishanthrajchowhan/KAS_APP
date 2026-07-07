@@ -112,36 +112,19 @@ DOCUMENT_MIME_TYPES = {
 PRE_CONSTRUCTION_STATUSES = (
     "Lead",
     "Estimating",
-    "Proposal Sent",
     "Negotiation",
     "Approved",
     "Rejected",
 )
 EXECUTION_STATUSES = ("Scheduled", "Started", "In Progress", "Completed")
-FINANCIAL_STATUSES = ("Invoiced", "Paid")
-STATUSES = PRE_CONSTRUCTION_STATUSES + EXECUTION_STATUSES + FINANCIAL_STATUSES
+STATUSES = PRE_CONSTRUCTION_STATUSES + EXECUTION_STATUSES
 APPROVED_PIPELINE_STATUSES = (
     "Approved",
     "Scheduled",
     "Started",
     "In Progress",
     "Completed",
-    "Invoiced",
-    "Paid",
 )
-PROPOSAL_PIPELINE_STATUSES = (
-    "Proposal Sent",
-    "Negotiation",
-    "Approved",
-    "Rejected",
-    "Scheduled",
-    "Started",
-    "In Progress",
-    "Completed",
-    "Invoiced",
-    "Paid",
-)
-PAYMENT_STATUSES = ("Not Paid", "Paid")
 ROLES = ("admin", "employee", "client")
 PUBLIC_ENDPOINTS = {"login", "static", "client_portal", "portal_comment", "portal_sign", "portal_report"}
 
@@ -211,7 +194,7 @@ DEFAULT_WORKSPACE_SETTINGS = {
     "logo_path": "",
     "dark_mode_default": False,
     "notify_new_lead": True,
-    "notify_payment_received": True,
+    "notify_payment_received": False,
     "notify_photo_upload": True,
 }
 
@@ -1270,19 +1253,6 @@ def build_notifications_for_user(user, settings):
                 for row in rows:
                     append_item("New lead submitted", row["name"], row["created_at"], url_for("update_job", job_id=row["id"]), "lead")
 
-            if settings["notify_payment_received"]:
-                rows = conn.execute(
-                    """
-                    SELECT id, name, invoice_amount, created_at
-                    FROM jobs
-                    WHERE payment_status = 'Paid'
-                    ORDER BY created_at DESC, id DESC
-                    LIMIT 3
-                    """
-                ).fetchall()
-                for row in rows:
-                    append_item("Payment received", f"{row['name']} · {money(row['invoice_amount'])}", row["created_at"], url_for("update_job", job_id=row["id"]), "payment")
-
             if settings["notify_photo_upload"]:
                 rows = conn.execute(
                     """
@@ -1585,17 +1555,6 @@ def display_file_name(stored_value):
     if "/" in stored_value:
         return stored_value.rsplit("/", 1)[-1]
     return stored_value
-
-
-def parse_money(value):
-    value = (value or "").strip()
-    if not value:
-        return None
-    try:
-        amount = float(value)
-    except ValueError:
-        return None
-    return amount if amount >= 0 else None
 
 
 def parse_date(value):
@@ -1983,11 +1942,6 @@ def process_logo_upload(uploaded_file):
         raise ValueError("Unable to upload logo to Supabase Storage. Please try again.") from exc
 
     return stored_logo["path"], stored_logo["url"]
-
-
-def money(value):
-    return f"${value:,.2f}" if value is not None else "-"
-
 
 
 def group_updates(update_rows):
@@ -2395,10 +2349,6 @@ def index():
 
     quick_filters = {
         "leads": ("jobs.status = ?", ["Lead"]),
-        "proposals": (
-            "jobs.status IN (?, ?, ?)",
-            ["Estimating", "Proposal Sent", "Negotiation"],
-        ),
         "assigned_work": (
             "jobs.status IN (?, ?, ?, ?)",
             ["Scheduled", "Started", "In Progress", "Completed"],
@@ -2410,10 +2360,6 @@ def index():
             list(APPROVED_PIPELINE_STATUSES),
         ),
         "lost": ("jobs.status = ?", ["Rejected"]),
-        "payment_pending": (
-            "COALESCE(jobs.invoice_amount, 0) > 0 AND jobs.payment_status != ?",
-            ["Paid"],
-        ),
     }
     if quick_filter in quick_filters:
         clause, quick_params = quick_filters[quick_filter]
@@ -2503,7 +2449,7 @@ def index():
             f"""
             SELECT COUNT(*) AS count
             FROM jobs
-            {date_scope_sql}jobs.status IN ('Estimating', 'Proposal Sent', 'Negotiation')
+            {date_scope_sql}jobs.status IN ('Estimating', 'Negotiation')
             """,
             role_params,
         ).fetchone()
@@ -2522,9 +2468,9 @@ def index():
             f"""
             SELECT COUNT(*) AS count
             FROM jobs
-            {date_scope_sql}COALESCE(jobs.due_date, jobs.proposal_sent_date, jobs.decision_date) IS NOT NULL
-              AND COALESCE(jobs.due_date, jobs.proposal_sent_date, jobs.decision_date) < ?
-              AND jobs.status NOT IN ('Completed', 'Paid', 'Rejected')
+                        {date_scope_sql}COALESCE(jobs.due_date, jobs.decision_date) IS NOT NULL
+                            AND COALESCE(jobs.due_date, jobs.decision_date) < ?
+                            AND jobs.status NOT IN ('Completed', 'Rejected')
             """,
             role_params + [today_str],
         ).fetchone()
@@ -2543,7 +2489,7 @@ def index():
     open_jobs = sum(
         1
         for row in jobs
-        if row["status"] in {"Scheduled", "Started", "In Progress", "Approved", "Estimating", "Proposal Sent", "Negotiation"}
+        if row["status"] in {"Scheduled", "Started", "In Progress", "Approved", "Estimating", "Negotiation"}
     )
     ops_metrics = {
         "open_jobs": open_jobs,
@@ -2566,7 +2512,6 @@ def index():
         statuses=STATUSES,
         pre_construction_statuses=PRE_CONSTRUCTION_STATUSES,
         execution_statuses=EXECUTION_STATUSES,
-        financial_statuses=FINANCIAL_STATUSES,
         status_counts=status_counts,
         can_view_financials=can_view_financials_flag,
         can_manage_jobs=can_manage_jobs_flag,
@@ -2595,28 +2540,9 @@ def analytics():
             """
         ).fetchall()
 
-        monthly_revenue = conn.execute(
-            """
-            SELECT
-                SUBSTRING(created_at, 1, 7) AS month,
-                COALESCE(SUM(CASE WHEN payment_status = 'Paid' THEN invoice_amount ELSE 0 END), 0) AS paid_revenue,
-                COALESCE(SUM(CASE WHEN status != 'Rejected' THEN proposal_amount ELSE 0 END), 0) AS pipeline_revenue
-            FROM jobs
-            GROUP BY SUBSTRING(created_at, 1, 7)
-            ORDER BY month DESC
-            LIMIT 12
-            """
-        ).fetchall()
-
-    monthly_revenue = list(reversed(monthly_revenue))
-    revenue_peak = max((row["paid_revenue"] or 0) for row in monthly_revenue) if monthly_revenue else 0
-
     return render_template(
         "analytics.html",
         jobs_by_status=jobs_by_status,
-        monthly_revenue=monthly_revenue,
-        revenue_peak=revenue_peak,
-        money=money,
     )
 
 
@@ -2655,7 +2581,7 @@ def settings():
 
         dark_mode_default = parse_checkbox(request.form.get("dark_mode_default"))
         notify_new_lead = parse_checkbox(request.form.get("notify_new_lead"))
-        notify_payment_received = parse_checkbox(request.form.get("notify_payment_received"))
+        notify_payment_received = False
         notify_photo_upload = parse_checkbox(request.form.get("notify_photo_upload"))
 
         logo_path = workspace_settings.get("logo_path", "")
@@ -2678,7 +2604,6 @@ def settings():
                         "theme": theme,
                         "dark_mode_default": dark_mode_default,
                         "notify_new_lead": notify_new_lead,
-                        "notify_payment_received": notify_payment_received,
                         "notify_photo_upload": notify_photo_upload,
                     },
                     users_summary=users_summary,
@@ -2704,7 +2629,6 @@ def settings():
                         "logo_url": logo_url,
                         "dark_mode_default": dark_mode_default,
                         "notify_new_lead": notify_new_lead,
-                        "notify_payment_received": notify_payment_received,
                         "notify_photo_upload": notify_photo_upload,
                     },
                     users_summary=users_summary,
@@ -2770,8 +2694,6 @@ def add_job():
         service_type = compose_service_text(selected_service_types)
         other_service_details = ""
         status = request.form.get("status", "Lead").strip()
-        proposal_amount = parse_money(request.form.get("proposal_amount"))
-        proposal_sent_date = parse_date(request.form.get("proposal_sent_date"))
         assigned_to = request.form.get("assigned_to", type=int)
         client_id = request.form.get("client_id", type=int)
 
@@ -2797,8 +2719,6 @@ def add_job():
                 selected_service_types=selected_service_types,
                 other_service_details=other_service_details,
                 status=status,
-                proposal_amount=proposal_amount,
-                proposal_sent_date=proposal_sent_date,
                 statuses=STATUSES,
                 employees=employees,
                 clients=clients,
@@ -2815,10 +2735,9 @@ def add_job():
                 """
                 INSERT INTO jobs (
                     name, client_name, location, due_date, service_type, other_service_details, description, status,
-                    proposal_amount, proposal_sent_date, payment_status,
                     assigned_to, client_id, created_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     name,
@@ -2829,9 +2748,6 @@ def add_job():
                     other_service_details,
                     description,
                     status,
-                    proposal_amount,
-                    proposal_sent_date,
-                    "Not Paid",
                     assigned_to,
                     client_id,
                     now,
@@ -3133,10 +3049,10 @@ def jobs():
         "oldest": "jobs.created_at ASC",
         "status": "jobs.status ASC, jobs.created_at DESC",
         "employee": "COALESCE(employee.name, jobs.client_name, jobs.name) ASC, jobs.created_at DESC",
-        "due": "COALESCE(jobs.due_date, jobs.decision_date, jobs.proposal_sent_date) ASC NULLS LAST, jobs.created_at DESC",
+        "due": "COALESCE(jobs.due_date, jobs.decision_date) ASC NULLS LAST, jobs.created_at DESC",
     }.get(
         sort,
-        "CASE jobs.status WHEN 'Lead' THEN 1 WHEN 'Estimating' THEN 2 WHEN 'Proposal Sent' THEN 3 WHEN 'Negotiation' THEN 4 WHEN 'Approved' THEN 5 WHEN 'Scheduled' THEN 6 WHEN 'Started' THEN 7 WHEN 'In Progress' THEN 8 WHEN 'Completed' THEN 9 WHEN 'Invoiced' THEN 10 WHEN 'Paid' THEN 11 ELSE 99 END, jobs.created_at DESC",
+        "CASE jobs.status WHEN 'Lead' THEN 1 WHEN 'Estimating' THEN 2 WHEN 'Negotiation' THEN 3 WHEN 'Approved' THEN 4 WHEN 'Scheduled' THEN 5 WHEN 'Started' THEN 6 WHEN 'In Progress' THEN 7 WHEN 'Completed' THEN 8 ELSE 99 END, jobs.created_at DESC",
     )
 
     today = datetime.now().date().isoformat()
@@ -3149,25 +3065,22 @@ def jobs():
                 employee.email AS assigned_employee_email,
                 client.name AS client_user_name,
                 client.email AS client_user_email,
-                COALESCE(jobs.due_date, jobs.decision_date, jobs.proposal_sent_date) AS effective_due_date,
+                COALESCE(jobs.due_date, jobs.decision_date) AS effective_due_date,
                 CASE
-                    WHEN COALESCE(jobs.due_date, jobs.decision_date, jobs.proposal_sent_date) IS NOT NULL
-                         AND COALESCE(jobs.due_date, jobs.decision_date, jobs.proposal_sent_date) < ?
-                         AND jobs.status NOT IN ('Completed', 'Paid')
+                    WHEN COALESCE(jobs.due_date, jobs.decision_date) IS NOT NULL
+                         AND COALESCE(jobs.due_date, jobs.decision_date) < ?
+                         AND jobs.status NOT IN ('Completed')
                     THEN 1 ELSE 0
                 END AS is_overdue,
                 CASE jobs.status
                     WHEN 'Lead' THEN 12
                     WHEN 'Estimating' THEN 22
-                    WHEN 'Proposal Sent' THEN 34
-                    WHEN 'Negotiation' THEN 42
+                    WHEN 'Negotiation' THEN 34
                     WHEN 'Approved' THEN 54
                     WHEN 'Scheduled' THEN 68
                     WHEN 'Started' THEN 74
                     WHEN 'In Progress' THEN 84
-                    WHEN 'Completed' THEN 94
-                    WHEN 'Invoiced' THEN 98
-                    WHEN 'Paid' THEN 100
+                    WHEN 'Completed' THEN 100
                     ELSE 40
                 END AS progress_percent
             FROM jobs
@@ -3187,7 +3100,7 @@ def jobs():
     active_jobs = sum(1 for row in jobs_list if row["status"] in {"Scheduled", "Started", "In Progress"})
     scheduled_jobs = sum(1 for row in jobs_list if row["status"] == "Scheduled")
     in_progress_jobs = sum(1 for row in jobs_list if row["status"] == "In Progress")
-    completed_jobs = sum(1 for row in jobs_list if row["status"] in {"Completed", "Paid"})
+    completed_jobs = sum(1 for row in jobs_list if row["status"] == "Completed")
     overdue_jobs = sum(1 for row in jobs_list if row["is_overdue"])
 
     return render_template(
@@ -3219,11 +3132,9 @@ def clients():
                 users.email,
                 users.phone,
                 COUNT(DISTINCT jobs.id) AS total_projects,
-                COUNT(DISTINCT CASE WHEN jobs.status IN ('Completed', 'Paid') THEN jobs.id END) AS completed_projects,
+                COUNT(DISTINCT CASE WHEN jobs.status = 'Completed' THEN jobs.id END) AS completed_projects,
                 COUNT(DISTINCT CASE WHEN jobs.status IN ('Scheduled', 'Started', 'In Progress') THEN jobs.id END) AS active_projects,
-                MAX(jobs.created_at) AS last_job_date,
-                COALESCE(SUM(CASE WHEN jobs.payment_status = 'Paid' THEN COALESCE(jobs.invoice_amount, 0) ELSE 0 END), 0) AS total_spent,
-                COALESCE(SUM(CASE WHEN jobs.payment_status != 'Paid' AND COALESCE(jobs.invoice_amount, 0) > 0 THEN COALESCE(jobs.invoice_amount, 0) ELSE 0 END), 0) AS outstanding_balance
+                MAX(jobs.created_at) AS last_job_date
             FROM users
             LEFT JOIN jobs ON jobs.client_id = users.id
             WHERE users.role = 'client' AND COALESCE(users.is_active, TRUE) = TRUE
@@ -3235,8 +3146,6 @@ def clients():
     total_clients = len(client_rows)
     active_clients = sum(1 for row in client_rows if row["total_projects"])
     repeat_clients = sum(1 for row in client_rows if (row["total_projects"] or 0) > 1)
-    outstanding_balance = sum(row["outstanding_balance"] or 0 for row in client_rows)
-    total_spent = sum(row["total_spent"] or 0 for row in client_rows)
 
     return render_template(
         "clients.html",
@@ -3244,9 +3153,6 @@ def clients():
         total_clients=total_clients,
         active_clients=active_clients,
         repeat_clients=repeat_clients,
-        outstanding_balance=outstanding_balance,
-        total_spent=total_spent,
-        money=money,
     )
 
 
@@ -3361,9 +3267,6 @@ def update_job(job_id):
         statuses=STATUSES,
         pre_construction_statuses=PRE_CONSTRUCTION_STATUSES,
         execution_statuses=EXECUTION_STATUSES,
-        financial_statuses=FINANCIAL_STATUSES,
-        payment_statuses=PAYMENT_STATUSES,
-        money=money,
         can_edit_job=can_update_job(job),
         can_manage_jobs=can_manage_jobs(),
         can_view_financials=can_view_financials(),
@@ -3617,13 +3520,8 @@ def submit_update():
 
     due_date = job["due_date"] or None
 
-    # These fields are intentionally managed outside the update form.
-    proposal_amount = job["proposal_amount"]
-    proposal_sent_date = job["proposal_sent_date"]
     decision_date = job["decision_date"]
     rejection_reason = job["rejection_reason"] or ""
-    invoice_amount = job["invoice_amount"]
-    payment_status = job["payment_status"] or "Not Paid"
 
     if is_admin():
         status = status_input
@@ -3642,10 +3540,6 @@ def submit_update():
 
     if status == "Rejected" and not rejection_reason:
         flash("Please add a rejection reason before marking a job rejected.", "error")
-        return redirect(url_for("update_job", job_id=job_id))
-
-    if payment_status == "Paid" and invoice_amount is None and job["invoice_amount"] is None:
-        flash("Enter an invoice amount before marking the job paid.", "error")
         return redirect(url_for("update_job", job_id=job_id))
 
     task_updates = {}
@@ -3742,12 +3636,8 @@ def submit_update():
         [
             status != job["status"],
             client_name != (job["client_name"] or ""),
-            proposal_amount != job["proposal_amount"],
-            proposal_sent_date != job["proposal_sent_date"],
             decision_date != job["decision_date"],
             rejection_reason != (job["rejection_reason"] or ""),
-            invoice_amount != job["invoice_amount"],
-            payment_status != (job["payment_status"] or "Not Paid"),
             assigned_to != job["assigned_to"],
             client_id != job["client_id"],
             service_type != (job["service_type"] or ""),
@@ -3816,12 +3706,8 @@ def submit_update():
                     due_date = ?,
                     service_type = ?,
                     other_service_details = ?,
-                    proposal_amount = ?,
-                    proposal_sent_date = ?,
                     decision_date = ?,
                     rejection_reason = ?,
-                    invoice_amount = ?,
-                    payment_status = ?,
                     assigned_to = ?,
                     client_id = ?
                 WHERE id = ?
@@ -3832,12 +3718,8 @@ def submit_update():
                     due_date,
                     service_type,
                     other_service_details,
-                    proposal_amount,
-                    proposal_sent_date,
                     decision_date,
                     rejection_reason,
-                    invoice_amount,
-                    payment_status,
                     assigned_to,
                     client_id,
                     job_id,

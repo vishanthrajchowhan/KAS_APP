@@ -4,7 +4,7 @@
 
 {% block content %}
 {% set active_jobs = status_counts.get('Scheduled', 0) + status_counts.get('Started', 0) + status_counts.get('In Progress', 0) %}
-{% set completed_jobs = status_counts.get('Completed', 0) + status_counts.get('Paid', 0) %}
+{% set completed_jobs = status_counts.get('Completed', 0) %}
 
 <section class="dashboard-hero glass-panel reveal">
     <div class="dashboard-hero-copy">
@@ -26,7 +26,7 @@
             {% if dashboard_role != "client" %}
                 <span>
                     <strong>{{ completed_jobs }}</strong>
-                    <small>Closed and paid</small>
+                    <small>Completed jobs</small>
                 </span>
             {% endif %}
         </div>
@@ -103,7 +103,7 @@
                 <span class="activity-strip-icon" data-lucide="shield-check"></span>
                 <div>
                     <strong>{{ completed_jobs }}</strong>
-                    <small>Completed and paid jobs</small>
+                    <small>Completed jobs</small>
                 </div>
             </div>
         {% endif %}
@@ -340,7 +340,6 @@ document.addEventListener('DOMContentLoaded', function() {
         <a class="quick-filter {% if filters.quick == 'completed' %}active{% endif %}" href="{{ url_for('index', quick='completed', view_as=filters.view_as) }}">Completed</a>
     {% else %}
         <a class="quick-filter {% if filters.quick == 'leads' %}active{% endif %}" href="{{ url_for('index', quick='leads', view_as=filters.view_as) }}">Only Leads</a>
-        <a class="quick-filter {% if filters.quick == 'proposals' %}active{% endif %}" href="{{ url_for('index', quick='proposals', view_as=filters.view_as) }}">Only Proposals</a>
         <a class="quick-filter {% if filters.quick == 'approved' %}active{% endif %}" href="{{ url_for('index', quick='approved', view_as=filters.view_as) }}">Approved Jobs</a>
         <a class="quick-filter {% if filters.quick == 'lost' %}active{% endif %}" href="{{ url_for('index', quick='lost', view_as=filters.view_as) }}">Lost Jobs</a>
     {% endif %}
@@ -367,11 +366,6 @@ document.addEventListener('DOMContentLoaded', function() {
             </optgroup>
             <optgroup label="Execution">
                 {% for status in execution_statuses %}
-                    <option value="{{ status }}" {% if filters.status == status %}selected{% endif %}>{{ status }}</option>
-                {% endfor %}
-            </optgroup>
-            <optgroup label="Financial">
-                {% for status in financial_statuses %}
                     <option value="{{ status }}" {% if filters.status == status %}selected{% endif %}>{{ status }}</option>
                 {% endfor %}
             </optgroup>

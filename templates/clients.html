@@ -8,11 +8,10 @@
         <div class="hero-copy shell-copy">
             <p class="eyebrow">Client Relationship Management</p>
             <h1>Clients</h1>
-            <p>Keep every customer account, project history, and invoice balance visible from one premium CRM surface.</p>
+            <p>Keep every customer account and project history visible from one premium CRM surface.</p>
             <div class="dashboard-tags">
                 <span class="dashboard-tag">Total clients: {{ total_clients }}</span>
                 <span class="dashboard-tag">Active clients: {{ active_clients }}</span>
-                <span class="dashboard-tag">Outstanding balance: {{ money(outstanding_balance or 0) }}</span>
             </div>
         </div>
         <div class="hero-actions">
@@ -51,10 +50,8 @@
                             <small>{{ client.phone or 'Phone not on file' }}</small>
                         </div>
                     </div>
-                    <span class="person-status {% if (client.outstanding_balance or 0) > 0 %}busy{% elif (client.total_projects or 0) > 0 %}available{% else %}off-duty{% endif %}">
-                        {% if (client.outstanding_balance or 0) > 0 %}
-                            Balance Due
-                        {% elif (client.total_projects or 0) > 0 %}
+                    <span class="person-status {% if (client.total_projects or 0) > 0 %}available{% else %}off-duty{% endif %}">
+                        {% if (client.total_projects or 0) > 0 %}
                             Active
                         {% else %}
                             New
@@ -65,8 +62,6 @@
                 <div class="summary-grid">
                     <div class="metric-pill">Projects: {{ client.total_projects or 0 }}</div>
                     <div class="metric-pill">Completed: {{ client.completed_projects or 0 }}</div>
-                    <div class="metric-pill">Spent: {{ money(client.total_spent or 0) }}</div>
-                    <div class="metric-pill {% if (client.outstanding_balance or 0) > 0 %}busy{% endif %}">Open: {{ money(client.outstanding_balance or 0) }}</div>
                     <div class="metric-pill">Last Job: {{ client.last_job_date[:10] if client.last_job_date else 'No jobs yet' }}</div>
                 </div>
 

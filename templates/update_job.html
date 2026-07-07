@@ -14,13 +14,6 @@
         {% if g.user.role != "employee" %}
             <p>{{ job.description }}</p>
         {% endif %}
-        {% if can_view_financials %}
-            <div class="pipeline-money detail-money">
-                <span>Proposal {{ money(job.proposal_amount) }}</span>
-                <span>Invoice {{ money(job.invoice_amount) }}</span>
-                <span class="payment payment-{{ (job.payment_status or 'Not Paid')|lower|replace(' ', '-') }}">{{ job.payment_status or "Not Paid" }}</span>
-            </div>
-        {% endif %}
     </div>
 
     <section class="analytics-grid" style="margin-top: 20px;">
@@ -81,11 +74,6 @@
                         </optgroup>
                         <optgroup label="Execution">
                             {% for pipeline_status in execution_statuses %}
-                                <option value="{{ pipeline_status }}" {% if pipeline_status == job.status %}selected{% endif %}>{{ pipeline_status }}</option>
-                            {% endfor %}
-                        </optgroup>
-                        <optgroup label="Financial">
-                            {% for pipeline_status in financial_statuses %}
                                 <option value="{{ pipeline_status }}" {% if pipeline_status == job.status %}selected{% endif %}>{{ pipeline_status }}</option>
                             {% endfor %}
                         </optgroup>
@@ -160,7 +148,7 @@
                 {% if can_manage_receipts %}
                     <label for="receipts">Receipts / Bills</label>
                     <input id="receipts" name="receipts" type="file" accept="image/png,image/jpeg,image/gif,image/webp,application/pdf,.doc,.docx,.xls,.xlsx" multiple>
-                    <p class="help-text">Upload receipts, material bills, supplier invoices, or cost documents separately from job photos.</p>
+                    <p class="help-text">Upload receipts, material bills, or project documents separately from job photos.</p>
                 {% endif %}
             </section>
 
