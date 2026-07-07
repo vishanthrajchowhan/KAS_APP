@@ -923,6 +923,25 @@ fieldset label { flex-direction: row; margin: 4px 0; font-size: 0.88rem; }
 .progress-hero-card { padding: var(--space-5); }
 .progress-hero-aside { display: flex; flex-direction: column; gap: var(--space-4); }
 .progress-hero-meta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+.progress-hero-meta > span,
+.job-meta > span {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+}
+.progress-hero-meta > span > strong,
+.job-meta > span > strong {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted-2);
+}
+.progress-hero-meta > span > small,
+.job-meta > span > small,
+.job-meta > span > span {
+    color: var(--muted);
+    font-size: 0.84rem;
+}
 .progress-stats { margin-top: var(--space-5); }
 .progress-timeline { margin-top: var(--space-5); }
 
