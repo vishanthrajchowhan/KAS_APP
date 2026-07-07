@@ -77,6 +77,9 @@
                     <a class="button" href="#employee-{{ employee.id }}">View</a>
                     <a class="button" href="{{ url_for('users') }}">Edit</a>
                     <a class="button button-primary" href="{{ url_for('add_job') }}">Assign Job</a>
+                    <form method="post" action="{{ url_for('delete_user_permanent', user_id=employee.id) }}" onsubmit="return confirm('Permanently delete {{ employee.name|replace("'", "\\'") }}? This will remove the employee from the database and cannot be undone.');">
+                        <button type="submit" class="button button-danger">Delete Permanently</button>
+                    </form>
                 </div>
             </article>
         {% else %}

@@ -3066,6 +3066,37 @@ def delete_user(user_id: int):
     return redirect(url_for("users"))
 
 
+@app.route("/users/<int:user_id>/delete-permanent", methods=("POST",))
+@login_required
+@role_required("admin")
+def delete_user_permanent(user_id: int):
+    if g.user is not None and g.user["id"] == user_id:
+        flash("You cannot permanently delete your own account.", "error")
+        return redirect(request.referrer or url_for("users"))
+
+    with get_db_connection() as conn:
+        user_record = conn.execute(
+            "SELECT id, name, role FROM users WHERE id = ?",
+            (user_id,),
+        ).fetchone()
+        if user_record is None:
+            flash("User not found.", "error")
+            return redirect(request.referrer or url_for("users"))
+
+        if user_record["role"] == "admin":
+            admin_count = conn.execute(
+                "SELECT COUNT(*) AS total FROM users WHERE role = 'admin' AND COALESCE(is_active, TRUE) = TRUE"
+            ).fetchone()
+            if admin_count is not None and int(admin_count["total"] or 0) <= 1:
+                flash("You cannot permanently delete the last admin account.", "error")
+                return redirect(request.referrer or url_for("users"))
+
+        conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+
+    flash(f"{user_record['name']} was permanently deleted from the database.", "success")
+    return redirect(request.referrer or url_for("users"))
+
+
 @app.route("/jobs")
 @login_required
 def jobs():
@@ -3238,7 +3269,7 @@ def employees():
                 MAX(jobs.created_at) AS last_assigned_job
             FROM users
             LEFT JOIN jobs ON jobs.assigned_to = users.id
-            WHERE users.role = 'employee'
+            WHERE users.role = 'employee' AND COALESCE(users.is_active, TRUE) = TRUE
             GROUP BY users.id
             ORDER BY users.name
             """,
