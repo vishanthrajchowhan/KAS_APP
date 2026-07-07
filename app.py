@@ -3115,7 +3115,6 @@ def jobs():
         completed_jobs=completed_jobs,
         overdue_jobs=overdue_jobs,
         can_manage_jobs=can_manage_jobs(),
-        money=money,
     )
 
 
