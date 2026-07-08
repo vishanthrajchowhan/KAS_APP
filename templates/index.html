@@ -420,9 +420,9 @@ document.addEventListener('DOMContentLoaded', function() {
                         <span>General Service</span>
                     {% endif %}
                 </span>
-                {% if job.assigned_employee %}<span><strong>Owner</strong>{{ job.assigned_employee }}</span>{% endif %}
-                <span><strong>Updates</strong>{{ job.update_count }}</span>
-                <span><strong>Last update</strong>{{ job.last_update|replace('T', ' ') if job.last_update else 'No updates yet' }}</span>
+                {% if job.assigned_employee %}<span><strong>Owner</strong><span>{{ job.assigned_employee }}</span></span>{% endif %}
+                <span><strong>Updates</strong><span>{{ job.update_count }}</span></span>
+                <span><strong>Last update</strong><span>{{ job.last_update|replace('T', ' ') if job.last_update else 'No updates yet' }}</span></span>
             </div>
 
             <div class="job-actions">
