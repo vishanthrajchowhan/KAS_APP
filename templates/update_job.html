@@ -88,6 +88,23 @@
                         <label>Services</label>
                         <p class="help-text">Add each service as a point. Use Add Service to include more items.</p>
                         <div class="task-add-list" data-service-points-list>
+                                {% if can_manage_jobs and update.author_role == "client" %}
+                                    <div class="timeline-entry-actions">
+                                        <button type="button" class="button button-compact" onclick="toggleClientCommentEditor('{{ update_loop }}')">Edit</button>
+                                        <form method="post" action="{{ url_for('delete_client_comment', update_id=update.id) }}" onsubmit="return confirm('Delete this client comment?');">
+                                            <input type="hidden" name="return_endpoint" value="update_job">
+                                            <button type="submit" class="button button-danger button-compact">Delete</button>
+                                        </form>
+                                    </div>
+                                    <form id="client-comment-editor-{{ update_loop }}" class="timeline-entry-edit-form" method="post" action="{{ url_for('edit_client_comment', update_id=update.id) }}">
+                                        <input type="hidden" name="return_endpoint" value="update_job">
+                                        <textarea name="comment">{{ update.notes or '' }}</textarea>
+                                        <div class="timeline-entry-edit-actions">
+                                            <button type="submit" class="button button-primary button-compact">Save</button>
+                                            <button type="button" class="button button-compact" onclick="toggleClientCommentEditor('{{ update_loop }}')">Cancel</button>
+                                        </div>
+                                    </form>
+                                {% endif %}
                             {% set services = selected_service_types if selected_service_types else [''] %}
                             {% for service in services %}
                                 <div class="task-add-row" data-service-point-row>
@@ -388,6 +405,11 @@
 {% endif %}
 
 <script>
+function toggleClientCommentEditor(entryId) {
+    const form = document.getElementById(`client-comment-editor-${entryId}`);
+    if (!form) return;
+    form.style.display = form.style.display === 'block' ? 'none' : 'block';
+}
 const mediaChangesForm = document.getElementById('job-media-changes-form');
 if (mediaChangesForm) {
     mediaChangesForm.addEventListener('submit', (event) => {

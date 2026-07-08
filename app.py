@@ -1979,6 +1979,8 @@ def group_updates(update_rows):
                 display_date = date_key
                 display_time = timestamp[11:16] if len(timestamp) >= 16 else ""
             group_lookup[group_key] = {
+                "id": row["id"],
+                "update_group": row["update_group"],
                 "timestamp": timestamp,
                 "date_key": date_key,
                 "display_date": display_date,
@@ -4162,6 +4164,114 @@ def delete_photo(update_id):
 @role_required("admin")
 def delete_receipt(update_id):
     return delete_update_media(update_id, "receipt")
+
+
+@app.route("/update/<int:update_id>/comment/edit", methods=("POST",))
+@login_required
+@role_required("admin")
+def edit_client_comment(update_id):
+    updated_comment = request.form.get("comment", "")
+    return_endpoint = request.form.get("return_endpoint") or "job_progress"
+    if return_endpoint not in {"job_progress", "update_job"}:
+        return_endpoint = "job_progress"
+
+    with get_db_connection() as conn:
+        update = conn.execute(
+            """
+            SELECT id, job_id, update_group, author_role
+            FROM updates
+            WHERE id = ?
+            """,
+            (update_id,),
+        ).fetchone()
+        if update is None or update["author_role"] != "client":
+            flash("Client comment not found.", "error")
+            return redirect(url_for("index") if update is None else url_for(return_endpoint, job_id=update["job_id"]))
+
+        if update["update_group"]:
+            conn.execute(
+                """
+                UPDATE updates
+                SET notes = ?
+                WHERE job_id = ? AND author_role = 'client' AND update_group = ?
+                """,
+                (updated_comment, update["job_id"], update["update_group"]),
+            )
+        else:
+            conn.execute(
+                """
+                UPDATE updates
+                SET notes = ?
+                WHERE id = ?
+                """,
+                (updated_comment, update_id),
+            )
+
+    flash("Client comment updated.", "success")
+    return redirect(url_for(return_endpoint, job_id=update["job_id"]))
+
+
+@app.route("/update/<int:update_id>/comment/delete", methods=("POST",))
+@login_required
+@role_required("admin")
+def delete_client_comment(update_id):
+    return_endpoint = request.form.get("return_endpoint") or "job_progress"
+    if return_endpoint not in {"job_progress", "update_job"}:
+        return_endpoint = "job_progress"
+
+    with get_db_connection() as conn:
+        update = conn.execute(
+            """
+            SELECT id, job_id, update_group, author_role
+            FROM updates
+            WHERE id = ?
+            """,
+            (update_id,),
+        ).fetchone()
+        if update is None or update["author_role"] != "client":
+            flash("Client comment not found.", "error")
+            return redirect(url_for("index") if update is None else url_for(return_endpoint, job_id=update["job_id"]))
+
+        if update["update_group"]:
+            rows = conn.execute(
+                """
+                SELECT id, image_path, photo_url, receipt_path, receipt_url
+                FROM updates
+                WHERE job_id = ? AND author_role = 'client' AND update_group = ?
+                """,
+                (update["job_id"], update["update_group"]),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """
+                SELECT id, image_path, photo_url, receipt_path, receipt_url
+                FROM updates
+                WHERE id = ?
+                """,
+                (update_id,),
+            ).fetchall()
+
+        storage_delete_failed = False
+        for row in rows:
+            if row["image_path"]:
+                try:
+                    delete_storage_object("job_photos", row["image_path"], row["photo_url"])
+                except Exception as exc:
+                    storage_delete_failed = True
+                    app.logger.warning("Failed to delete client comment photo %s: %s", row["id"], exc)
+            if row["receipt_path"]:
+                try:
+                    delete_storage_object("receipts", row["receipt_path"], row["receipt_url"])
+                except Exception as exc:
+                    storage_delete_failed = True
+                    app.logger.warning("Failed to delete client comment receipt %s: %s", row["id"], exc)
+            conn.execute("DELETE FROM updates WHERE id = ?", (row["id"],))
+
+    if storage_delete_failed:
+        flash("Client comment deleted. Some storage cleanup needs a retry.", "error")
+    else:
+        flash("Client comment deleted.", "success")
+    return redirect(url_for(return_endpoint, job_id=update["job_id"]))
 
 
 @app.route("/delete/<int:job_id>", methods=("POST",))

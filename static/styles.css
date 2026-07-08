@@ -889,6 +889,11 @@ fieldset label { flex-direction: row; margin: 4px 0; font-size: 0.88rem; }
 .timeline-day-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
 .timeline-day-stats { display: flex; gap: 8px; flex-wrap: wrap; }
 .timeline-stat { font-size: 0.72rem; font-weight: 700; color: var(--muted); background: var(--surface); border: 1px solid var(--line); padding: 3px 9px; border-radius: var(--radius-pill); }
+.timeline-entry-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+.timeline-entry-actions .button { padding: 4px 10px; font-size: 0.72rem; border-radius: 9px; }
+.timeline-entry-edit-form { display: none; margin-top: 10px; }
+.timeline-entry-edit-form textarea { min-height: 84px; padding: 10px 12px; font-size: 0.84rem; }
+.timeline-entry-edit-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
 
 /* ---------------------------------------------------------------------- */
 /* 10. PROGRESS BARS / CHARTS                                              */
