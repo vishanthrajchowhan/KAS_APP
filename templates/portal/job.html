@@ -34,7 +34,7 @@
 <div class="card">
   <div class="section-label">RECENT UPDATES</div>
   <div class="update-feed">
-    {% for update in updates[:5] %}
+    {% for update in updates %}
     <div class="update-item">
       <div class="update-dot" style="{% if loop.index > 1 %}background:#d1d5db;{% endif %}"></div>
       <div>
@@ -45,6 +45,31 @@
           </div>
         {% endif %}
         <div class="update-meta">{{ update.timestamp[:10] if update.timestamp else '' }} · {{ (update.author_role or 'team')|title }}</div>
+        {% if update.author_role == 'client' %}
+          <div style="display:flex;gap:6px;align-items:center;margin-top:8px;">
+            <button
+              type="button"
+              class="btn"
+              style="padding:4px 10px;font-size:11px;border-radius:9px;"
+              onclick="toggleEditForm({{ update.id }})"
+            >Edit</button>
+            <form method="post" action="{{ url_for('portal_delete_comment', token=token, update_id=update.id) }}" onsubmit="return confirm('Delete this comment?');" style="display:inline;">
+              <button class="btn" type="submit" style="padding:4px 10px;font-size:11px;border-radius:9px;">Delete</button>
+            </form>
+          </div>
+          <form
+            id="edit-comment-{{ update.id }}"
+            method="post"
+            action="{{ url_for('portal_edit_comment', token=token, update_id=update.id) }}"
+            style="display:none;margin-top:8px;"
+          >
+            <textarea name="comment" rows="3" style="width:100%;border:1px solid #d1d5db;border-radius:10px;padding:10px 12px;">{{ update.notes or '' }}</textarea>
+            <div style="display:flex;gap:6px;margin-top:6px;">
+              <button class="btn btn-primary" type="submit" style="padding:5px 10px;font-size:11px;border-radius:9px;">Save</button>
+              <button type="button" class="btn" style="padding:5px 10px;font-size:11px;border-radius:9px;" onclick="toggleEditForm({{ update.id }})">Cancel</button>
+            </div>
+          </form>
+        {% endif %}
       </div>
     </div>
     {% endfor %}
@@ -140,5 +165,13 @@
     <a href="tel:{{ workspace_settings.company_phone }}" class="btn">Call</a>
   {% endif %}
 </div>
+
+<script>
+  function toggleEditForm(updateId) {
+    const form = document.getElementById(`edit-comment-${updateId}`);
+    if (!form) return;
+    form.style.display = form.style.display === "none" || !form.style.display ? "block" : "none";
+  }
+</script>
 
 {% endblock %}

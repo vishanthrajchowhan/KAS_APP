@@ -4973,6 +4973,109 @@ def portal_comment(token):
     return redirect(url_for("client_portal", token=token))
 
 
+@app.route("/portal/<token>/comment/<int:update_id>/edit", methods=("POST",))
+def portal_edit_comment(token, update_id):
+    job = get_job_by_portal_token(token)
+    if not job:
+        abort(404)
+
+    comment = request.form.get("comment", "").strip()
+    if not comment:
+        flash("Comment cannot be empty.", "error")
+        return redirect(url_for("client_portal", token=token))
+
+    with get_db_connection() as conn:
+        update = conn.execute(
+            """
+            SELECT id, update_group
+            FROM updates
+            WHERE id = ? AND job_id = ? AND author_role = 'client'
+            """,
+            (update_id, job["id"]),
+        ).fetchone()
+        if not update:
+            flash("Comment not found.", "error")
+            return redirect(url_for("client_portal", token=token))
+
+        updated_at = current_time_iso()
+        if update["update_group"]:
+            conn.execute(
+                """
+                UPDATE updates
+                SET notes = ?, timestamp = ?
+                WHERE job_id = ? AND author_role = 'client' AND update_group = ?
+                """,
+                (comment, updated_at, job["id"], update["update_group"]),
+            )
+        else:
+            conn.execute(
+                """
+                UPDATE updates
+                SET notes = ?, timestamp = ?
+                WHERE id = ?
+                """,
+                (comment, updated_at, update_id),
+            )
+
+    flash("Comment updated.", "success")
+    return redirect(url_for("client_portal", token=token))
+
+
+@app.route("/portal/<token>/comment/<int:update_id>/delete", methods=("POST",))
+def portal_delete_comment(token, update_id):
+    job = get_job_by_portal_token(token)
+    if not job:
+        abort(404)
+
+    with get_db_connection() as conn:
+        update = conn.execute(
+            """
+            SELECT id, update_group
+            FROM updates
+            WHERE id = ? AND job_id = ? AND author_role = 'client'
+            """,
+            (update_id, job["id"]),
+        ).fetchone()
+        if not update:
+            flash("Comment not found.", "error")
+            return redirect(url_for("client_portal", token=token))
+
+        if update["update_group"]:
+            rows = conn.execute(
+                """
+                SELECT id, image_path, photo_url, receipt_path, receipt_url
+                FROM updates
+                WHERE job_id = ? AND author_role = 'client' AND update_group = ?
+                """,
+                (job["id"], update["update_group"]),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """
+                SELECT id, image_path, photo_url, receipt_path, receipt_url
+                FROM updates
+                WHERE id = ?
+                """,
+                (update_id,),
+            ).fetchall()
+
+        for row in rows:
+            if row["image_path"]:
+                try:
+                    delete_storage_object("job_photos", row["image_path"], row["photo_url"])
+                except Exception as exc:
+                    app.logger.warning("Portal comment photo delete failed for update %s: %s", row["id"], exc)
+            if row["receipt_path"]:
+                try:
+                    delete_storage_object("receipts", row["receipt_path"], row["receipt_url"])
+                except Exception as exc:
+                    app.logger.warning("Portal comment attachment delete failed for update %s: %s", row["id"], exc)
+            conn.execute("DELETE FROM updates WHERE id = ?", (row["id"],))
+
+    flash("Comment deleted.", "success")
+    return redirect(url_for("client_portal", token=token))
+
+
 @app.route("/portal/<token>/report/<int:walkthrough_id>")
 def portal_report(token, walkthrough_id):
     with get_db_connection() as conn:
