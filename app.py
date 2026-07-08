@@ -7,6 +7,7 @@ import secrets
 import importlib
 from io import BytesIO
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 from functools import wraps
 from pathlib import Path
 from typing import Any, cast
@@ -197,6 +198,22 @@ DEFAULT_WORKSPACE_SETTINGS = {
     "notify_payment_received": False,
     "notify_photo_upload": True,
 }
+
+APP_TIMEZONE_NAME = "America/New_York"
+APP_TIMEZONE = ZoneInfo(APP_TIMEZONE_NAME)
+
+
+def current_time():
+    # Keep timestamps stored as naive strings while sourcing them from Eastern Time.
+    return datetime.now(APP_TIMEZONE).replace(tzinfo=None)
+
+
+def current_time_iso():
+    return current_time().isoformat(timespec="seconds")
+
+
+def current_date_iso():
+    return current_time().date().isoformat()
 
 def _fmt_date(val):
     if not val:
@@ -966,7 +983,7 @@ def init_db():
 
 
 def seed_default_users(conn):
-    now = datetime.now().isoformat(timespec="seconds")
+    now = current_time_iso()
     default_password = os.environ.get("ADMIN_PASSWORD", os.environ.get("WORKER_PASSWORD", "password123"))
     default_users = (
         ("Admin", os.environ.get("ADMIN_EMAIL", "admin@example.com"), default_password, "admin"),
@@ -1103,7 +1120,7 @@ def migrate_workspace_settings_table(conn):
 
     existing_settings = conn.execute("SELECT id FROM workspace_settings WHERE id = 1").fetchone()
     if existing_settings is None:
-        now = datetime.now().isoformat(timespec="seconds")
+        now = current_time_iso()
         conn.execute(
             """
             INSERT INTO workspace_settings (
@@ -1190,7 +1207,7 @@ def load_workspace_settings(conn):
 
 
 def save_workspace_settings(conn, data):
-    now = datetime.now().isoformat(timespec="seconds")
+    now = current_time_iso()
     conn.execute(
         """
         UPDATE workspace_settings
@@ -1225,7 +1242,7 @@ def build_notifications_for_user(user, settings):
         return []
 
     items = []
-    now = datetime.now()
+    now = current_time()
 
     def append_item(title, message, timestamp, href, kind):
         items.append(
@@ -1360,7 +1377,7 @@ def raw_upload_bytes(uploaded_file):
 
 
 def storage_path_for_upload(kind, source_filename, job_id=None, extension=None):
-    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    timestamp = current_time().strftime("%Y%m%d%H%M%S")
     unique = uuid.uuid4().hex[:8]
     extension = extension or extension_for_file(source_filename)
     clean_stem = clean_storage_stem(source_filename)
@@ -1787,7 +1804,7 @@ def serialize_task_row(row):
 
 
 def sync_job_tasks(conn, job_id, selected_services, description="", other_service_details=""):
-    now = datetime.now().isoformat(timespec="seconds")
+    now = current_time_iso()
     existing_rows = conn.execute(
         """
         SELECT id, service_type, title, COALESCE(is_custom, FALSE) AS is_custom
@@ -1848,7 +1865,7 @@ def add_job_task(conn, job_id, service_type, title, *, is_custom=True):
         """,
         (job_id, normalized_service or "", normalized_title),
     ).fetchone()
-    now = datetime.now().isoformat(timespec="seconds")
+    now = current_time_iso()
     if existing is not None:
         if existing["is_removed"]:
             conn.execute(
@@ -2429,7 +2446,7 @@ def index():
             role_params,
         ).fetchall()
 
-        today = datetime.now().date()
+        today = current_time().date()
         today_str = today.isoformat()
         week_start = today - timedelta(days=today.weekday())
         week_end = week_start + timedelta(days=6)
@@ -2729,7 +2746,7 @@ def add_job():
         location = location or "TBD"
         description = compose_service_text(selected_service_types) or "No description provided."
 
-        now = datetime.now().isoformat(timespec="seconds")
+        now = current_time_iso()
         with get_db_connection() as conn:
             conn.execute(
                 """
@@ -2816,7 +2833,7 @@ def users():
                         generate_password_hash(password),
                         password,
                         role,
-                        datetime.now().isoformat(timespec="seconds"),
+                        current_time_iso(),
                     ),
                 )
         except errors.UniqueViolation:
@@ -2975,7 +2992,7 @@ def delete_user(user_id: int):
 
         conn.execute(
             "UPDATE users SET is_active = FALSE, deleted_at = ?, temp_password_plain = NULL WHERE id = ?",
-            (datetime.now().isoformat(timespec="seconds"), user_id),
+            (current_time_iso(), user_id),
         )
 
     flash(f"{user_record['name']} was deleted and can no longer log in.", "success")
@@ -3055,7 +3072,7 @@ def jobs():
         "CASE jobs.status WHEN 'Lead' THEN 1 WHEN 'Estimating' THEN 2 WHEN 'Negotiation' THEN 3 WHEN 'Approved' THEN 4 WHEN 'Scheduled' THEN 5 WHEN 'Started' THEN 6 WHEN 'In Progress' THEN 7 WHEN 'Completed' THEN 8 ELSE 99 END, jobs.created_at DESC",
     )
 
-    today = datetime.now().date().isoformat()
+    today = current_date_iso()
     with get_db_connection() as conn:
         jobs_list = conn.execute(
             f"""
@@ -3159,7 +3176,7 @@ def clients():
 @login_required
 @role_required("admin")
 def employees():
-    today_prefix = datetime.now().date().isoformat() + "%"
+    today_prefix = current_date_iso() + "%"
     with get_db_connection() as conn:
         employee_rows = conn.execute(
             """
@@ -3318,7 +3335,7 @@ def upload_progress_report(job_id):
         flash(f"Could not upload report: {safe_error_detail(exc)}", "error")
         return redirect(url_for("update_job", job_id=job_id))
 
-    now = datetime.now().isoformat(timespec="seconds")
+    now = current_time_iso()
     with get_db_connection() as conn:
         conn.execute(
             """
@@ -3648,7 +3665,7 @@ def submit_update():
         flash("Add notes, photos, or change the status before submitting.", "error")
         return redirect(url_for("update_job", job_id=job_id))
 
-    now = datetime.now().isoformat(timespec="seconds")
+    now = current_time_iso()
     update_group = uuid.uuid4().hex
     saved_photos = []
     saved_receipts = []
@@ -3823,7 +3840,7 @@ def client_comment(job_id):
         flash("Please write a comment or attach a photo before submitting.", "error")
         return safe_redirect(next_url) if is_safe_redirect_target(next_url) else redirect(url_for("job_progress", job_id=job_id))
 
-    now = datetime.now().isoformat(timespec="seconds")
+    now = current_time_iso()
     update_group = uuid.uuid4().hex
     saved_photos = []
     saved_files = []
@@ -4410,7 +4427,7 @@ def api_walkthrough_upload():
     save_path = subdir / unique_name
     video.save(str(save_path))
 
-    now = datetime.now().isoformat(timespec="seconds")
+    now = current_time_iso()
     created_by = g.user["id"] if g.user else None
 
     with get_db_connection() as conn:
@@ -4562,7 +4579,7 @@ def process_walkthrough(walkthrough_id: int, video_path: Path, field_notes: str 
             # Insert backup video frames before AI generation so reports still have photos
             # when the employee did not press Snap.
             for f in frames:
-                now = datetime.now().isoformat(timespec="seconds")
+                now = current_time_iso()
                 frame_url = f"/walkthroughs/media/{quote(f['filename'])}"
                 if supabase_storage_configured():
                     try:
@@ -4628,7 +4645,7 @@ def process_walkthrough(walkthrough_id: int, video_path: Path, field_notes: str 
                 (walkthrough_id,),
             ).fetchall()
         created_by_id = wt_row.get("created_by") if wt_row else None
-        created_at_str = wt_row.get("created_at") if wt_row else datetime.now().isoformat(timespec="seconds")
+        created_at_str = wt_row.get("created_at") if wt_row else current_time_iso()
         created_by_name = "Crew Member"
         if created_by_id:
             with get_db_connection() as conn:
@@ -4663,7 +4680,7 @@ def process_walkthrough(walkthrough_id: int, video_path: Path, field_notes: str 
 
             with get_db_connection() as conn:
                 conn.execute("UPDATE walkthroughs SET pdf_url = ? WHERE id = ?", (pdf_url, walkthrough_id))
-                now = datetime.now().isoformat(timespec="seconds")
+                now = current_time_iso()
                 conn.execute(
                     "INSERT INTO walkthrough_reports (walkthrough_id, report_text, pdf_url, created_by, created_at) VALUES (?, ?, ?, ?, ?)",
                     (walkthrough_id, report_text, pdf_url, created_by_id, now),
@@ -4760,7 +4777,7 @@ def upload_walkthrough_pdf(walkthrough_id: int):
         public_url = up.get("url")
         with get_db_connection() as conn:
             conn.execute("UPDATE walkthroughs SET pdf_url = ? WHERE id = ?", (public_url, walkthrough_id))
-            now = datetime.now().isoformat(timespec="seconds")
+            now = current_time_iso()
             conn.execute(
                 "INSERT INTO walkthrough_reports (walkthrough_id, report_text, pdf_url, created_by, created_at) VALUES (?, ?, ?, ?, ?)",
                 (walkthrough_id, report_text, public_url, g.user.id if g.user else None, now),
@@ -4836,7 +4853,7 @@ def client_portal(token):
 
         conn.execute(
             "INSERT INTO portal_views (job_id, viewed_at, ip_address) VALUES (?, ?, ?)",
-            (job["id"], datetime.now().isoformat(timespec="seconds"), request.remote_addr),
+            (job["id"], current_time_iso(), request.remote_addr),
         )
         updates = conn.execute(
             "SELECT * FROM updates WHERE job_id = ? AND client_visible = TRUE ORDER BY timestamp DESC",
@@ -4887,7 +4904,7 @@ def portal_comment(token):
         flash("Please write a comment or attach a file before submitting.", "error")
         return redirect(url_for("client_portal", token=token))
 
-    now = datetime.now().isoformat(timespec="seconds")
+    now = current_time_iso()
     update_group = uuid.uuid4().hex
     saved_photos = []
     saved_files = []
@@ -5003,7 +5020,7 @@ def portal_sign(token, doc_id):
             if signed_by:
                 conn.execute(
                     "UPDATE documents SET signed_at = ?, signed_by_name = ?, signed_ip = ? WHERE id = ?",
-                    (datetime.now().isoformat(timespec="seconds"), signed_by, request.remote_addr, doc_id),
+                    (current_time_iso(), signed_by, request.remote_addr, doc_id),
                 )
                 flash("Document signed successfully. Thank you!", "success")
                 return redirect(url_for("client_portal", token=token))
