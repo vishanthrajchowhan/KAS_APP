@@ -4168,7 +4168,6 @@ def delete_receipt(update_id):
 
 @app.route("/update/<int:update_id>/comment/edit", methods=("POST",))
 @login_required
-@role_required("admin")
 def edit_client_comment(update_id):
     updated_comment = request.form.get("comment", "")
     return_endpoint = request.form.get("return_endpoint") or "job_progress"
@@ -4187,6 +4186,14 @@ def edit_client_comment(update_id):
         if update is None or update["author_role"] != "client":
             flash("Client comment not found.", "error")
             return redirect(url_for("index") if update is None else url_for(return_endpoint, job_id=update["job_id"]))
+
+        job = get_job_or_404(update["job_id"])
+        if job is None:
+            flash("Client comment not found.", "error")
+            return redirect(url_for("index"))
+        if not (is_admin() or (is_client() and can_view_job(job))):
+            flash("You do not have permission to edit that comment.", "error")
+            return redirect(url_for("index"))
 
         if update["update_group"]:
             conn.execute(
@@ -4213,7 +4220,6 @@ def edit_client_comment(update_id):
 
 @app.route("/update/<int:update_id>/comment/delete", methods=("POST",))
 @login_required
-@role_required("admin")
 def delete_client_comment(update_id):
     return_endpoint = request.form.get("return_endpoint") or "job_progress"
     if return_endpoint not in {"job_progress", "update_job"}:
@@ -4231,6 +4237,14 @@ def delete_client_comment(update_id):
         if update is None or update["author_role"] != "client":
             flash("Client comment not found.", "error")
             return redirect(url_for("index") if update is None else url_for(return_endpoint, job_id=update["job_id"]))
+
+        job = get_job_or_404(update["job_id"])
+        if job is None:
+            flash("Client comment not found.", "error")
+            return redirect(url_for("index"))
+        if not (is_admin() or (is_client() and can_view_job(job))):
+            flash("You do not have permission to delete that comment.", "error")
+            return redirect(url_for("index"))
 
         if update["update_group"]:
             rows = conn.execute(

@@ -209,7 +209,7 @@
                                 {% else %}
                                     <p class="muted">Photos or CRM changes were added with this update.</p>
                                 {% endif %}
-                                {% if can_manage_jobs and update.author_role == "client" %}
+                                {% if update.author_role == "client" and (can_manage_jobs or g.user.role == "client") %}
                                     <div class="timeline-entry-actions">
                                         <button type="button" class="button button-compact" onclick="toggleClientCommentEditor('{{ update_loop }}')">Edit</button>
                                         <form method="post" action="{{ url_for('delete_client_comment', update_id=update.id) }}" onsubmit="return confirm('Delete this client comment?');">
