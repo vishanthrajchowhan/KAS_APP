@@ -227,6 +227,14 @@
         const defaultTheme = "{{ workspace_settings.theme if workspace_settings is defined else 'light' }}";
         let deferredInstallPrompt = null;
 
+        function showManualInstallHelp() {
+            if (isIos) {
+                window.alert('To install on iPhone/iPad: tap Share, then tap "Add to Home Screen".');
+                return;
+            }
+            window.alert('Install is not available automatically on this browser. Open your browser menu and choose "Install app" or "Add to Home screen".');
+        }
+
         function hideInstallPrompts() {
             if (installCta) {
                 installCta.hidden = true;
@@ -391,11 +399,13 @@
             return outputArray;
         }
 
-        // During active UI debugging, automatically unregister any service workers
-        // and clear caches so the browser loads the latest templates and CSS.
-        // This is temporary — remove when you're done testing.
-        window.__sw_disabled = true;
-        (function unregisterExistingServiceWorkers() {
+        // Optional debug switch: add ?sw=off to temporarily disable service workers.
+        const swDisabledByQuery = new URLSearchParams(window.location.search).get('sw') === 'off';
+        window.__sw_disabled = swDisabledByQuery;
+        (function unregisterExistingServiceWorkersWhenDisabled() {
+            if (!window.__sw_disabled) {
+                return;
+            }
             try {
                 if ('serviceWorker' in navigator) {
                     navigator.serviceWorker.getRegistrations().then(function (regs) {
@@ -480,6 +490,7 @@
             installBtn.disabled = true;
             installBtn.addEventListener("click", async function () {
                 if (!deferredInstallPrompt) {
+                    showManualInstallHelp();
                     showInstallPrompt();
                     return;
                 }
@@ -510,7 +521,11 @@
 
                 // If iOS, show the iOS install tip
                 if (isIos) {
-                    if (iosInstallTip) iosInstallTip.hidden = false;
+                    if (iosInstallTip) {
+                        iosInstallTip.hidden = false;
+                    } else {
+                        showManualInstallHelp();
+                    }
                     return;
                 }
 
@@ -518,7 +533,13 @@
                 if (installCta) {
                     installCta.hidden = false;
                     if (installBtn) installBtn.disabled = !deferredInstallPrompt;
+                    if (!deferredInstallPrompt) {
+                        showManualInstallHelp();
+                    }
+                    return;
                 }
+
+                showManualInstallHelp();
             });
         }
 

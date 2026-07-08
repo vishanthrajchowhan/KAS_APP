@@ -214,6 +214,15 @@
     function setupPWAInstall() {
         let deferredPrompt = null;
         const installBtn = document.getElementById('install-button');
+        const isIos = /iphone|ipad|ipod/i.test(window.navigator.userAgent || '');
+
+        function showManualInstallHelp() {
+            if (isIos) {
+                window.alert('To install on iPhone/iPad: tap Share, then tap "Add to Home Screen".');
+                return;
+            }
+            window.alert('Install is not available automatically on this browser. Open your browser menu and choose "Install app" or "Add to Home screen".');
+        }
 
         window.addEventListener('beforeinstallprompt', (e) => {
             // Prevent the mini-infobar from appearing on mobile
@@ -228,6 +237,7 @@
         if (installBtn) {
             installBtn.addEventListener('click', async () => {
                 if (!deferredPrompt) {
+                    showManualInstallHelp();
                     return;
                 }
                 deferredPrompt.prompt();
