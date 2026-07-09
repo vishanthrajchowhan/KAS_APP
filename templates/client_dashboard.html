@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}My Projects | KAS{% endblock %}
+
+{% block content %}
+<section class="dashboard-hero glass-panel reveal">
+    <div class="dashboard-hero-copy">
+        <p class="eyebrow">Client Dashboard</p>
+        <h1>Welcome {{ g.user.name.split(' ')[0] }}!</h1>
+        <p>Your approved project workspace.</p>
+    </div>
+</section>
+
+<section class="panel premium-panel glass-panel reveal">
+    <div class="panel-header">
+        <div>
+            <p class="eyebrow">My Projects</p>
+            <h3>Assigned Projects</h3>
+        </div>
+        <span class="panel-chip">{{ jobs|length }} projects</span>
+    </div>
+
+    {% if jobs %}
+        <div class="activity-feed">
+            {% for job in jobs %}
+                <a class="activity-item premium-activity-item" href="{{ url_for('job_progress', job_id=job.id) }}">
+                    <strong>{{ job.name }}</strong>
+                    <p class="muted">{{ job.location }}</p>
+                    <small>{{ job.status }}</small>
+                </a>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="panel-empty-state">
+            <span data-lucide="briefcase-business"></span>
+            <strong>No projects assigned yet</strong>
+            <p>Your projects will appear here after KAS approves and assigns them.</p>
+        </div>
+    {% endif %}
+</section>
+{% endblock %}

@@ -860,11 +860,40 @@ def init_db():
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS job_employees (
+                job_id BIGINT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+                user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                created_at TEXT NOT NULL,
+                PRIMARY KEY (job_id, user_id)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS job_clients (
+                job_id BIGINT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+                user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                created_at TEXT NOT NULL,
+                PRIMARY KEY (job_id, user_id)
+            )
+            """
+        )
         conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS phone TEXT")
+        conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS first_name TEXT")
+        conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS last_name TEXT")
+        conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS company TEXT")
         conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS temp_password_plain TEXT")
         conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE")
         conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at TEXT")
+        conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS account_status TEXT NOT NULL DEFAULT 'approved'")
+        conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS approved_at TEXT")
+        conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS approved_by BIGINT")
+        conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS rejected_at TEXT")
+        conn.execute("UPDATE users SET account_status = 'approved' WHERE account_status IS NULL OR account_status = ''")
         migrate_jobs_table(conn)
+        migrate_job_assignment_tables(conn)
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS updates (
@@ -1046,6 +1075,35 @@ def migrate_jobs_table(conn):
         WHERE payment_status IS NULL
         """
     )
+
+
+def migrate_job_assignment_tables(conn):
+    now = current_time_iso()
+    existing_employee_rows = conn.execute(
+        "SELECT id, assigned_to FROM jobs WHERE assigned_to IS NOT NULL"
+    ).fetchall()
+    for row in existing_employee_rows:
+        conn.execute(
+            """
+            INSERT INTO job_employees (job_id, user_id, created_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT (job_id, user_id) DO NOTHING
+            """,
+            (row["id"], row["assigned_to"], now),
+        )
+
+    existing_client_rows = conn.execute(
+        "SELECT id, client_id FROM jobs WHERE client_id IS NOT NULL"
+    ).fetchall()
+    for row in existing_client_rows:
+        conn.execute(
+            """
+            INSERT INTO job_clients (job_id, user_id, created_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT (job_id, user_id) DO NOTHING
+            """,
+            (row["id"], row["client_id"], now),
+        )
 
 
 def migrate_updates_table(conn):
@@ -1257,6 +1315,25 @@ def build_notifications_for_user(user, settings):
 
     with get_db_connection() as conn:
         if user["role"] == "admin":
+            pending_clients = conn.execute(
+                """
+                SELECT id, name, email, company, created_at
+                FROM users
+                WHERE role = 'client' AND account_status = 'pending'
+                ORDER BY created_at DESC, id DESC
+                LIMIT 3
+                """
+            ).fetchall()
+            for row in pending_clients:
+                company = row["company"] or "Company not provided"
+                append_item(
+                    "New client registration",
+                    f"{row['name']} - {company}",
+                    row["created_at"],
+                    url_for("clients"),
+                    "client_registration",
+                )
+
             if settings["notify_new_lead"]:
                 rows = conn.execute(
                     """
@@ -2075,17 +2152,100 @@ def can_manage_jobs():
     return is_admin()
 
 
+def parse_user_id_list(field_name: str) -> list[int]:
+    ids = []
+    seen = set()
+    for value in request.form.getlist(field_name):
+        if not value or not str(value).isdigit():
+            continue
+        user_id = int(value)
+        if user_id in seen:
+            continue
+        ids.append(user_id)
+        seen.add(user_id)
+    return ids
+
+
+def get_job_assignment_ids(conn, job_id: int, table_name: str) -> list[int]:
+    rows = conn.execute(
+        f"SELECT user_id FROM {table_name} WHERE job_id = ? ORDER BY created_at ASC, user_id ASC",
+        (job_id,),
+    ).fetchall()
+    return [int(row["user_id"]) for row in rows]
+
+
+def sync_job_assignments(conn, job_id: int, employee_ids: list[int], client_ids: list[int]):
+    now = current_time_iso()
+    employee_ids = list(dict.fromkeys(employee_ids))
+    client_ids = list(dict.fromkeys(client_ids))
+
+    conn.execute("DELETE FROM job_employees WHERE job_id = ?", (job_id,))
+    for user_id in employee_ids:
+        conn.execute(
+            "INSERT INTO job_employees (job_id, user_id, created_at) VALUES (?, ?, ?)",
+            (job_id, user_id, now),
+        )
+
+    conn.execute("DELETE FROM job_clients WHERE job_id = ?", (job_id,))
+    for user_id in client_ids:
+        conn.execute(
+            "INSERT INTO job_clients (job_id, user_id, created_at) VALUES (?, ?, ?)",
+            (job_id, user_id, now),
+        )
+
+    # Keep legacy single-assignment columns as the primary assignee for older views/integrations.
+    conn.execute(
+        "UPDATE jobs SET assigned_to = ?, client_id = ? WHERE id = ?",
+        (employee_ids[0] if employee_ids else None, client_ids[0] if client_ids else None, job_id),
+    )
+
+
+def user_is_assigned_to_job(job_id: int, table_name: str, legacy_column: str) -> bool:
+    with get_db_connection() as conn:
+        row = conn.execute(
+            f"""
+            SELECT 1
+            FROM jobs
+            WHERE id = ?
+              AND (
+                {legacy_column} = ?
+                OR EXISTS (
+                    SELECT 1 FROM {table_name}
+                    WHERE {table_name}.job_id = jobs.id
+                      AND {table_name}.user_id = ?
+                )
+              )
+            LIMIT 1
+            """,
+            (job_id, g.user["id"], g.user["id"]),
+        ).fetchone()
+    return row is not None
+
+
 def can_update_job(job):
-    return is_admin() or (is_employee() and job["assigned_to"] == g.user["id"])
+    if is_admin():
+        return True
+    if is_employee():
+        job_id = job["id"] if "id" in job.keys() else None
+        if job["assigned_to"] == g.user["id"]:
+            return True
+        return bool(job_id and user_is_assigned_to_job(job_id, "job_employees", "assigned_to"))
+    return False
 
 
 def can_view_job(job):
     if is_admin():
         return True
     if is_employee():
-        return job["assigned_to"] == g.user["id"]
+        job_id = job["id"] if "id" in job.keys() else None
+        if job["assigned_to"] == g.user["id"]:
+            return True
+        return bool(job_id and user_is_assigned_to_job(job_id, "job_employees", "assigned_to"))
     if is_client():
-        return job["client_id"] == g.user["id"]
+        job_id = job["id"] if "id" in job.keys() else None
+        if job["client_id"] == g.user["id"]:
+            return True
+        return bool(job_id and user_is_assigned_to_job(job_id, "job_clients", "client_id"))
     return False
 
 
@@ -2096,9 +2256,9 @@ def visible_jobs_where():
     if is_admin():
         return "", []
     if is_employee():
-        return "jobs.assigned_to = ?", [g.user["id"]]
+        return "(jobs.assigned_to = ? OR EXISTS (SELECT 1 FROM job_employees WHERE job_employees.job_id = jobs.id AND job_employees.user_id = ?))", [g.user["id"], g.user["id"]]
     if is_client():
-        return "jobs.client_id = ?", [g.user["id"]]
+        return "(jobs.client_id = ? OR EXISTS (SELECT 1 FROM job_clients WHERE job_clients.job_id = jobs.id AND job_clients.user_id = ?))", [g.user["id"], g.user["id"]]
     return "1 = 0", []
 
 
@@ -2108,13 +2268,13 @@ def visible_jobs_where_for_role(dashboard_role):
     if dashboard_role == "employee":
         # Admin preview shows the employee workspace across assigned jobs.
         if is_admin():
-            return "jobs.assigned_to IS NOT NULL", []
-        return "jobs.assigned_to = ?", [g.user["id"]]
+            return "(jobs.assigned_to IS NOT NULL OR EXISTS (SELECT 1 FROM job_employees WHERE job_employees.job_id = jobs.id))", []
+        return "(jobs.assigned_to = ? OR EXISTS (SELECT 1 FROM job_employees WHERE job_employees.job_id = jobs.id AND job_employees.user_id = ?))", [g.user["id"], g.user["id"]]
     if dashboard_role == "client":
         # Admin preview shows the client workspace across linked jobs.
         if is_admin():
-            return "jobs.client_id IS NOT NULL", []
-        return "jobs.client_id = ?", [g.user["id"]]
+            return "(jobs.client_id IS NOT NULL OR EXISTS (SELECT 1 FROM job_clients WHERE job_clients.job_id = jobs.id))", []
+        return "(jobs.client_id = ? OR EXISTS (SELECT 1 FROM job_clients WHERE job_clients.job_id = jobs.id AND job_clients.user_id = ?))", [g.user["id"], g.user["id"]]
     return "1 = 0", []
 
 
@@ -2324,12 +2484,21 @@ def login():
 
         with get_db_connection() as conn:
             user = conn.execute(
-                "SELECT * FROM users WHERE email = ? AND COALESCE(is_active, TRUE) = TRUE",
+                "SELECT * FROM users WHERE email = ?",
                 (email,),
             ).fetchone()
 
         if user is None or not check_password_hash(user["password"], password):
             flash("Invalid email or password.", "error")
+            return render_template("login.html", email=email)
+        if user["role"] == "client" and user["account_status"] == "pending":
+            flash("Your account is pending approval. You will be able to access projects once an admin approves it.", "info")
+            return render_template("login.html", email=email)
+        if user["role"] == "client" and user["account_status"] == "rejected":
+            flash("This client account request was rejected. Please contact KAS for help.", "error")
+            return render_template("login.html", email=email)
+        if not bool(user["is_active"]):
+            flash("This account is inactive. Please contact an administrator.", "error")
             return render_template("login.html", email=email)
 
         session.clear()
@@ -2338,6 +2507,77 @@ def login():
         return safe_redirect(request.args.get("next"))
 
     return render_template("login.html")
+
+
+@app.route("/register", methods=("GET", "POST"))
+def register():
+    if g.user is not None:
+        return redirect(url_for("index"))
+
+    form = {
+        "first_name": "",
+        "last_name": "",
+        "company": "",
+        "email": "",
+        "phone": "",
+    }
+
+    if request.method == "POST":
+        form = {
+            "first_name": request.form.get("first_name", "").strip(),
+            "last_name": request.form.get("last_name", "").strip(),
+            "company": request.form.get("company", "").strip(),
+            "email": request.form.get("email", "").strip().lower(),
+            "phone": request.form.get("phone", "").strip(),
+        }
+        password = request.form.get("password", "")
+        confirm_password = request.form.get("confirm_password", "")
+
+        if not form["first_name"] or not form["last_name"] or not form["company"] or not form["email"]:
+            flash("Please complete first name, last name, company, and email.", "error")
+            return render_template("register.html", form=form)
+        if len(password) < 6:
+            flash("Password must be at least 6 characters.", "error")
+            return render_template("register.html", form=form)
+        if password != confirm_password:
+            flash("Passwords do not match.", "error")
+            return render_template("register.html", form=form)
+
+        full_name = f"{form['first_name']} {form['last_name']}".strip()
+        try:
+            with get_db_connection() as conn:
+                conn.execute(
+                    """
+                    INSERT INTO users (
+                        name, first_name, last_name, company, email, phone, password,
+                        role, is_active, account_status, created_at
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, 'client', FALSE, 'pending', ?)
+                    """,
+                    (
+                        full_name,
+                        form["first_name"],
+                        form["last_name"],
+                        form["company"],
+                        form["email"],
+                        form["phone"] or None,
+                        generate_password_hash(password),
+                        current_time_iso(),
+                    ),
+                )
+        except errors.UniqueViolation:
+            flash("An account with that email already exists.", "error")
+            return render_template("register.html", form=form)
+        except sqlite3.IntegrityError as exc:
+            if "UNIQUE constraint failed" in str(exc):
+                flash("An account with that email already exists.", "error")
+                return render_template("register.html", form=form)
+            raise
+
+        flash("Account created. Your status is pending approval, and projects will appear after an admin approves your account.", "success")
+        return redirect(url_for("login"))
+
+    return render_template("register.html", form=form)
 
 
 @app.route("/logout", methods=("POST",))
@@ -2504,6 +2744,14 @@ def index():
             """,
             role_params + [today_str],
         ).fetchone()
+
+    if dashboard_role == "client":
+        return render_template(
+            "client_dashboard.html",
+            jobs=jobs,
+            dashboard_role=dashboard_role,
+            filters={"q": search, "status": status_filter, "quick": quick_filter, "sort": sort, "view_as": dashboard_role},
+        )
 
     open_jobs = sum(
         1
@@ -2713,8 +2961,10 @@ def add_job():
         service_type = compose_service_text(selected_service_types)
         other_service_details = ""
         status = request.form.get("status", "Lead").strip()
-        assigned_to = request.form.get("assigned_to", type=int)
-        client_id = request.form.get("client_id", type=int)
+        employee_ids = parse_user_id_list("employee_ids")
+        client_ids = parse_user_id_list("client_ids")
+        assigned_to = employee_ids[0] if employee_ids else None
+        client_id = client_ids[0] if client_ids else None
 
         if status not in STATUSES:
             status = "Lead"
@@ -2724,7 +2974,7 @@ def add_job():
                 "SELECT id, name, email FROM users WHERE role = 'employee' ORDER BY name"
             ).fetchall()
             clients = conn.execute(
-                "SELECT id, name, email FROM users WHERE role = 'client' ORDER BY name"
+                "SELECT id, name, email FROM users WHERE role = 'client' AND account_status = 'approved' AND COALESCE(is_active, TRUE) = TRUE ORDER BY name"
             ).fetchall()
 
         if not name:
@@ -2741,8 +2991,8 @@ def add_job():
                 statuses=STATUSES,
                 employees=employees,
                 clients=clients,
-                assigned_to=assigned_to,
-                client_id=client_id,
+                selected_employee_ids=employee_ids,
+                selected_client_ids=client_ids,
             )
 
         location = location or "TBD"
@@ -2777,6 +3027,7 @@ def add_job():
                 (now, name),
             ).fetchone()
             if job_row:
+                sync_job_assignments(conn, job_row["id"], employee_ids, client_ids)
                 sync_job_tasks(conn, job_row["id"], selected_service_types, description, other_service_details)
         flash("CRM job created.", "success")
         if job_row:
@@ -2788,7 +3039,7 @@ def add_job():
             "SELECT id, name, email FROM users WHERE role = 'employee' ORDER BY name"
         ).fetchall()
         clients = conn.execute(
-            "SELECT id, name, email FROM users WHERE role = 'client' ORDER BY name"
+            "SELECT id, name, email FROM users WHERE role = 'client' AND account_status = 'approved' AND COALESCE(is_active, TRUE) = TRUE ORDER BY name"
         ).fetchall()
     return render_template(
         "add_job.html",
@@ -2797,6 +3048,8 @@ def add_job():
         due_date="",
         employees=employees,
         clients=clients,
+        selected_employee_ids=[],
+        selected_client_ids=[],
     )
 
 
@@ -3142,20 +3395,30 @@ def jobs():
 @role_required("admin")
 def clients():
     with get_db_connection() as conn:
+        pending_clients = conn.execute(
+            """
+            SELECT id, name, first_name, last_name, company, email, phone, created_at
+            FROM users
+            WHERE role = 'client' AND account_status = 'pending'
+            ORDER BY created_at DESC, id DESC
+            """
+        ).fetchall()
         client_rows = conn.execute(
             """
             SELECT
                 users.id,
                 users.name,
+                users.company,
                 users.email,
                 users.phone,
+                users.account_status,
                 COUNT(DISTINCT jobs.id) AS total_projects,
                 COUNT(DISTINCT CASE WHEN jobs.status = 'Completed' THEN jobs.id END) AS completed_projects,
                 COUNT(DISTINCT CASE WHEN jobs.status IN ('Scheduled', 'Started', 'In Progress') THEN jobs.id END) AS active_projects,
                 MAX(jobs.created_at) AS last_job_date
             FROM users
             LEFT JOIN jobs ON jobs.client_id = users.id
-            WHERE users.role = 'client' AND COALESCE(users.is_active, TRUE) = TRUE
+            WHERE users.role = 'client' AND users.account_status = 'approved' AND COALESCE(users.is_active, TRUE) = TRUE
             GROUP BY users.id
             ORDER BY users.name
             """
@@ -3168,10 +3431,159 @@ def clients():
     return render_template(
         "clients.html",
         clients=client_rows,
+        pending_clients=pending_clients,
         total_clients=total_clients,
         active_clients=active_clients,
         repeat_clients=repeat_clients,
     )
+
+
+@app.route("/clients/<int:user_id>/approve", methods=("POST",))
+@login_required
+@role_required("admin")
+def approve_client(user_id: int):
+    with get_db_connection() as conn:
+        client = conn.execute(
+            "SELECT id, name FROM users WHERE id = ? AND role = 'client' AND account_status = 'pending'",
+            (user_id,),
+        ).fetchone()
+        if client is None:
+            flash("Pending client registration not found.", "error")
+            return redirect(url_for("clients"))
+        conn.execute(
+            """
+            UPDATE users
+            SET account_status = 'approved',
+                is_active = TRUE,
+                approved_at = ?,
+                approved_by = ?,
+                rejected_at = NULL
+            WHERE id = ?
+            """,
+            (current_time_iso(), g.user["id"], user_id),
+        )
+    flash(f"{client['name']} was approved. Assign projects to control what they can see.", "success")
+    return redirect(url_for("client_projects", user_id=user_id))
+
+
+@app.route("/clients/<int:user_id>/reject", methods=("POST",))
+@login_required
+@role_required("admin")
+def reject_client(user_id: int):
+    with get_db_connection() as conn:
+        client = conn.execute(
+            "SELECT id, name FROM users WHERE id = ? AND role = 'client' AND account_status = 'pending'",
+            (user_id,),
+        ).fetchone()
+        if client is None:
+            flash("Pending client registration not found.", "error")
+            return redirect(url_for("clients"))
+        conn.execute(
+            """
+            UPDATE users
+            SET account_status = 'rejected',
+                is_active = FALSE,
+                rejected_at = ?,
+                approved_at = NULL,
+                approved_by = NULL
+            WHERE id = ?
+            """,
+            (current_time_iso(), user_id),
+        )
+    flash(f"{client['name']} was rejected.", "success")
+    return redirect(url_for("clients"))
+
+
+@app.route("/clients/<int:user_id>/projects", methods=("GET", "POST"))
+@login_required
+@role_required("admin")
+def client_projects(user_id: int):
+    with get_db_connection() as conn:
+        client = conn.execute(
+            """
+            SELECT id, name, email, company
+            FROM users
+            WHERE id = ? AND role = 'client' AND account_status = 'approved' AND COALESCE(is_active, TRUE) = TRUE
+            """,
+            (user_id,),
+        ).fetchone()
+        if client is None:
+            flash("Approved client not found.", "error")
+            return redirect(url_for("clients"))
+
+        if request.method == "POST":
+            selected_job_ids = {
+                int(value)
+                for value in request.form.getlist("job_ids")
+                if value.isdigit()
+            }
+            current_rows = conn.execute(
+                """
+                SELECT jobs.id
+                FROM jobs
+                WHERE jobs.client_id = ?
+                   OR EXISTS (
+                        SELECT 1 FROM job_clients
+                        WHERE job_clients.job_id = jobs.id
+                          AND job_clients.user_id = ?
+                   )
+                """,
+                (user_id, user_id),
+            ).fetchall()
+            current_job_ids = {int(row["id"]) for row in current_rows}
+
+            for job_id in current_job_ids - selected_job_ids:
+                conn.execute("DELETE FROM job_clients WHERE job_id = ? AND user_id = ?", (job_id, user_id))
+                first_client = conn.execute(
+                    "SELECT user_id FROM job_clients WHERE job_id = ? ORDER BY created_at ASC, user_id ASC LIMIT 1",
+                    (job_id,),
+                ).fetchone()
+                conn.execute(
+                    "UPDATE jobs SET client_id = ? WHERE id = ? AND client_id = ?",
+                    (first_client["user_id"] if first_client else None, job_id, user_id),
+                )
+            for job_id in selected_job_ids:
+                conn.execute(
+                    """
+                    INSERT INTO job_clients (job_id, user_id, created_at)
+                    VALUES (?, ?, ?)
+                    ON CONFLICT (job_id, user_id) DO NOTHING
+                    """,
+                    (job_id, user_id, current_time_iso()),
+                )
+                conn.execute(
+                    "UPDATE jobs SET client_id = COALESCE(client_id, ?) WHERE id = ?",
+                    (user_id, job_id),
+                )
+
+            flash(f"Project access saved for {client['name']}.", "success")
+            return redirect(url_for("clients"))
+
+        jobs_list = conn.execute(
+            """
+            SELECT
+                jobs.id,
+                jobs.name,
+                jobs.location,
+                jobs.client_name,
+                jobs.status,
+                jobs.client_id,
+                CASE
+                    WHEN jobs.client_id = ?
+                      OR EXISTS (
+                            SELECT 1 FROM job_clients
+                            WHERE job_clients.job_id = jobs.id
+                              AND job_clients.user_id = ?
+                        )
+                    THEN 1 ELSE 0
+                END AS is_assigned
+            FROM jobs
+            ORDER BY name ASC, created_at DESC
+            """,
+            (user_id, user_id),
+        ).fetchall()
+
+    return render_template("client_projects.html", client=client, jobs=jobs_list)
 
 
 @app.route("/employees")
@@ -3250,8 +3662,41 @@ def update_job(job_id):
             "SELECT id, name, email FROM users WHERE role = 'employee' ORDER BY name"
         ).fetchall()
         clients = conn.execute(
-            "SELECT id, name, email FROM users WHERE role = 'client' ORDER BY name"
+            "SELECT id, name, email FROM users WHERE role = 'client' AND account_status = 'approved' AND COALESCE(is_active, TRUE) = TRUE ORDER BY name"
         ).fetchall()
+        selected_employee_ids = get_job_assignment_ids(conn, job_id, "job_employees")
+        selected_client_ids = get_job_assignment_ids(conn, job_id, "job_clients")
+        if job["assigned_to"] and int(job["assigned_to"]) not in selected_employee_ids:
+            selected_employee_ids.insert(0, int(job["assigned_to"]))
+        if job["client_id"] and int(job["client_id"]) not in selected_client_ids:
+            selected_client_ids.insert(0, int(job["client_id"]))
+
+        employee_name_map = {int(row["id"]): row["name"] for row in employees}
+        client_name_map = {int(row["id"]): row["name"] for row in clients}
+
+        for user_id in selected_employee_ids:
+            if user_id in employee_name_map:
+                continue
+            legacy_employee = conn.execute(
+                "SELECT name FROM users WHERE id = ?",
+                (user_id,),
+            ).fetchone()
+            if legacy_employee is not None:
+                employee_name_map[user_id] = legacy_employee["name"]
+
+        for user_id in selected_client_ids:
+            if user_id in client_name_map:
+                continue
+            legacy_client = conn.execute(
+                "SELECT name FROM users WHERE id = ?",
+                (user_id,),
+            ).fetchone()
+            if legacy_client is not None:
+                client_name_map[user_id] = legacy_client["name"]
+
+        assigned_employees = [employee_name_map[user_id] for user_id in selected_employee_ids if user_id in employee_name_map]
+        assigned_clients = [client_name_map[user_id] for user_id in selected_client_ids if user_id in client_name_map]
+
         sync_job_tasks(conn, job_id, split_services(job["service_type"]), job["description"] or "", job["other_service_details"] or "")
         tasks = fetch_job_tasks(conn, job_id)
         # Fetch uploaded walkthrough reports for this job (public URLs)
@@ -3291,6 +3736,10 @@ def update_job(job_id):
         can_manage_receipts=can_manage_receipts(),
         employees=employees,
         clients=clients,
+        selected_employee_ids=selected_employee_ids,
+        selected_client_ids=selected_client_ids,
+        assigned_employees=assigned_employees,
+        assigned_clients=assigned_clients,
         tasks=tasks,
         task_statuses=TASK_STATUSES,
         task_tracking_modes=TASK_TRACKING_MODES,
@@ -3519,8 +3968,10 @@ def submit_update():
     files = request.files.getlist("images")
     receipt_files = request.files.getlist("receipts")
     photos_client_visible = is_admin() and parse_checkbox(request.form.get("photos_client_visible"))
-    assigned_to = request.form.get("assigned_to", type=int)
-    client_id = request.form.get("client_id", type=int)
+    employee_ids = parse_user_id_list("employee_ids")
+    client_ids = parse_user_id_list("client_ids")
+    assigned_to = employee_ids[0] if employee_ids else None
+    client_id = client_ids[0] if client_ids else None
     selected_service_types = parse_service_points(request.form.getlist("service_points"))
     service_type = compose_service_text(selected_service_types)
     other_service_details = ""
@@ -3551,6 +4002,9 @@ def submit_update():
 
     if is_employee():
         client_name = job["client_name"] or ""
+        with get_db_connection() as conn:
+            employee_ids = get_job_assignment_ids(conn, job_id, "job_employees")
+            client_ids = get_job_assignment_ids(conn, job_id, "job_clients")
         assigned_to = job["assigned_to"]
         client_id = job["client_id"]
         service_type = job["service_type"] or ""
@@ -3650,14 +4104,24 @@ def submit_update():
             break
     if new_task_entries:
         task_fields_changed = True
+    with get_db_connection() as conn:
+        current_employee_ids = get_job_assignment_ids(conn, job_id, "job_employees")
+        current_client_ids = get_job_assignment_ids(conn, job_id, "job_clients")
+    if job["assigned_to"] and int(job["assigned_to"]) not in current_employee_ids:
+        current_employee_ids.insert(0, int(job["assigned_to"]))
+    if job["client_id"] and int(job["client_id"]) not in current_client_ids:
+        current_client_ids.insert(0, int(job["client_id"]))
+    assignment_fields_changed = (
+        set(employee_ids) != set(current_employee_ids)
+        or set(client_ids) != set(current_client_ids)
+    )
     job_fields_changed = any(
         [
             status != job["status"],
             client_name != (job["client_name"] or ""),
             decision_date != job["decision_date"],
             rejection_reason != (job["rejection_reason"] or ""),
-            assigned_to != job["assigned_to"],
-            client_id != job["client_id"],
+            assignment_fields_changed,
             service_type != (job["service_type"] or ""),
             other_service_details != (job["other_service_details"] or ""),
             due_date != (job["due_date"] or None),
@@ -3743,6 +4207,8 @@ def submit_update():
                     job_id,
                 ),
             )
+            if is_admin():
+                sync_job_assignments(conn, job_id, employee_ids, client_ids)
 
             if saved_photos:
                 for photo in saved_photos:
@@ -5472,4 +5938,3 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", "5000"))
     is_production = os.environ.get("RENDER") == "true" or os.environ.get("FLASK_ENV") == "production"
     app.run(host="0.0.0.0", port=port, debug=not is_production)
-

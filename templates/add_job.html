@@ -71,22 +71,36 @@
             <h2>Team and Access</h2>
             <div class="form-grid two">
                 <div>
-                    <label for="assigned_to">Assign Employee</label>
-                    <select id="assigned_to" name="assigned_to">
-                        <option value="">Unassigned</option>
+                    <label>Assign Employees</label>
+                    <div class="project-checklist">
                         {% for employee in employees %}
-                            <option value="{{ employee.id }}" {% if assigned_to == employee.id %}selected{% endif %}>{{ employee.name }} ({{ employee.email }})</option>
+                            <label class="check-row">
+                                <input type="checkbox" name="employee_ids" value="{{ employee.id }}" {% if employee.id in selected_employee_ids %}checked{% endif %}>
+                                <span>
+                                    <strong>{{ employee.name }}</strong>
+                                    <small>{{ employee.email }}</small>
+                                </span>
+                            </label>
+                        {% else %}
+                            <p class="muted">No employees available.</p>
                         {% endfor %}
-                    </select>
+                    </div>
                 </div>
                 <div>
-                    <label for="client_id">Client Portal User</label>
-                    <select id="client_id" name="client_id">
-                        <option value="">No client access yet</option>
+                    <label>Client Portal Users</label>
+                    <div class="project-checklist">
                         {% for client in clients %}
-                            <option value="{{ client.id }}" {% if client_id == client.id %}selected{% endif %}>{{ client.name }} ({{ client.email }})</option>
+                            <label class="check-row">
+                                <input type="checkbox" name="client_ids" value="{{ client.id }}" {% if client.id in selected_client_ids %}checked{% endif %}>
+                                <span>
+                                    <strong>{{ client.name }}</strong>
+                                    <small>{{ client.email }}</small>
+                                </span>
+                            </label>
+                        {% else %}
+                            <p class="muted">No approved clients available.</p>
                         {% endfor %}
-                    </select>
+                    </div>
                 </div>
             </div>
         </section>

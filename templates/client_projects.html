@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}Assign Projects | KAS{% endblock %}
+
+{% block content %}
+<section class="page-title">
+    <div>
+        <p class="eyebrow">Client Access</p>
+        <h1>Assign Projects</h1>
+        <p>{{ client.name }}{% if client.company %} - {{ client.company }}{% endif %}</p>
+    </div>
+</section>
+
+<form class="form-card" method="post" action="{{ url_for('client_projects', user_id=client.id) }}">
+    <section class="form-section">
+        <h2>{{ client.name }}</h2>
+        <p class="help-text">{{ client.email }}</p>
+
+        <div class="project-checklist">
+            {% for job in jobs %}
+                <label class="check-row">
+                    <input type="checkbox" name="job_ids" value="{{ job.id }}" {% if job.is_assigned %}checked{% endif %}>
+                    <span>
+                        <strong>{{ job.name }}</strong>
+                        <small>{{ job.location }} - {{ job.status }}</small>
+                    </span>
+                </label>
+            {% else %}
+                <p class="muted">No unassigned projects are available.</p>
+            {% endfor %}
+        </div>
+    </section>
+
+    <div class="form-actions">
+        <a class="button" href="{{ url_for('clients') }}">Cancel</a>
+        <button class="button button-primary" type="submit">Save</button>
+    </div>
+</form>
+{% endblock %}

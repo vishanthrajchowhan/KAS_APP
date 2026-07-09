@@ -37,6 +37,45 @@
         </div>
     </section>
 
+    {% if pending_clients %}
+        <section class="updates reveal">
+            <h2>New Client Registrations</h2>
+            <div class="table-card">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Client</th>
+                            <th>Company</th>
+                            <th>Email</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for client in pending_clients %}
+                            <tr>
+                                <td data-label="Client">{{ client.name }}</td>
+                                <td data-label="Company">{{ client.company or 'Company not provided' }}</td>
+                                <td data-label="Email">{{ client.email }}</td>
+                                <td data-label="Status"><span class="status status-pending">Pending</span></td>
+                                <td data-label="Actions">
+                                    <div class="user-action-buttons">
+                                        <form method="post" action="{{ url_for('approve_client', user_id=client.id) }}">
+                                            <button class="button button-primary button-small" type="submit">Approve</button>
+                                        </form>
+                                        <form method="post" action="{{ url_for('reject_client', user_id=client.id) }}" onsubmit="return confirm('Reject {{ client.name|replace("'", "\\'") }}?');">
+                                            <button class="button button-danger button-small" type="submit">Reject</button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    {% endif %}
+
     <section class="person-grid stagger-grid" aria-label="Client cards">
         {% for client in clients %}
             <article id="client-{{ client.id }}" class="person-card client glass-panel reveal">
@@ -46,6 +85,7 @@
                         <p class="eyebrow">Client Account</p>
                         <h3>{{ client.name }}</h3>
                         <div class="client-meta">
+                            <small>{{ client.company or 'Company not on file' }}</small>
                             <small>{{ client.email }}</small>
                             <small>{{ client.phone or 'Phone not on file' }}</small>
                         </div>
@@ -67,6 +107,7 @@
 
                 <div class="card-actions">
                     <a class="button" href="#client-{{ client.id }}">View</a>
+                    <a class="button button-primary" href="{{ url_for('client_projects', user_id=client.id) }}">Assign Projects</a>
                     <a class="button" href="{{ url_for('users') }}">Edit</a>
                     <form method="post" action="{{ url_for('delete_user_permanent', user_id=client.id) }}" onsubmit="return confirm('Permanently delete {{ client.name|replace("'", "\\'") }}? This removes the client from the database and cannot be undone.');">
                         <button type="submit" class="button button-danger">Delete Permanently</button>

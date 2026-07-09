@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block title %}Create Account | KAS{% endblock %}
+
+{% block content %}
+<section class="auth-premium reveal">
+    <div class="auth-premium-left glass-panel">
+        <div class="auth-left-content">
+            <div class="auth-premium-brand">
+                <span class="brand-mark{% if workspace_settings.uploaded_logo_url %} has-logo{% endif %}">
+                    {% if workspace_settings.uploaded_logo_url %}
+                        <img class="brand-logo" src="{{ workspace_settings.uploaded_logo_url }}" alt="{{ workspace_settings.company_name or 'KAS' }} logo" loading="lazy" decoding="async">
+                    {% else %}
+                        KAS
+                    {% endif %}
+                </span>
+                <div class="brand-meta-compact">
+                    <strong>{{ workspace_settings.company_name or 'KAS Waterproofing & Building Services' }}</strong>
+                    <small>{{ workspace_settings.company_city or 'Fort Lauderdale, Florida' }}</small>
+                </div>
+            </div>
+
+            <div class="auth-left-hero">
+                <p class="eyebrow">Client Access</p>
+                <h1>Create Account</h1>
+            </div>
+        </div>
+        <div class="auth-left-footer" aria-hidden="true"></div>
+    </div>
+
+    <form class="form-card auth-card auth-premium-card glass-panel" method="post" action="{{ url_for('register') }}">
+        <h2>Create Account</h2>
+        <p class="help-text">Client accounts require admin approval before projects are visible.</p>
+
+        <div class="form-grid two">
+            <div>
+                <label for="first_name">First Name</label>
+                <input id="first_name" name="first_name" type="text" maxlength="80" value="{{ form.first_name }}" autocomplete="given-name" required>
+            </div>
+            <div>
+                <label for="last_name">Last Name</label>
+                <input id="last_name" name="last_name" type="text" maxlength="80" value="{{ form.last_name }}" autocomplete="family-name" required>
+            </div>
+        </div>
+
+        <label for="company">Company</label>
+        <input id="company" name="company" type="text" maxlength="180" value="{{ form.company }}" autocomplete="organization" required>
+
+        <label for="email">Email</label>
+        <input id="email" name="email" type="email" maxlength="180" value="{{ form.email }}" autocomplete="email" required>
+
+        <label for="phone">Phone Number <span class="muted">(optional)</span></label>
+        <input id="phone" name="phone" type="tel" maxlength="30" value="{{ form.phone }}" autocomplete="tel">
+
+        <label for="password">Password</label>
+        <div class="password-input-wrap">
+            <input id="password" name="password" type="password" minlength="6" autocomplete="new-password" required>
+            <button class="icon-button password-toggle" type="button" aria-label="Show password" aria-pressed="false" data-password-toggle data-password-target="password">
+                <span data-lucide="eye"></span>
+            </button>
+        </div>
+
+        <label for="confirm_password">Confirm Password</label>
+        <div class="password-input-wrap">
+            <input id="confirm_password" name="confirm_password" type="password" minlength="6" autocomplete="new-password" required>
+            <button class="icon-button password-toggle" type="button" aria-label="Show password" aria-pressed="false" data-password-toggle data-password-target="confirm_password">
+                <span data-lucide="eye"></span>
+            </button>
+        </div>
+
+        <button class="button button-primary button-full" type="submit">Create Account</button>
+        <p class="help-text auth-switch">Already have an account? <a href="{{ url_for('login') }}">Sign In</a></p>
+    </form>
+</section>
+{% endblock %}
