@@ -3962,9 +3962,14 @@ def job_progress(job_id):
 @login_required
 def submit_update():
     job_id = request.form.get("job_id", type=int)
+    name = request.form.get("name", "").strip()
     status_input = request.form.get("status", "").strip()
     notes = request.form.get("notes", "").strip()
     client_name = request.form.get("client_name", "").strip()
+    location = request.form.get("location", "").strip()
+    due_date_input = request.form.get("due_date", "").strip()
+    decision_date_input = request.form.get("decision_date", "").strip()
+    rejection_reason_input = request.form.get("rejection_reason", "").strip()
     files = request.files.getlist("images")
     receipt_files = request.files.getlist("receipts")
     photos_client_visible = is_admin() and parse_checkbox(request.form.get("photos_client_visible"))
@@ -3987,17 +3992,24 @@ def submit_update():
         flash("You do not have permission to update that job.", "error")
         return redirect(url_for("index"))
 
-    due_date = job["due_date"] or None
-
-    decision_date = job["decision_date"]
-    rejection_reason = job["rejection_reason"] or ""
-
     if is_admin():
+        if not name:
+            flash("Job name is required.", "error")
+            return redirect(url_for("update_job", job_id=job_id))
+        location = location or "TBD"
+        due_date = due_date_input or None
+        decision_date = decision_date_input or None
+        rejection_reason = rejection_reason_input
         status = status_input
         if status not in STATUSES:
             flash("Please choose a valid status.", "error")
             return redirect(url_for("update_job", job_id=job_id))
     else:
+        name = job["name"] or ""
+        location = job["location"] or ""
+        due_date = job["due_date"] or None
+        decision_date = job["decision_date"]
+        rejection_reason = job["rejection_reason"] or ""
         status = job["status"]
 
     if is_employee():
@@ -4117,8 +4129,10 @@ def submit_update():
     )
     job_fields_changed = any(
         [
+            name != (job["name"] or ""),
             status != job["status"],
             client_name != (job["client_name"] or ""),
+            location != (job["location"] or ""),
             decision_date != job["decision_date"],
             rejection_reason != (job["rejection_reason"] or ""),
             assignment_fields_changed,
@@ -4183,10 +4197,13 @@ def submit_update():
             conn.execute(
                 """
                 UPDATE jobs
-                SET status = ?,
+                SET name = ?,
+                    status = ?,
                     client_name = ?,
+                    location = ?,
                     due_date = ?,
                     service_type = ?,
+                    description = ?,
                     other_service_details = ?,
                     decision_date = ?,
                     rejection_reason = ?,
@@ -4195,10 +4212,13 @@ def submit_update():
                 WHERE id = ?
                 """,
                 (
+                    name,
                     status,
                     client_name,
+                    location,
                     due_date,
                     service_type,
+                    service_type or job["description"] or "No description provided.",
                     other_service_details,
                     decision_date,
                     rejection_reason,
